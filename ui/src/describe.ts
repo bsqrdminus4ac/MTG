@@ -28,8 +28,14 @@ function unreachable(value: never): never {
 const signed = (n: number): string => (n >= 0 ? `+${n}` : `${n}`);
 
 /** A card's name, or "#id" when the object no longer exists (e.g. it changed zones since an event). */
-export const nameOf = (state: GameState, id: ObjectId): string =>
-  getCharacteristics(state, id)?.name ?? `#${id}`;
+export const nameOf = (state: GameState, id: ObjectId, includeId?: boolean): string => {
+  const name = getCharacteristics(state, id)?.name;
+  if (name) {
+    return includeId ? `${name} (#${id})` : name;
+  } else {
+    return `#${id}`;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Card data
@@ -169,7 +175,7 @@ export function describeAction(state: GameState, a: Action): string {
     case "castSpell":
       return `cast ${nameOf(state, a.card)} (#${a.card})`;
     case "activateAbility":
-      return `activate ability ${a.abilityIndex} of ${nameOf(state, a.source)} (#${a.source})`;
+      return `activate ability ${a.abilityIndex+1} of ${nameOf(state, a.source)} (#${a.source})`;
     case "declareAttackers":
       return `declare ${a.attackers.length} attacker(s)`;
     case "declareBlockers":
@@ -221,6 +227,12 @@ export function describeEvent(state: GameState, e: GameEvent): string {
       return `${e.player} life ${signed(e.delta)}`;
     case "gameWon":
       return `${e.winner} wins`;
+    case "permanentTapped":
+      return `${nameOf(state, e.object)} is tapped`;
+    case "permanentUntapped":
+      return `${nameOf(state, e.object)} is untapped`;
+    case "abilityActivated":
+      return `${e.player} activates ability of ${nameOf(state, e.abilitySource, true)}` + (e.stackEntryId ? ` (#${e.stackEntryId})` : "") + (e.targets ? ` targeting ${e.targets.map((t) => describeTarget(state, t)).join(", ")}` : "");
     default:
       return unreachable(e);
   }

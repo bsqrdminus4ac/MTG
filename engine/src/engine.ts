@@ -1,4 +1,5 @@
 import type { Action } from "./actions";
+import type { AbilityOfKind } from "./cards";
 import { getCharacteristics, isPermanentType } from "./characteristics";
 import {
   chooseMany, objectChoice, resolveChooseAnswer, resolvePriorityAnswer, resolveYesNoAnswer,
@@ -69,10 +70,13 @@ export function applyAction(state: GameState, action: Action): ApplyResult {
     case "playLand":
       return playLand(state, action.player, action.card);
     case "castSpell":
+      return fail("Casting spells is not implemented yet");
     case "activateAbility":
+      return activateAbility(state, action.player, action.source, action.abilityIndex);
     case "declareAttackers":
+      return fail("Declaring attackers is not implemented yet");
     case "declareBlockers":
-      return fail(`Action not implemented yet: ${action.type}`);
+      return fail("Declaring blockers is not implemented yet");
     default:
       return assertNever(action);
   }
@@ -155,6 +159,77 @@ function playLand(state: GameState, player: PlayerId, card: ObjectId): ApplyResu
     ...moved.events,
     { type: "landPlayed", player, card: moved.newId },
   ]);
+}
+
+
+function activateAbility(state: GameState, player: PlayerId, source: ObjectId, abilityIndex: number): ApplyResult {
+  const priority = state.priority;
+  if (!priority || priority.holder !== player) return fail("You don't have priority");
+
+  const obj = state.objects[source];
+  if (!obj || obj.controller !== player) return fail("That object isn't under your control");
+  const chars = getCharacteristics(state, source);
+  if (!chars) return fail("That object is gone");
+  const ability = chars.abilities[abilityIndex];
+  if (!ability) return fail("That object doesn't have that ability");
+  if (ability.kind !== "activated") return fail("That ability isn't an activated ability");
+  if (!ability.activateableZones.includes(obj.zone)) return fail("That ability can't be activated from that zone");
+  
+  // If ability targets are required, we need to ask the player to choose them before we can put the ability on the stack.
+  
+  if (ability.targets.length === 0 && ability.cost.mana === null) {
+     if (ability.isManaAbility) {
+      // Mana abilities don't use the stack (CR 605). We just resolve it immediately.
+      const payResult = payAbilityCosts(state, player, source, ability);
+      if (!payResult.ok) return fail(payResult.error);
+      const resolveResult = resolveManaAbility(payResult.state, player, source, ability);
+      if (!resolveResult.ok) return fail(resolveResult.error);
+      const next = {...resolveResult.state, priority: { holder: player, consecutivePasses: 0 } };
+      const event : GameEvent = { type: "abilityActivated", player: player, abilitySource: source };
+      return ok(withPriorityDecision(next), [...payResult.events, ...resolveResult.events, event]);
+     }
+  }
+  
+  return fail("That ability requires targets or mana costs, which are not yet implemented");
+}
+
+function payAbilityCosts(state: GameState, player: PlayerId, source: ObjectId, ability: AbilityOfKind<"activated">): ApplyResult {
+  const obj = state.objects[source];
+  let events: GameEvent[] = [];
+  let currentState = state;
+  if (!obj) return fail("That object is gone");
+  if (ability.cost.mana) {
+    // TODO
+  }
+  if (ability.cost.tap) {
+    if (obj.tapped) return fail("That object is already tapped");
+    const tappedObj = withEntry(state.objects, source, { ...obj, tapped: true });
+    currentState = { ...currentState, objects: tappedObj };
+    events.push({ type: "permanentTapped", object: source });
+  }
+  if (ability.cost.sacrificeSelf) {
+    // TODO
+  }
+  return ok(currentState, events);
+}
+
+function resolveManaAbility(state: GameState, player: PlayerId, source: ObjectId, ability: AbilityOfKind<"activated">): ApplyResult {
+  let events: GameEvent[] = [];
+  let currentState = state;
+  for (const effect of ability.effects) {
+    if (effect.kind === "addMana") {
+      const p = currentState.players[player];
+      if (!p) return fail("Unknown player");
+      const newPool = { ...p.manaPool };
+      newPool[effect.mana] = (newPool[effect.mana] ?? 0) + effect.amount;
+      const newPlayers = withEntry(currentState.players, player, { ...p, manaPool: newPool });
+      currentState = { ...currentState, players: newPlayers };
+      // Maybe add a GameEvent for mana added? Not strictly necessary, but could be useful for UI.
+    } else {
+      return fail("Unimplemented effect kind for mana ability: " + effect.kind);  
+    }
+  }
+  return ok(currentState, events);
 }
 
 function resolveTopOfStack(state: GameState, events: readonly GameEvent[]): ApplyResult {

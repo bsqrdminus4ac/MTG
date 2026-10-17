@@ -11,6 +11,9 @@ const tapForMana = (mana: ManaType): Ability => ({
   isManaAbility: true,
   targets: [],
   effects: [{ kind: "addMana", mana, amount: 1 }],
+  activateableZones: ["battlefield"],
+  timingRestriction: "instantSpeed",
+  description: `Tap: Add ${mana}`,
 });
 
 export const forest: CardDefinition = {

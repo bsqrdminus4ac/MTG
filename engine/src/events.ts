@@ -23,4 +23,8 @@ export type GameEvent =
   | Readonly<{ type: "stackEntryResolved"; id: StackId }>
   | Readonly<{ type: "damageDealt"; source: ObjectId; target: Target; amount: number }>
   | Readonly<{ type: "lifeChanged"; player: PlayerId; delta: number }>
-  | Readonly<{ type: "gameWon"; winner: PlayerId }>;
+  | Readonly<{ type: "gameWon"; winner: PlayerId }>
+  | Readonly<{ type: "permanentTapped"; object: ObjectId }>
+  | Readonly<{ type: "permanentUntapped"; object: ObjectId }>
+  | Readonly<{type:  "abilityActivated"; player: PlayerId; abilitySource: ObjectId; stackEntryId?: StackId; targets?: Target[]}>
+  ;

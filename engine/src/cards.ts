@@ -2,6 +2,7 @@ import type { CardDefId, ObjectId, Timestamp } from "./ids";
 import type { Color, ManaCost, ManaType } from "./mana";
 import type { GameEvent } from "./events";
 import { assertNever } from "./util";
+import type { Zone } from "./state";
 
 export type CardType =
   | "Artifact" | "Battle" | "Creature" | "Enchantment"
@@ -111,14 +112,20 @@ export type Ability =
       isManaAbility: boolean; // mana abilities don't use the stack (CR 605)
       targets: readonly TargetSpec[];
       effects: readonly Effect[];
+      activateableZones: readonly Zone[];
+      timingRestriction: "sorcerySpeed" | "instantSpeed";
+      description?: string; // for UI, not used by the engine
     }>
   | Readonly<{
       kind: "triggered";
       trigger: TriggerCondition;
       targets: readonly TargetSpec[];
       effects: readonly Effect[];
+      triggerableZones: readonly Zone[];
     }>
   | Readonly<{ kind: "static"; effect: ContinuousEffectTemplate }>;
+
+export type AbilityOfKind<K extends Ability["kind"]> = Extract<Ability, { kind: K }>;
 
 // ---------------------------------------------------------------------------
 // Cards
