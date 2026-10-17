@@ -44,6 +44,12 @@ export function App() {
           {problems.length === 0 && <span className="badge ok">state consistent</span>}
         </div>
         <div className="actions">
+          <button type="button" onClick={game.undoAction} title="Undo the last decision." disabled={!game.enableUndo}>
+            Undo
+          </button>
+          <button type="button" onClick={game.redoAction} title="Redo the last undone decision." disabled={!game.enableRedo}>
+            Redo
+          </button>
           <button
             type="button"
             onClick={game.autoPass}

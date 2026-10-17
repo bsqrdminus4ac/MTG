@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { submitAnswer, type Answer, type GameState } from "@mtg/engine";
+import { submitAnswer, type Answer, type GameState, type Submission } from "@mtg/engine";
 import { newDemoGame } from "./demo";
 import { describeAnswer, describeEvent } from "./describe";
 
@@ -9,11 +9,18 @@ export interface LogEntry {
   readonly text: string;
 }
 
+interface History {
+  readonly startingState: GameState;
+  readonly submissions: Submission[];
+}
+
 interface Model {
   readonly state: GameState;
   readonly log: readonly LogEntry[];
   /** The engine's reason for rejecting the last answer, if it did. */
   readonly error: string | null;
+  readonly history: History;
+  readonly undoneDecisions: readonly Submission[];
 }
 
 const MAX_LOG = 300;
@@ -28,10 +35,13 @@ function appendLog(log: readonly LogEntry[], drafts: readonly Draft[]): readonly
 }
 
 function freshModel(): Model {
+  const startingState = newDemoGame();
   return {
-    state: newDemoGame(),
+    state: startingState,
     log: appendLog([], [{ kind: "event", text: "New game: alice vs bob, 7 cards each (decks are not shuffled)" }]),
     error: null,
+    history: { startingState, submissions: [] },
+    undoneDecisions: [],
   };
 }
 
@@ -39,8 +49,8 @@ function freshModel(): Model {
 function step(model: Model, answer: Answer): Model {
   const d = model.state.pending;
   if (d === null) return { ...model, error: "No decision is waiting" };
-
-  const result = submitAnswer(model.state, { player: d.player, decision: d.id, answer });
+  const submission: Submission = { player: d.player, decision: d.id, answer };
+  const result = submitAnswer(model.state, submission);
   if (!result.ok) {
     return { ...model, error: result.error, log: appendLog(model.log, [{ kind: "error", text: result.error }]) };
   }
@@ -51,8 +61,32 @@ function step(model: Model, answer: Answer): Model {
       { kind: "answer", text: `${d.player}: ${describeAnswer(d, answer)}` },
       ...result.events.map((e): Draft => ({ kind: "event", text: describeEvent(result.state, e) })),
     ]),
+    history: { ...model.history, submissions: [...model.history.submissions, submission] },
+    undoneDecisions: [],
   };
 }
+
+function undo(model: Model): Model {
+  const { startingState, submissions } = model.history;
+  if (submissions.length === 0) return model;
+  const newSubmissions = submissions.slice(0, -1);
+  let state = startingState;
+  let log: readonly LogEntry[] = appendLog([], [{ kind: "event", text: "New game: alice vs bob, 7 cards each (decks are not shuffled)" }]);
+  for (const submission of newSubmissions) {
+    const result = submitAnswer(state, submission);
+    if (!result.ok) throw new Error("Failed to replay history: " + result.error);
+    state = result.state;
+    log = appendLog(log, [{ kind: "answer", text: `${submission.player}: ${describeAnswer(state.pending!, submission.answer)}`}, ...result.events.map((e): Draft => ({ kind: "event", text: describeEvent(result.state, e) }))]); 
+  } 
+  return { ...model, state, log, history: { ...model.history, submissions: newSubmissions }, undoneDecisions: [...model.undoneDecisions, submissions[submissions.length - 1]!] };
+}
+
+function redo(model: Model): Model {
+  if (model.undoneDecisions.length === 0) return model;
+  const nextSubmission = model.undoneDecisions[model.undoneDecisions.length - 1]!;
+  return {...step(model, nextSubmission.answer), undoneDecisions: model.undoneDecisions.slice(0, -1)};
+}
+  
 
 /**
  * Keeps passing priority while "pass" is the only legal option, and stops as soon as there is a
@@ -78,5 +112,9 @@ export function useGame() {
   const submit = useCallback((answer: Answer) => setModel((m) => step(m, answer)), []);
   const autoPass = useCallback(() => setModel((m) => runAutoPass(m)), []);
   const reset = useCallback(() => setModel(freshModel()), []);
-  return { ...model, submit, autoPass, reset };
+  const undoAction = useCallback(() => setModel((m) => undo(m)), []);
+  const redoAction = useCallback(() => setModel((m) => redo(m)), []);
+  const enableUndo = model.history.submissions.length > 0;
+  const enableRedo = model.undoneDecisions.length > 0;
+  return { ...model, submit, autoPass, reset, undoAction, redoAction, enableUndo, enableRedo };
 }
