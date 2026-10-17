@@ -1,0 +1,9 @@
+{
+  "name": "mtg",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter ui dev",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck"
+  }
+}

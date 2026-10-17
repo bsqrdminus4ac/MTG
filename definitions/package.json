@@ -1,0 +1,10 @@
+{
+  "name": "@mtg/definitions",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": { "typecheck": "tsc --noEmit" },
+  "dependencies": { "@mtg/engine": "workspace:*" },
+  "devDependencies": { "typescript": "^7.0.2" }
+}
