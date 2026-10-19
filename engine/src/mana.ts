@@ -1,3 +1,7 @@
+import { getCharacteristics } from "./characteristics";
+import type { ObjectId, PlayerId } from "./ids";
+import type { GameState, PlayerState } from "./state";
+
 export const COLORS = ["W", "U", "B", "R", "G"] as const;
 export type Color = (typeof COLORS)[number];
 
@@ -16,3 +20,42 @@ export const emptyPool = (): ManaPool => ({ W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 }
 
 export const manaValue = (cost: ManaCost | null): number =>
   cost === null ? 0 : cost.generic + cost.pips.length;
+
+export const addMana = (player: PlayerState, mana: ManaType, amount: number): PlayerState  => {
+  return { ...player, manaPool: { ...player.manaPool, [mana]: (player.manaPool[mana] ?? 0) + amount } };
+}
+
+export const totalManaPoolCount = (pool: ManaPool): number => Object.values(pool).reduce((a, b) => a + b, 0);
+
+export const canPayMana = (player: PlayerState, cost: ManaCost): boolean => {
+  let generic = cost.generic;
+  const pool = {...player.manaPool};
+
+  for (const pip of cost.pips) {
+    if ((pool[pip] ?? 0) <= 0) return false;
+    pool[pip]--;
+  }
+
+  const totalAvailable = Object.values(pool).reduce((a, b) => a + b, 0);
+  return totalAvailable >= generic;
+}
+
+export const payMana = (player: PlayerState, cost: ManaCost): PlayerState | null => {
+  let generic = cost.generic;
+  const pool = { ...player.manaPool };
+
+  for (const pip of cost.pips) {
+    pool[pip]--;
+    if (pool[pip] < 0) return null; // Not enough mana of this type
+  }
+
+  for (const [color, amount] of Object.entries(pool)) { // For now, we just use the first available mana in WUBRGC order to pay generic costs. This could be improved to allow the player to choose which mana to use.
+    const amountToUse = Math.min(generic, amount);
+    generic -= amountToUse;
+    pool[color as ManaType] = amount - amountToUse;
+    if (generic <= 0) break;
+  }
+  if (generic > 0) return null;
+
+  return { ...player, manaPool: pool };
+}

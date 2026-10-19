@@ -21,7 +21,8 @@ import type { DecisionId, ObjectId, PlayerId } from "./ids";
 export type ChoiceValue =
   | Readonly<{ kind: "object"; id: ObjectId }>
   | Readonly<{ kind: "player"; id: PlayerId }>
-  | Readonly<{ kind: "index"; index: number }>; // e.g. which mode of a modal spell
+  | Readonly<{ kind: "index"; index: number }> // e.g. which mode of a modal spell
+  | Readonly<{ kind: "ability"; id: ObjectId; index: number}>;
 
 export interface Choice {
   /** Unique within its decision. This is what answers quote. */
@@ -53,6 +54,11 @@ export const indexChoice = (index: number, label: string): Choice => ({
   label,
   value: { kind: "index", index },
 });
+export const manaAbilityChoice = (id: ObjectId, abilityIndex: number, label: string): Choice => ({
+  id: `object:${id}#${abilityIndex}`,
+  label,
+  value: {kind: "ability", id, index: abilityIndex}
+});
 
 // ---------------------------------------------------------------------------
 // Decisions
@@ -63,7 +69,7 @@ export const indexChoice = (index: number, label: string): Choice => ({
  * callback so a paused game can be saved, restored, and replayed. Add a variant here, and a
  * case in engine.ts `resume`, for each new kind of question.
  */
-export type Continuation = Readonly<{ kind: "discardToHandSize" }>;
+export type Continuation = Readonly<{ kind: "discardToHandSize" } | { kind: "cancel" } | { kind: "selectTargets" } | { kind: "costPayment" }>;
 
 interface DecisionBase {
   readonly id: DecisionId;
@@ -71,6 +77,8 @@ interface DecisionBase {
   readonly player: PlayerId;
   /** Text to show the player. */
   readonly prompt: string;
+
+  readonly onCancel?: Continuation;
 }
 
 export interface PriorityDecision extends DecisionBase {
@@ -117,7 +125,8 @@ export const chooseOne = (spec: Omit<ChooseDecision, "kind" | "min" | "max">): C
 export type Answer =
   | Readonly<{ kind: "priority"; option: string }>
   | Readonly<{ kind: "yesNo"; value: boolean }>
-  | Readonly<{ kind: "choose"; selected: readonly string[] }>;
+  | Readonly<{ kind: "choose"; selected: readonly string[] }>
+  | Readonly<{ kind: "cancel" }>;
 
 /** The only thing a UI or AI sends to the engine. */
 export interface Submission {
@@ -164,6 +173,7 @@ export function resolveChooseAnswer(d: ChooseDecision, answer: Answer): Result<r
 
 /** Is this answer acceptable for this decision? Handy for UIs that want to disable a Submit button. */
 export function validateAnswer(d: Decision, answer: Answer): Result<null> {
+  if (answer.kind === "cancel") return d.onCancel ? good(null) : bad("This decision cannot be canceled");
   const r =
     d.kind === "priority" ? resolvePriorityAnswer(d, answer)
     : d.kind === "yesNo" ? resolveYesNoAnswer(d, answer)

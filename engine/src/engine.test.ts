@@ -1,7 +1,17 @@
 import { describe, expect, test } from "vitest";
 import {
-  applyAction, cardDefId, createGame, drawCard, getCharacteristics, moveObject, playerId,
-  type CardDefinition, type ContinuousEffect, type GameState, type Timestamp,
+    applyAction,
+    cardDefId,
+    createGame,
+    drawCard,
+    getCharacteristics,
+    moveObject,
+    playerId,
+    submitAnswer,
+    type CardDefinition,
+    type ContinuousEffect,
+    type GameState,
+    type Timestamp,
 } from "./index";
 
 const alice = playerId("alice");
@@ -18,6 +28,32 @@ const bear: CardDefinition = {
   power: 2,
   toughness: 2,
   abilities: [],
+};
+
+const targetSpell: CardDefinition = {
+    ...bear,
+    id: cardDefId("target-spell"),
+    name: "Target Spell",
+    manaCost: { generic: 0, pips: [] },
+    types: ["Instant"],
+    subtypes: [],
+    power: null,
+    toughness: null,
+    abilities: [
+        {
+            kind: "spell",
+            targets: [
+                {
+                    kind: "Player",
+                    allowedTypes: "any",
+                    zone: "battlefield",
+                    minCount: 1,
+                    maxCount: 1,
+                },
+            ],
+            effects: [],
+        },
+    ],
 };
 
 function newGame(): GameState {
@@ -109,3 +145,46 @@ describe("priority and turn structure", () => {
   });
 });
 
+describe("spell targeting", () => {
+    test("replaying a targeting answer from the same state does not duplicate its target", () => {
+        const g = createGame(
+            [bear, targetSpell],
+            [
+                { id: alice, deck: [targetSpell.id] },
+                { id: bob, deck: [bear.id] },
+            ],
+        );
+        const card = g.players[alice]!.library[0]!;
+        const moved = moveObject(g, card, "hand")!;
+        const inHand = moved.state;
+        const cardInHand = moved.newId;
+        const cast = applyAction(inHand, {
+            type: "castSpell",
+            player: alice,
+            card: cardInHand,
+            targets: [],
+        });
+        if (!cast.ok) throw new Error(cast.error);
+        const decision = cast.state.pending;
+        if (!decision || decision.kind !== "choose")
+            throw new Error("Expected a target decision");
+        const submission = {
+            player: alice,
+            decision: decision.id,
+            answer: { kind: "choose" as const, selected: ["player:bob"] },
+        };
+
+        const first = submitAnswer(cast.state, submission);
+        const second = submitAnswer(cast.state, submission);
+
+        if (!first.ok) throw new Error(first.error);
+        if (!second.ok) throw new Error(second.error);
+        expect(cast.state.casting?.targets).toEqual([]);
+        expect(first.state.casting?.targets).toEqual([
+            { kind: "player", id: bob },
+        ]);
+        expect(second.state.casting?.targets).toEqual([
+            { kind: "player", id: bob },
+        ]);
+    });
+});

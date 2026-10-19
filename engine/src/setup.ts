@@ -72,5 +72,6 @@ export function createGame(
     pending: null,
     nextId: counter,
     winner: null,
+    casting: null,
   };  return withPriorityDecision(state);
 }

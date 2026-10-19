@@ -1,5 +1,11 @@
 import type { Action } from "./actions";
 import type { AbilityOfKind } from "./cards";
+import {
+    applyTargetSelections,
+    beginCast,
+    cancelCast,
+    payManaOptions,
+} from "./casting";
 import { getCharacteristics, isPermanentType } from "./characteristics";
 import {
   chooseMany, objectChoice, resolveChooseAnswer, resolvePriorityAnswer, resolveYesNoAnswer,
@@ -7,11 +13,18 @@ import {
 } from "./decisions";
 import type { GameEvent } from "./events";
 import type { ObjectId, PlayerId } from "./ids";
-import { emptyPool } from "./mana";
+import { addMana, emptyPool } from "./mana";
 import { canPlayLand, openDecision, withPriorityDecision } from "./prompts";
-import { STEPS, stepGrantsPriority, type GameState, type Step, type Zone } from "./state";
+import {
+    STEPS,
+    stepGrantsPriority,
+    type GameState,
+    type Step,
+    type Target,
+    type Zone,
+} from "./state";
 import { assertNever, withEntry } from "./util";
-import { drawCard, moveObject } from "./zones";
+import { commitSpell, drawCard, moveObject } from "./zones";
 
 export const MAX_HAND_SIZE = 7;
 
@@ -19,8 +32,11 @@ export type ApplyResult =
   | Readonly<{ ok: true; state: GameState; events: readonly GameEvent[] }>
   | Readonly<{ ok: false; error: string }>;
 
-const ok = (state: GameState, events: readonly GameEvent[]): ApplyResult => ({ ok: true, state, events });
-const fail = (error: string): ApplyResult => ({ ok: false, error });
+export const ok = (
+    state: GameState,
+    events: readonly GameEvent[],
+): ApplyResult => ({ ok: true, state, events });
+export const fail = (error: string): ApplyResult => ({ ok: false, error });
 
 // ---------------------------------------------------------------------------
 // Entry points
@@ -37,6 +53,13 @@ export function submitAnswer(state: GameState, submission: Submission): ApplyRes
   if (!d) return fail("No decision is waiting");
   if (d.id !== submission.decision) return fail("That decision is no longer current");
   if (d.player !== submission.player) return fail("It isn't your decision");
+
+  if (submission.answer.kind === "cancel") {
+      if (!d.onCancel) {
+          return fail("This decision cannot be canceled");
+      }
+      return resume(state, d.onCancel, { kind: "cancel" });
+  }
 
   switch (d.kind) {
     case "priority": {
@@ -65,20 +88,27 @@ export function applyAction(state: GameState, action: Action): ApplyResult {
   if (state.pending && state.pending.kind !== "priority") return fail("A decision must be answered first");
 
   switch (action.type) {
-    case "passPriority":
-      return passPriority(state, action.player);
-    case "playLand":
-      return playLand(state, action.player, action.card);
-    case "castSpell":
-      return fail("Casting spells is not implemented yet");
-    case "activateAbility":
-      return activateAbility(state, action.player, action.source, action.abilityIndex);
-    case "declareAttackers":
-      return fail("Declaring attackers is not implemented yet");
-    case "declareBlockers":
-      return fail("Declaring blockers is not implemented yet");
-    default:
-      return assertNever(action);
+      case "passPriority":
+          return passPriority(state, action.player);
+      case "playLand":
+          return playLand(state, action.player, action.card);
+      case "castSpell":
+          return beginCast(state, action.player, action.card);
+      case "activateAbility":
+          return activateAbilityForPriority(
+              state,
+              action.player,
+              action.source,
+              action.abilityIndex,
+          );
+      case "declareAttackers":
+          return fail("Declaring attackers is not implemented yet");
+      case "declareBlockers":
+          return fail("Declaring blockers is not implemented yet");
+      case "cancelSpellCast":
+          return fail("Canceling spell casts is not implemented yet");
+      default:
+          return assertNever(action);
   }
 }
 
@@ -87,17 +117,32 @@ export function applyAction(state: GameState, action: Action): ApplyResult {
 // ---------------------------------------------------------------------------
 
 type Resolved =
-  | Readonly<{ kind: "yesNo"; value: boolean }>
-  | Readonly<{ kind: "choose"; chosen: readonly Choice[] }>;
+    | Readonly<{ kind: "yesNo"; value: boolean }>
+    | Readonly<{ kind: "choose"; chosen: readonly Choice[] }>
+    | Readonly<{ kind: "cancel" }>;
 
 function resume(state: GameState, then: Continuation, answer: Resolved): ApplyResult {
   switch (then.kind) {
-    case "discardToHandSize": {
-      if (answer.kind !== "choose") return fail("Expected a selection");
-      return finishDiscard(state, answer.chosen);
-    }
-    default:
-      return assertNever(then.kind); // narrows to never once every continuation kind has a case
+      case "discardToHandSize": {
+          if (answer.kind !== "choose") return fail("Expected a selection");
+          return finishDiscard(state, answer.chosen);
+      }
+      case "cancel":
+      case "selectTargets": {
+          if (answer.kind !== "choose") return fail("Expected a selection");
+          return applyTargetingDecision(state, answer.chosen);
+      }
+      case "costPayment": {
+          if (answer.kind === "choose") {
+              return applyAddManaDecision(state, answer.chosen);
+          } else if (answer.kind === "yesNo") {
+              return applyCommitSpellDecision(state, answer.value);
+          } else {
+              return fail("Expected a selection or yes/no");
+          }
+      }
+      default:
+          return assertNever(then); // narrows to never once every continuation kind has a case
   }
 }
 
@@ -159,77 +204,6 @@ function playLand(state: GameState, player: PlayerId, card: ObjectId): ApplyResu
     ...moved.events,
     { type: "landPlayed", player, card: moved.newId },
   ]);
-}
-
-
-function activateAbility(state: GameState, player: PlayerId, source: ObjectId, abilityIndex: number): ApplyResult {
-  const priority = state.priority;
-  if (!priority || priority.holder !== player) return fail("You don't have priority");
-
-  const obj = state.objects[source];
-  if (!obj || obj.controller !== player) return fail("That object isn't under your control");
-  const chars = getCharacteristics(state, source);
-  if (!chars) return fail("That object is gone");
-  const ability = chars.abilities[abilityIndex];
-  if (!ability) return fail("That object doesn't have that ability");
-  if (ability.kind !== "activated") return fail("That ability isn't an activated ability");
-  if (!ability.activateableZones.includes(obj.zone)) return fail("That ability can't be activated from that zone");
-  
-  // If ability targets are required, we need to ask the player to choose them before we can put the ability on the stack.
-  
-  if (ability.targets.length === 0 && ability.cost.mana === null) {
-     if (ability.isManaAbility) {
-      // Mana abilities don't use the stack (CR 605). We just resolve it immediately.
-      const payResult = payAbilityCosts(state, player, source, ability);
-      if (!payResult.ok) return fail(payResult.error);
-      const resolveResult = resolveManaAbility(payResult.state, player, source, ability);
-      if (!resolveResult.ok) return fail(resolveResult.error);
-      const next = {...resolveResult.state, priority: { holder: player, consecutivePasses: 0 } };
-      const event : GameEvent = { type: "abilityActivated", player: player, abilitySource: source };
-      return ok(withPriorityDecision(next), [...payResult.events, ...resolveResult.events, event]);
-     }
-  }
-  
-  return fail("That ability requires targets or mana costs, which are not yet implemented");
-}
-
-function payAbilityCosts(state: GameState, player: PlayerId, source: ObjectId, ability: AbilityOfKind<"activated">): ApplyResult {
-  const obj = state.objects[source];
-  let events: GameEvent[] = [];
-  let currentState = state;
-  if (!obj) return fail("That object is gone");
-  if (ability.cost.mana) {
-    // TODO
-  }
-  if (ability.cost.tap) {
-    if (obj.tapped) return fail("That object is already tapped");
-    const tappedObj = withEntry(state.objects, source, { ...obj, tapped: true });
-    currentState = { ...currentState, objects: tappedObj };
-    events.push({ type: "permanentTapped", object: source });
-  }
-  if (ability.cost.sacrificeSelf) {
-    // TODO
-  }
-  return ok(currentState, events);
-}
-
-function resolveManaAbility(state: GameState, player: PlayerId, source: ObjectId, ability: AbilityOfKind<"activated">): ApplyResult {
-  let events: GameEvent[] = [];
-  let currentState = state;
-  for (const effect of ability.effects) {
-    if (effect.kind === "addMana") {
-      const p = currentState.players[player];
-      if (!p) return fail("Unknown player");
-      const newPool = { ...p.manaPool };
-      newPool[effect.mana] = (newPool[effect.mana] ?? 0) + effect.amount;
-      const newPlayers = withEntry(currentState.players, player, { ...p, manaPool: newPool });
-      currentState = { ...currentState, players: newPlayers };
-      // Maybe add a GameEvent for mana added? Not strictly necessary, but could be useful for UI.
-    } else {
-      return fail("Unimplemented effect kind for mana ability: " + effect.kind);  
-    }
-  }
-  return ok(currentState, events);
 }
 
 function resolveTopOfStack(state: GameState, events: readonly GameEvent[]): ApplyResult {
@@ -368,5 +342,127 @@ function onEnterStep(state: GameState, step: Step, newTurn: boolean, out: GameEv
     }
     default:
       return next;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Ability Activation
+// ---------------------------------------------------------------------------
+
+function activateAbility(state: GameState, player: PlayerId, source: ObjectId, abilityIndex: number): ApplyResult {
+  const priority = state.priority;
+  if (!priority || priority.holder !== player) return fail("You don't have priority");
+
+  const obj = state.objects[source];
+  if (!obj || obj.controller !== player) return fail("That object isn't under your control");
+  const chars = getCharacteristics(state, source);
+  if (!chars) return fail("That object is gone");
+  const ability = chars.abilities[abilityIndex];
+  if (!ability) return fail("That object doesn't have that ability");
+  if (ability.kind !== "activated") return fail("That ability isn't an activated ability");
+  if (!ability.activateableZones.includes(obj.zone)) return fail("That ability can't be activated from that zone");
+  
+  // If ability targets are required, we need to ask the player to choose them before we can put the ability on the stack.
+  
+  if ((!ability.targets || ability.targets.length === 0) && ability.cost.mana === null) {
+     if (ability.isManaAbility) {
+      // Mana abilities don't use the stack (CR 605). We just resolve it immediately.
+      const payResult = payAbilityCosts(state, player, source, ability);
+      if (!payResult.ok) return fail(payResult.error);
+      const resolveResult = resolveManaAbility(payResult.state, player, source, ability);
+      if (!resolveResult.ok) return fail(resolveResult.error);
+      const next = {...resolveResult.state, priority: { holder: player, consecutivePasses: 0 } };
+      const event : GameEvent = { type: "abilityActivated", player: player, abilitySource: source };
+      return ok(next, [...payResult.events, ...resolveResult.events, event]);
+     }
+  }
+  
+  return fail("That ability requires targets or mana costs, which are not yet implemented");
+}
+
+function activateAbilityForPriority(state: GameState, player: PlayerId, source: ObjectId, abilityIndex: number): ApplyResult {
+  const next = activateAbility(state, player, source, abilityIndex);
+  if (!next.ok) return next;
+  return ok(withPriorityDecision(next.state), next.events);
+}
+
+function payAbilityCosts(state: GameState, player: PlayerId, source: ObjectId, ability: AbilityOfKind<"activated">): ApplyResult {
+  const obj = state.objects[source];
+  let events: GameEvent[] = [];
+  let currentState = state;
+  if (!obj) return fail("That object is gone");
+  if (ability.cost.mana) {
+    // TODO
+  }
+  if (ability.cost.tap) {
+    if (obj.tapped) return fail("That object is already tapped");
+    const tappedObj = withEntry(state.objects, source, { ...obj, tapped: true });
+    currentState = { ...currentState, objects: tappedObj };
+    events.push({ type: "permanentTapped", object: source });
+  }
+  if (ability.cost.sacrificeSelf) {
+    // TODO
+  }
+  return ok(currentState, events);
+}
+
+function resolveManaAbility(state: GameState, player: PlayerId, source: ObjectId, ability: AbilityOfKind<"activated">): ApplyResult {
+  let events: GameEvent[] = [];
+  let currentState = state;
+  for (const effect of ability.effects) {
+    if (effect.kind === "addMana") {
+      const p = currentState.players[player];
+      if (!p) return fail("Unknown player");
+      currentState = { ...currentState, players: withEntry(currentState.players, player, addMana(p, effect.mana, effect.amount)) };      
+      // Maybe add a GameEvent for mana added? Not strictly necessary, but could be useful for UI.
+    } else {
+      return fail("Unimplemented effect kind for mana ability: " + effect.kind);  
+    }
+  }
+  return ok(currentState, events);
+}
+
+// ---------------------------------------------------------------------------
+// Spell/Ability Targeting
+// ---------------------------------------------------------------------------
+function applyTargetingDecision(state: GameState, answer: readonly Choice[]): ApplyResult {
+  if (!state.casting) return fail("No spell is currently being cast");
+  // Maybe validate against legal targets again? Skipping for now.
+  const targetsToAdd: Target[] = [];
+  for (const choice of answer) {
+    if (choice.value.kind !== "player" && choice.value.kind !== "object") return fail("Invalid choice type for spell targeting");
+    else if (choice.value.kind === "player") {
+      targetsToAdd.push({kind: "player", id: choice.value.id});
+    } else {
+      targetsToAdd.push({kind: "object", id: choice.value.id});
+    }
+  }
+  return applyTargetSelections(state, targetsToAdd);
+}
+
+function applyAddManaDecision(state: GameState, answer: readonly Choice[]): ApplyResult {
+  if (!state.casting) return fail("No spell is currently being cast");
+  if (answer.length !== 1) return fail("Can only select one mana ability to use at a time");
+  const choice = answer[0]!;
+  if (choice.value.kind !== "ability") return fail("Adding mana while casting has to be via an ability");
+  const activatedResult = activateAbility(state, state.casting.player, choice.value.id, choice.value.index);
+  if (!activatedResult.ok) return activatedResult;
+  const casting = activatedResult.state.casting;
+  if (!casting) return fail("No spell is currently being cast");
+  const nextState: GameState = {
+    ...activatedResult.state,
+    casting: {
+      ...casting,
+      events: [...casting.events, ...activatedResult.events],
+    },
+  };
+  return payManaOptions(nextState);
+}
+
+function applyCommitSpellDecision(state: GameState, answer: boolean): ApplyResult {
+  if (answer) {
+    return commitSpell(state);
+  } else {
+    return cancelCast(state);
   }
 }

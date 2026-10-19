@@ -1,4 +1,5 @@
 import type { CardDefinition, ContinuousEffect, Effect } from "./cards";
+import type { CastingInProgress } from "./casting";
 import type { Decision } from "./decisions";
 import type { CardDefId, ObjectId, PlayerId, StackId, Timestamp } from "./ids";
 import type { ManaPool } from "./mana";
@@ -58,7 +59,8 @@ export interface PlayerState {
 
 export type Target =
   | Readonly<{ kind: "object"; id: ObjectId }>
-  | Readonly<{ kind: "player"; id: PlayerId }>;
+  | Readonly<{ kind: "player"; id: PlayerId }>
+  | Readonly<{ kind: "stackEntry"; id: StackId}>;
 
 interface StackEntryBase {
   readonly id: StackId;
@@ -108,4 +110,6 @@ export interface GameState {
   /** Single counter used to issue ObjectIds, StackIds and Timestamps, so everything is deterministic. */
   readonly nextId: number;
   readonly winner: PlayerId | null;
+
+  casting: CastingInProgress | null;
 }

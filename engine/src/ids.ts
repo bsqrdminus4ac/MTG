@@ -1,3 +1,5 @@
+import type { GameState } from "./state";
+
 declare const brand: unique symbol;
 
 /** Nominal typing for primitives, so a PlayerId can't be passed where an ObjectId is expected. */
@@ -15,3 +17,7 @@ export type Timestamp = Brand<number, "Timestamp">;
 
 export const playerId = (s: string): PlayerId => s as PlayerId;
 export const cardDefId = (s: string): CardDefId => s as CardDefId;
+
+export function nextID<Id extends number>(state: GameState): [GameState, Id] {
+  return [{ ...state, nextId: state.nextId + 1 }, state.nextId as Id];
+}

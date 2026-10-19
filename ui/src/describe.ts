@@ -123,9 +123,15 @@ export function describeCost(c: Cost): string {
   return parts.length > 0 ? parts.join(", ") : "no cost";
 }
 
-const describeTargetSpecs = (specs: readonly TargetSpec[]): string =>
-  specs.length > 0 ? ` targeting ${specs.map((s) => s.kind).join(", ")}` : "";
-
+const describeTargetSpecs = (specs?: TargetSpec[]): string => {
+  if (!specs || specs.length === 0) { return "";}
+  return ` targeting ${specs.map((s) => { 
+    const count = s.minCount === s.maxCount ? s.maxCount : `${s.minCount} - ${s.maxCount}`
+    const isPlural = s.minCount !== 1 || s.maxCount !== 1;
+    const kindString = s.kind === "AnyTarget" ? "of any target" : s.kind;
+    return `${count} ${kindString}` + (isPlural ? "s" : "")
+  }).join(", ")}`;
+}
 const describeEffects = (effects: readonly Effect[]): string => effects.map(describeEffect).join("; ");
 
 export function describeAbility(a: Ability): string {
@@ -161,6 +167,8 @@ export function describeChoiceValue(state: GameState, v: ChoiceValue): string {
       return `player ${v.id}`;
     case "index":
       return `option ${v.index}`;
+    case "ability":
+      return  `activate ability ${v.index+1} of ${nameOf(state, v.id)} (#${v.id})`;
     default:
       return unreachable(v);
   }
@@ -180,6 +188,8 @@ export function describeAction(state: GameState, a: Action): string {
       return `declare ${a.attackers.length} attacker(s)`;
     case "declareBlockers":
       return `declare ${a.blocks.length} blocker(s)`;
+    case "cancelSpellCast":
+      return `cancel casting of ${nameOf(state, a.card)} (#${a.card})`;
     default:
       return unreachable(a);
   }
@@ -197,6 +207,8 @@ export function describeAnswer(d: Decision, a: Answer): string {
         d.kind === "choose" ? a.selected.map((id) => d.options.find((o) => o.id === id)?.label ?? id) : [...a.selected];
       return labels.length > 0 ? labels.join(", ") : "(nothing)";
     }
+    case "cancel":
+      return "(canceled)";
     default:
       return unreachable(a);
   }
@@ -217,8 +229,16 @@ export function describeEvent(state: GameState, e: GameEvent): string {
       return `${e.player} draws ${nameOf(state, e.card)}`;
     case "landPlayed":
       return `${e.player} plays ${nameOf(state, e.card)}`;
-    case "spellCast":
+    case "spellCastSuccess":
       return `${e.player} casts ${nameOf(state, e.card)}`;
+    case "spellCastStart":
+      return `${e.player} starts casting ${nameOf(state, e.card)}`;
+    case "spellTargetsSelected":
+      return `${e.player} selects targets for ${nameOf(state, e.card)}`; // Include target details later
+    case "spellManaPaid":
+      return `${e.player} pays mana for ${nameOf(state, e.card)}`;
+    case "spellCastCancelled":
+      return `${e.player} cancels casting of ${nameOf(state, e.card)}`;
     case "stackEntryResolved":
       return `Stack entry #${e.id} resolves`;
     case "damageDealt":

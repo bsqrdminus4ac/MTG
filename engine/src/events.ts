@@ -19,7 +19,13 @@ export type GameEvent =
     }>
   | Readonly<{ type: "cardDrawn"; player: PlayerId; card: ObjectId }>
   | Readonly<{ type: "landPlayed"; player: PlayerId; card: ObjectId }>
-  | Readonly<{ type: "spellCast"; player: PlayerId; card: ObjectId }>
+
+  | Readonly<{ type: "spellCastSuccess"; player: PlayerId; card: ObjectId, targets: readonly Target[] }>
+  | Readonly<{ type: "spellCastStart"; player: PlayerId; card: ObjectId }>
+  | Readonly<{ type: "spellTargetsSelected"; player: PlayerId; card: ObjectId }>
+  | Readonly<{ type: "spellManaPaid"; player: PlayerId; card: ObjectId }>
+  | Readonly<{ type: "spellCastCancelled"; player: PlayerId; card: ObjectId }>
+
   | Readonly<{ type: "stackEntryResolved"; id: StackId }>
   | Readonly<{ type: "damageDealt"; source: ObjectId; target: Target; amount: number }>
   | Readonly<{ type: "lifeChanged"; player: PlayerId; delta: number }>

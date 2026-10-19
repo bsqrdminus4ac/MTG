@@ -27,7 +27,7 @@ describe("text describers", () => {
     expect(describeAbility({ kind: "keyword", keyword: "flying" })).toBe("Keyword: flying");
     expect(describeAbility(definition("forest").abilities[0]!)).toBe("Mana ability: {T} → add 1× {G}");
     expect(describeAbility(definition("bolt").abilities[0]!)).toBe(
-      "Spell targeting creatureOrPlayer: deal 3 damage to target 1",
+      "Spell targeting 1 of any target: deal 3 damage to target 1",
     );
   });
 });

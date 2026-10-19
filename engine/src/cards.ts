@@ -7,6 +7,7 @@ import type { Zone } from "./state";
 export type CardType =
   | "Artifact" | "Battle" | "Creature" | "Enchantment"
   | "Instant" | "Land" | "Planeswalker" | "Sorcery";
+export type PermanentType = Exclude<CardType, "Instant" | "Sorcery">;
 export type Supertype = "Basic" | "Legendary" | "Snow";
 export type Keyword =
   | "flying" | "firstStrike" | "doubleStrike" | "deathtouch" | "haste" | "lifelink"
@@ -19,9 +20,15 @@ export type Keyword =
 /** Relative to the controller of the spell/ability. */
 export type PlayerRef = "controller" | "opponent" | "eachPlayer";
 
-export type TargetSpec = Readonly<{
-  kind: "creature" | "player" | "creatureOrPlayer" | "permanent";
-}>;
+export type TargetKinds =
+ | Readonly<{kind: "Permanent", allowedTypes: PermanentType[] | "any", zone: "battlefield"}>
+ | Readonly<{kind: "Player", allowedTypes: "opponent" | "any", zone: "battlefield"}>
+ | Readonly<{kind: "GraveyardCard", zone: "graveyard"}>
+ | Readonly<{kind: "StackAbility", zone: "stack"}>
+ | Readonly<{kind: "AnyTarget", zone: "battlefield"}> // Shorthand for player / creature / planeswalker / battle
+ ;
+
+export type TargetSpec = TargetKinds & {minCount: number; maxCount: number};
 
 export type EffectTarget =
   | Readonly<{ kind: "target"; index: number }> // index into the chosen targets
@@ -105,12 +112,12 @@ export type TriggerCondition = Readonly<{
 export type Ability =
   | Readonly<{ kind: "keyword"; keyword: Keyword }>
   /** The text of an instant or sorcery. */
-  | Readonly<{ kind: "spell"; targets: readonly TargetSpec[]; effects: readonly Effect[] }>
+  | Readonly<{ kind: "spell"; targets: TargetSpec[]; effects: readonly Effect[] }>
   | Readonly<{
       kind: "activated";
       cost: Cost;
       isManaAbility: boolean; // mana abilities don't use the stack (CR 605)
-      targets: readonly TargetSpec[];
+      targets: TargetSpec[];
       effects: readonly Effect[];
       activateableZones: readonly Zone[];
       timingRestriction: "sorcerySpeed" | "instantSpeed";
@@ -119,7 +126,7 @@ export type Ability =
   | Readonly<{
       kind: "triggered";
       trigger: TriggerCondition;
-      targets: readonly TargetSpec[];
+      targets: TargetSpec[];
       effects: readonly Effect[];
       triggerableZones: readonly Zone[];
     }>
