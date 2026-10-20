@@ -1,11 +1,6 @@
 import type { Action } from "./actions";
 import type { AbilityOfKind } from "./cards";
-import {
-    applyTargetSelections,
-    beginCast,
-    cancelCast,
-    payManaOptions,
-} from "./casting";
+import { applyTargetSelections, beginCast, cancelCast, payManaOptions, resolveSpell } from "./casting";
 import { getCharacteristics, isPermanentType } from "./characteristics";
 import {
   chooseMany, objectChoice, resolveChooseAnswer, resolvePriorityAnswer, resolveYesNoAnswer,
@@ -220,13 +215,18 @@ function resolveTopOfStack(state: GameState, events: readonly GameEvent[]): Appl
   const out: GameEvent[] = [...events, { type: "stackEntryResolved", id: entry.id }];
 
   if (entry.kind === "spell") {
-    const chars = getCharacteristics(next, entry.source);
-    const dest: Zone = chars?.types.some(isPermanentType) ? "battlefield" : "graveyard";
-    const moved = moveObject(next, entry.source, dest);
-    if (moved) {
-      next = moved.state;
-      out.push(...moved.events);
-    }
+      const result = resolveSpell(next, entry);
+      if (!result.ok) return result;
+      next = result.state;
+      out.push(...result.events);
+
+      const chars = getCharacteristics(next, entry.source);
+      const dest: Zone = chars?.types.some(isPermanentType) ? "battlefield" : "graveyard";
+      const moved = moveObject(next, entry.source, dest);
+      if (moved) {
+          next = moved.state;
+          out.push(...moved.events);
+      }
   }
   // TODO: interpret the effects (spell abilities / entry.effects), then check state-based actions.
 

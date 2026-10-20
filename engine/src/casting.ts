@@ -1,12 +1,13 @@
-import type { CardType, TargetSpec } from "./cards";
-import { getCharacteristics } from "./characteristics";
+import type { CardType, Effect, TargetSpec } from "./cards";
+import { getCharacteristics, isPermanentType } from "./characteristics";
 import { chooseMany, chooseOne, manaAbilityChoice, objectChoice, playerChoice, yesNo, type Choice } from "./decisions";
+import { damagePlayer } from "./effects";
 import { fail, ok, type ApplyResult } from "./engine";
 import type { GameEvent } from "./events";
 import type { PlayerId, ObjectId } from "./ids";
 import { canPayMana, type ManaCost } from "./mana";
 import { getAllManaSources, openDecision } from "./prompts";
-import type { Target, GameState } from "./state";
+import type { Target, GameState, SpellOnStack } from "./state";
 import { commitSpell, moveObject } from "./zones";
 
 export interface CastingInProgress {
@@ -227,4 +228,58 @@ export function payManaOptions(state: GameState): ApplyResult {
         }),
     );
     return ok(decisionState, []);
+}
+
+export function resolveSpell(state: GameState, spell: SpellOnStack): ApplyResult {
+    const spellInfo = getCharacteristics(state, spell.source);
+    if (!spellInfo) return fail("This spell's card no longer exists");
+    let currentState = state;
+    let events: GameEvent[] = [];
+    const isPermanentSpell = spellInfo.types.some((t) => isPermanentType(t));
+    if (isPermanentSpell) {
+        return fail("Permanent spell resolution not implemented yet");
+    } else {
+        for (const ability of spellInfo.abilities) {
+            if (ability.kind !== "spell") continue;
+            for (const effect of ability.effects) {
+                const result = resolveEffect(state, spell.source, effect, spell.targets);
+                if (!result.ok) return result;
+                currentState = result.state;
+                events.push(...result.events);
+            }
+        }
+        return ok(currentState, events);
+    }
+}
+
+function resolveEffect(state: GameState, source: ObjectId, effect: Effect, targets: readonly Target[]): ApplyResult {
+    let currentState = state;
+    let events: GameEvent[] = [];
+    switch (effect.kind) {
+        case "damage": {
+            if (effect.to.kind === "player") {
+                for (const targetPlayer of targets.filter((t) => t.kind === "player")) {
+                    const result = damagePlayer(currentState, targetPlayer.id, source, effect.amount);
+                    if (!result.ok) return result;
+                    currentState = result.state;
+                    events.push(...result.events);
+                }
+                return ok(currentState, events);
+            } else if (effect.to.kind === "target") {
+                const target = targets[effect.to.index];
+                if (!target) {
+                    return fail(`Invalid target index (${effect.to.index}) to damage`);
+                }
+                if (target.kind === "player") {
+                    return damagePlayer(currentState, target.id, source, effect.amount);
+                } else {
+                    return fail("Damaging non-players is not implemented yet");
+                }
+            } else {
+                return fail("Damaging non-players is not implemented yet");
+            }
+        }
+        default:
+            return fail(`Resolving effects of kind ${effect.kind} is not implemented yet`);
+    }
 }
