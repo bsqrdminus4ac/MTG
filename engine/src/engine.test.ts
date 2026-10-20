@@ -146,6 +146,42 @@ describe("priority and turn structure", () => {
 });
 
 describe("spell targeting", () => {
+    test("canceling a targeting decision rolls back the spell cast", () => {
+        const g = createGame(
+            [bear, targetSpell],
+            [
+                { id: alice, deck: [targetSpell.id] },
+                { id: bob, deck: [bear.id] },
+            ],
+        );
+        const card = g.players[alice]!.library[0]!;
+        const moved = moveObject(g, card, "hand")!;
+        const cast = applyAction(moved.state, {
+            type: "castSpell",
+            player: alice,
+            card: moved.newId,
+            targets: [],
+        });
+        if (!cast.ok) throw new Error(cast.error);
+        const decision = cast.state.pending;
+        if (!decision) throw new Error("Expected a target decision");
+
+        const canceled = submitAnswer(cast.state, {
+            player: alice,
+            decision: decision.id,
+            answer: { kind: "cancel" },
+        });
+
+        if (!canceled.ok) throw new Error(canceled.error);
+        expect(canceled.state.casting).toBeNull();
+        expect(canceled.state.players[alice]?.hand).toContain(moved.newId);
+        expect(canceled.events).toContainEqual({
+            type: "spellCastCancelled",
+            player: alice,
+            card: moved.newId,
+        });
+    });
+
     test("replaying a targeting answer from the same state does not duplicate its target", () => {
         const g = createGame(
             [bear, targetSpell],

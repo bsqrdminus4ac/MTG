@@ -127,7 +127,13 @@ function resume(state: GameState, then: Continuation, answer: Resolved): ApplyRe
           if (answer.kind !== "choose") return fail("Expected a selection");
           return finishDiscard(state, answer.chosen);
       }
-      case "cancel":
+      case "cancel": {
+          if (answer.kind !== "cancel") return fail("Expected a cancel answer");
+          if (state.casting) {
+              return cancelCast(state);
+          }
+          return fail("Cancelling non-casting decisions is not yet supported");
+      }
       case "selectTargets": {
           if (answer.kind !== "choose") return fail("Expected a selection");
           return applyTargetingDecision(state, answer.chosen);
@@ -349,35 +355,42 @@ function onEnterStep(state: GameState, step: Step, newTurn: boolean, out: GameEv
 // Ability Activation
 // ---------------------------------------------------------------------------
 
-function activateAbility(state: GameState, player: PlayerId, source: ObjectId, abilityIndex: number): ApplyResult {
-  const priority = state.priority;
-  if (!priority || priority.holder !== player) return fail("You don't have priority");
+export function activateAbility(state: GameState, player: PlayerId, source: ObjectId, abilityIndex: number): ApplyResult {
+    const priority = state.priority;
+    if (!priority || priority.holder !== player) return fail("You don't have priority");
 
-  const obj = state.objects[source];
-  if (!obj || obj.controller !== player) return fail("That object isn't under your control");
-  const chars = getCharacteristics(state, source);
-  if (!chars) return fail("That object is gone");
-  const ability = chars.abilities[abilityIndex];
-  if (!ability) return fail("That object doesn't have that ability");
-  if (ability.kind !== "activated") return fail("That ability isn't an activated ability");
-  if (!ability.activateableZones.includes(obj.zone)) return fail("That ability can't be activated from that zone");
-  
-  // If ability targets are required, we need to ask the player to choose them before we can put the ability on the stack.
-  
-  if ((!ability.targets || ability.targets.length === 0) && ability.cost.mana === null) {
-     if (ability.isManaAbility) {
-      // Mana abilities don't use the stack (CR 605). We just resolve it immediately.
-      const payResult = payAbilityCosts(state, player, source, ability);
-      if (!payResult.ok) return fail(payResult.error);
-      const resolveResult = resolveManaAbility(payResult.state, player, source, ability);
-      if (!resolveResult.ok) return fail(resolveResult.error);
-      const next = {...resolveResult.state, priority: { holder: player, consecutivePasses: 0 } };
-      const event : GameEvent = { type: "abilityActivated", player: player, abilitySource: source };
-      return ok(next, [...payResult.events, ...resolveResult.events, event]);
-     }
-  }
-  
-  return fail("That ability requires targets or mana costs, which are not yet implemented");
+    const obj = state.objects[source];
+    if (!obj || obj.controller !== player) return fail("That object isn't under your control");
+    const chars = getCharacteristics(state, source);
+    if (!chars) return fail("That object is gone");
+    const ability = chars.abilities[abilityIndex];
+    if (!ability) return fail("That object doesn't have that ability");
+    if (ability.kind !== "activated") return fail("That ability isn't an activated ability");
+    if (!ability.activateableZones.includes(obj.zone)) return fail("That ability can't be activated from that zone");
+
+    // If ability targets are required, we need to ask the player to choose them before we can put the ability on the stack.
+
+    if ((!ability.targets || ability.targets.length === 0) && ability.cost.mana === null) {
+        if (ability.isManaAbility) {
+            // Mana abilities don't use the stack (CR 605). We just resolve it immediately.
+            const payResult = payAbilityCosts(state, player, source, ability);
+            if (!payResult.ok) return fail(payResult.error);
+            const resolveResult = resolveManaAbility(payResult.state, player, source, ability);
+            if (!resolveResult.ok) return fail(resolveResult.error);
+            const next = {
+                ...resolveResult.state,
+                priority: { holder: player, consecutivePasses: 0 },
+            };
+            const event: GameEvent = {
+                type: "abilityActivated",
+                player: player,
+                abilitySource: source,
+            };
+            return ok(next, [...payResult.events, ...resolveResult.events, event]);
+        }
+    }
+
+    return fail("That ability requires targets or mana costs, which are not yet implemented");
 }
 
 function activateAbilityForPriority(state: GameState, player: PlayerId, source: ObjectId, abilityIndex: number): ApplyResult {

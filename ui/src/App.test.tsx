@@ -147,9 +147,25 @@ describe("decision panel", () => {
     expect(onSubmit).toHaveBeenCalledWith({ kind: "choose", selected: ["index:0", "index:1"] });
   });
 
-  test("a yes/no decision submits a boolean", () => {
+  test("a cancelable decision submits a cancel answer", () => {
     const pending = yesNo({
       id: 901 as DecisionId,
+      player: BOB,
+      prompt: "Keep this hand?",
+      then: { kind: "discardToHandSize" },
+      onCancel: { kind: "cancel" },
+    });
+    const onSubmit = vi.fn();
+    render(<DecisionPanel state={{ ...newDemoGame(), pending }} error={null} onSubmit={onSubmit} />);
+
+    fireEvent.click(screen.getByLabelText("Cancel"));
+    fireEvent.click(screen.getByRole("button", { name: "Submit answer" }));
+    expect(onSubmit).toHaveBeenCalledWith({ kind: "cancel" });
+  });
+
+  test("a yes/no decision submits a boolean", () => {
+    const pending = yesNo({
+      id: 902 as DecisionId,
       player: BOB,
       prompt: "Keep this hand?",
       then: { kind: "discardToHandSize" },
