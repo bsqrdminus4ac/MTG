@@ -1,20 +1,6 @@
-import type {
-    AbilityOfKind,
-    CardType,
-    Characteristics,
-    TargetKinds,
-    TargetSpec,
-} from "./cards";
+import type { CardType, TargetSpec } from "./cards";
 import { getCharacteristics } from "./characteristics";
-import {
-    chooseMany,
-    chooseOne,
-    manaAbilityChoice,
-    objectChoice,
-    playerChoice,
-    yesNo,
-    type Choice,
-} from "./decisions";
+import { chooseMany, chooseOne, manaAbilityChoice, objectChoice, playerChoice, yesNo, type Choice } from "./decisions";
 import { fail, ok, type ApplyResult } from "./engine";
 import type { GameEvent } from "./events";
 import type { PlayerId, ObjectId } from "./ids";
@@ -33,11 +19,7 @@ export interface CastingInProgress {
     events: readonly GameEvent[]; // buffered until commit
 }
 
-export function beginCast(
-    state: GameState,
-    player: PlayerId,
-    card: ObjectId,
-): ApplyResult {
+export function beginCast(state: GameState, player: PlayerId, card: ObjectId): ApplyResult {
     const rollback = state;
     const spellAbilities = getCharacteristics(state, card)?.abilities;
     const spell = spellAbilities?.find((a) => a.kind === "spell");
@@ -80,10 +62,7 @@ export function commitCast(state: GameState): ApplyResult {
 
 export function selectTargetOptions(state: GameState): ApplyResult {
     if (!state.casting) return fail("No casting in progress to cancel");
-    if (state.casting.targetSpecsSelected.length === 0)
-        return fail(
-            "Entered target selection with no target specification for the selected spell",
-        );
+    if (state.casting.targetSpecsSelected.length === 0) return fail("Entered target selection with no target specification for the selected spell");
     const player = state.casting.player;
     const card = state.casting.card;
     const nextSpecIndex = state.casting.targetSpecsSelected.indexOf(false);
@@ -102,33 +81,18 @@ export function selectTargetOptions(state: GameState): ApplyResult {
     const options: Choice[] = [];
     for (const target of legalTargets) {
         if (target.kind === "player") {
-            options.push(
-                playerChoice(
-                    target.id,
-                    `Target player ${target.id} with ${chars?.name}`,
-                ),
-            );
+            options.push(playerChoice(target.id, `Target player ${target.id} with ${chars?.name}`));
         } else if (target.kind === "object") {
             const targetChars = getCharacteristics(state, target.id);
             if (!targetChars) continue;
-            options.push(
-                objectChoice(
-                    target.id,
-                    `Target object ${targetChars.name} (#${target.id}) with ${chars?.name}`,
-                ),
-            );
+            options.push(objectChoice(target.id, `Target object ${targetChars.name} (#${target.id}) with ${chars?.name}`));
         }
     }
     const nextState = openDecision(state, (id) =>
         chooseMany({
             id,
             options: options,
-            prompt: buildTargetPrompt(
-                card,
-                chars?.name!,
-                spell.targets,
-                nextSpec,
-            ),
+            prompt: buildTargetPrompt(card, chars?.name!, spell.targets, nextSpec),
             min: nextSpec.minCount,
             max: nextSpec.maxCount,
             player: player,
@@ -140,23 +104,12 @@ export function selectTargetOptions(state: GameState): ApplyResult {
     return ok(nextState, []);
 }
 
-export function applyTargetSelections(
-    state: GameState,
-    targets: Target[],
-): ApplyResult {
-    if (!state.casting)
-        return fail("No casting in progress to set targets for");
-    if (state.casting.targetSpecsSelected.length === 0)
-        return fail(
-            "Selected targets with no target specification defined for the selected spell",
-        );
+export function applyTargetSelections(state: GameState, targets: Target[]): ApplyResult {
+    if (!state.casting) return fail("No casting in progress to set targets for");
+    if (state.casting.targetSpecsSelected.length === 0) return fail("Selected targets with no target specification defined for the selected spell");
     const casting = state.casting;
     const selectedSpecIndex = casting.targetSpecsSelected.indexOf(false);
-    const newSpecs = [
-        ...casting.targetSpecsSelected.slice(0, selectedSpecIndex),
-        true,
-        ...casting.targetSpecsSelected.slice(selectedSpecIndex + 1),
-    ];
+    const newSpecs = [...casting.targetSpecsSelected.slice(0, selectedSpecIndex), true, ...casting.targetSpecsSelected.slice(selectedSpecIndex + 1)];
     const nextState: GameState = {
         ...state,
         casting: {
@@ -168,12 +121,7 @@ export function applyTargetSelections(
     return selectTargetOptions(nextState);
 }
 
-function buildTargetPrompt(
-    card: ObjectId,
-    cardName: string,
-    specs: TargetSpec[],
-    spec: TargetSpec,
-): string {
+function buildTargetPrompt(card: ObjectId, cardName: string, specs: TargetSpec[], spec: TargetSpec): string {
     let prompt = "Select ";
     if (spec.minCount === 1 && spec.maxCount === 1) {
         prompt += "the target ";
@@ -189,11 +137,7 @@ function buildTargetPrompt(
     return prompt;
 }
 
-export function getLegalTargets(
-    state: GameState,
-    player: PlayerId,
-    targetSpec: TargetSpec,
-): readonly Target[] {
+export function getLegalTargets(state: GameState, player: PlayerId, targetSpec: TargetSpec): readonly Target[] {
     let targets: Target[] = [];
     const isAnyTarget = targetSpec.kind === "AnyTarget";
 
@@ -221,13 +165,8 @@ export function getLegalTargets(
         if (!characteristics) continue;
         if (targetSpec.zone !== obj.zone) continue;
         if (
-            (targetSpec.kind === "AnyTarget" &&
-                isValidForAnyTarget(characteristics.types)) ||
-            (targetSpec.kind == "Permanent" &&
-                (targetSpec.allowedTypes === "any" ||
-                    targetSpec.allowedTypes.some((type) =>
-                        characteristics.types.includes(type),
-                    )))
+            (targetSpec.kind === "AnyTarget" && isValidForAnyTarget(characteristics.types)) ||
+            (targetSpec.kind == "Permanent" && (targetSpec.allowedTypes === "any" || targetSpec.allowedTypes.some((type) => characteristics.types.includes(type))))
         ) {
             targets.push({ kind: "object", id: obj.id });
         }
@@ -237,18 +176,11 @@ export function getLegalTargets(
 }
 
 function isValidForAnyTarget(types: readonly CardType[]): boolean {
-    return types.some(
-        (type) =>
-            type === "Creature" || type === "Planeswalker" || type === "Battle",
-    );
+    return types.some((type) => type === "Creature" || type === "Planeswalker" || type === "Battle");
 }
 
 // No real logic for now, could add logic around target decisions changing costs later
-function calculateFinalCost(
-    state: GameState,
-    player: PlayerId,
-    card: ObjectId,
-): ManaCost | null {
+function calculateFinalCost(state: GameState, player: PlayerId, card: ObjectId): ManaCost | null {
     if (!state?.casting) return null;
     const obj = getCharacteristics(state, card);
     if (!obj) return null;
@@ -262,14 +194,12 @@ export function payManaOptions(state: GameState): ApplyResult {
     const card = casting.card;
     const cost = casting.cost ?? calculateFinalCost(state, player, card);
     if (!cost) return fail("Invalid mana cost for spell");
-    const nextState: GameState = casting.cost === cost
-        ? state
-        : { ...state, casting: { ...casting, cost } };
+    const nextState: GameState = casting.cost === cost ? state : { ...state, casting: { ...casting, cost } };
 
     const p = nextState.players[player];
     if (!p) return fail("Invalid player");
     const cardName = getCharacteristics(nextState, card)?.name;
-    if (canPayMana(p, cost)) {
+    if (canPayMana(p.manaPool, cost)) {
         const decisionState = openDecision(nextState, (id) =>
             yesNo({
                 id: id,
@@ -282,15 +212,9 @@ export function payManaOptions(state: GameState): ApplyResult {
     }
 
     const manaAbilities = getAllManaSources(nextState, player);
-    if (manaAbilities.length === 0)
-        return fail("Not enough mana abilities left to pay for this spell");
+    if (manaAbilities.length === 0) return fail("Not enough mana abilities left to pay for this spell");
     const options = manaAbilities.map((ability) =>
-        manaAbilityChoice(
-            ability.source,
-            ability.abilityIndex,
-            ability.ability.description ??
-                `Ability #${ability.abilityIndex + 1} of ${getCharacteristics(nextState, ability.source)?.name}`,
-        ),
+        manaAbilityChoice(ability.source, ability.abilityIndex, ability.ability.description ?? `Ability #${ability.abilityIndex + 1} of ${getCharacteristics(nextState, ability.source)?.name}`),
     );
     const decisionState = openDecision(nextState, (id) =>
         chooseOne({

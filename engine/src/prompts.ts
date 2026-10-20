@@ -2,8 +2,9 @@ import type { AbilityOfKind } from "./cards";
 import { getCharacteristics } from "./characteristics";
 import { priorityDecision, type PriorityOption } from "./decisions";
 import type { Decision } from "./decisions";
+import { activateAbility } from "./engine";
 import type { DecisionId, ObjectId, PlayerId } from "./ids";
-import { totalManaPoolCount, type ManaPool } from "./mana";
+import { canPayMana, totalManaPoolCount, type ManaCost, type ManaPool } from "./mana";
 import type { GameObject, GameState } from "./state";
 
 /** Stores a new pending decision, issuing it an id from the shared counter. */
@@ -188,20 +189,43 @@ export function getAllManaSources(
     );
 }
 
-// Naive approach to limiting which options we allow players to select
-function getTotalAvailableMana(state: GameState, player: PlayerId): number {
-    if (!state.players[player]) return 0;
-    if (!state.players[player].manaPool) return 0;
-    let total = totalManaPoolCount(state.players[player].manaPool);
-    const manaSources = getAllManaSources(state, player);
-    for (const { source, ability } of manaSources) {
-        for (const effect of ability.effects) {
-            if (effect.kind === "addMana") {
-                total += effect.amount;
-            }
+function hashManaSearchState(pool: ManaPool, abilities: ActivatableAbilityInfo[]) {
+    let hash = Object.values(pool).join("|");
+    hash =
+        hash +
+        "^" +
+        [...abilities]
+            .sort((a, b) => a.source - b.source || a.abilityIndex - b.abilityIndex)
+            .map((a) => `${a.source}#${a.abilityIndex}`)
+            .join("|");
+    return hash;
+}
+
+export function couldHaveManaToPayCost(state: GameState, player: PlayerId, cost: ManaCost, searchedStates: { [searchState: string]: boolean }): boolean {
+    const currentPool = state.players[player]?.manaPool;
+    if (!currentPool) return false;
+    const availableManaAbilities = getAllManaSources(state, player);
+    const currentSearchState = hashManaSearchState(currentPool, availableManaAbilities);
+    if (currentSearchState in searchedStates) return searchedStates[currentSearchState]!;
+    if (canPayMana(currentPool, cost)) {
+        searchedStates[currentSearchState] = true;
+        return true;
+    }
+    if (availableManaAbilities.length === 0) {
+        searchedStates[currentSearchState] = false;
+        return false;
+    }
+
+    let couldHaveMana = false;
+    for (const ability of availableManaAbilities) {
+        const stateToCheck = activateAbility(state, player, ability.source, ability.abilityIndex);
+        if (stateToCheck.ok && couldHaveManaToPayCost(stateToCheck.state, player, cost, searchedStates)) {
+            couldHaveMana = true;
+            break;
         }
     }
-    return total;
+    searchedStates[currentSearchState] = couldHaveMana;
+    return couldHaveMana;
 }
 
 function getCastableSpells(state: GameState, player: PlayerId): ObjectId[] {
@@ -213,12 +237,7 @@ function getCastableSpells(state: GameState, player: PlayerId): ObjectId[] {
         if (!card) continue;
         if (card.types.includes("Land")) continue; // Land cards are not castable spells
         if (!card.manaCost) continue; // Cards without mana costs cannot be cast
-        const totalAvailableMana = getTotalAvailableMana(state, player);
-        if (
-            totalAvailableMana <
-            card.manaCost.generic + card.manaCost.pips.length
-        )
-            continue; // Not enough total mana to pay for the spell
+        if (!couldHaveManaToPayCost(state, player, card.manaCost, {})) continue;
         castable.push(cardId);
     }
     return castable;
