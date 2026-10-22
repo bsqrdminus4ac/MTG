@@ -140,18 +140,19 @@ export type AbilityOfKind<K extends Ability["kind"]> = Extract<Ability, { kind: 
 
 /** The copiable values of an object (CR 109.3). Derived per-object by getCharacteristics. */
 export interface Characteristics {
-  readonly name: string;
-  readonly manaCost: ManaCost | null;
-  readonly colors: readonly Color[];
-  readonly supertypes: readonly Supertype[];
-  readonly types: readonly CardType[];
-  readonly subtypes: readonly string[];
-  readonly power: number | null;
-  readonly toughness: number | null;
-  readonly abilities: readonly Ability[];
+    readonly name: string;
+    readonly manaCost: ManaCost | null;
+    readonly colors: readonly Color[];
+    readonly supertypes: readonly Supertype[];
+    readonly types: readonly CardType[];
+    readonly subtypes: readonly string[];
+    readonly power: number | null;
+    readonly toughness: number | null;
+    readonly abilities: readonly Ability[];
 }
 
 /** Static card data. Many game objects can share one definition. */
 export interface CardDefinition extends Characteristics {
-  readonly id: CardDefId;
+    readonly id: CardDefId;
+    readonly isToken?: boolean;
 }

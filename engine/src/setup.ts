@@ -47,14 +47,15 @@ export function createGame(
       library.push(id);
     }
     players[setup.id] = {
-      id: setup.id,
-      life: 20,
-      manaPool: emptyPool(),
-      library,
-      hand: [],
-      graveyard: [],
-      landsPlayedThisTurn: 0,
-      drewFromEmptyLibrary: false,
+        id: setup.id,
+        life: 2,
+        manaPool: emptyPool(),
+        library,
+        hand: [],
+        graveyard: [],
+        landsPlayedThisTurn: 0,
+        drewFromEmptyLibrary: false,
+        counters: {},
     };
   }
 

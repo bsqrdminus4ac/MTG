@@ -1,11 +1,14 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import {
     applyAction,
+    applySequentially,
     cardDefId,
     createGame,
     drawCard,
+    fail,
     getCharacteristics,
     moveObject,
+    ok,
     playerId,
     submitAnswer,
     type CardDefinition,
@@ -67,6 +70,35 @@ describe("setup", () => {
     expect(g.players[alice]?.library).toHaveLength(5);
     expect(g.players[bob]?.life).toBe(20);
     expect(g.priority?.holder).toBe(alice);
+  });
+});
+
+describe("applySequentially", () => {
+  test("passes each resulting state forward and combines events", () => {
+    const initial = newGame();
+    const result = applySequentially(initial, [
+      (state) => ok({ ...state, nextId: state.nextId + 1 }, [{ type: "lifeChanged", player: alice, delta: -1 }]),
+      (state) => ok({ ...state, nextId: state.nextId + 1 }, [{ type: "lifeChanged", player: bob, delta: -1 }]),
+    ]);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.state.nextId).toBe(initial.nextId + 2);
+    expect(result.events).toEqual([
+      { type: "lifeChanged", player: alice, delta: -1 },
+      { type: "lifeChanged", player: bob, delta: -1 },
+    ]);
+  });
+
+  test("returns the first failure without invoking later steps", () => {
+    const afterFailure = vi.fn(() => ok(newGame(), []));
+    const result = applySequentially(newGame(), [
+      () => fail("stop"),
+      afterFailure,
+    ]);
+
+    expect(result).toEqual({ ok: false, error: "stop" });
+    expect(afterFailure).not.toHaveBeenCalled();
   });
 });
 

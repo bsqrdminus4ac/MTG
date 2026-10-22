@@ -34,27 +34,31 @@ export const stepGrantsPriority = (step: Step): boolean => step !== "untap" && s
 
 /** A card (or token) in some zone. Everything mutable about it lives here, not on the definition. */
 export interface GameObject {
-  readonly id: ObjectId;
-  readonly definitionId: CardDefId;
-  readonly owner: PlayerId;
-  readonly controller: PlayerId;
-  readonly zone: Zone;
-  readonly timestamp: Timestamp;
-  readonly tapped: boolean;
-  readonly damage: number;
-  readonly counters: Readonly<Record<string, number>>;
+    readonly id: ObjectId;
+    readonly definitionId: CardDefId;
+    readonly owner: PlayerId;
+    readonly controller: PlayerId;
+    readonly zone: Zone;
+    readonly timestamp: Timestamp;
+    readonly tapped: boolean;
+    readonly damage: number;
+    readonly counters: Readonly<Record<string, number>>;
+    readonly turnEnteredZone?: number;
 }
 
 export interface PlayerState {
-  readonly id: PlayerId;
-  readonly life: number;
-  readonly manaPool: ManaPool;
-  readonly library: readonly ObjectId[];
-  readonly hand: readonly ObjectId[];
-  readonly graveyard: readonly ObjectId[];
-  readonly landsPlayedThisTurn: number;
-  /** Set when drawing from an empty library; a state-based action checks it (CR 704.5b). */
-  readonly drewFromEmptyLibrary: boolean;
+    readonly id: PlayerId;
+    readonly life: number;
+    readonly manaPool: ManaPool;
+    readonly library: readonly ObjectId[];
+    readonly hand: readonly ObjectId[];
+    readonly graveyard: readonly ObjectId[];
+    readonly landsPlayedThisTurn: number;
+    readonly counters: Readonly<Record<string, number>>;
+
+    /** Set when drawing from an empty library; a state-based action checks it (CR 704.5b). */
+    readonly drewFromEmptyLibrary: boolean;
+    readonly hasLostTheGame?: boolean;
 }
 
 export type Target =

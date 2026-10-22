@@ -18,20 +18,32 @@ import {
     type Target,
     type Zone,
 } from "./state";
+import { checkStateBasedActions } from "./stateBasedActions";
 import { assertNever, withEntry } from "./util";
 import { commitSpell, drawCard, moveObject } from "./zones";
 
 export const MAX_HAND_SIZE = 7;
 
-export type ApplyResult =
-  | Readonly<{ ok: true; state: GameState; events: readonly GameEvent[] }>
-  | Readonly<{ ok: false; error: string }>;
+export type ApplyResult = Readonly<{ ok: true; state: GameState; events: readonly GameEvent[]; changesMade?: boolean }> | Readonly<{ ok: false; error: string }>;
 
-export const ok = (
-    state: GameState,
-    events: readonly GameEvent[],
-): ApplyResult => ({ ok: true, state, events });
+export const ok = (state: GameState, events: readonly GameEvent[], changesMade?: boolean): ApplyResult =>
+    changesMade === undefined ? { ok: true, state, events } : { ok: true, state, events, changesMade };
 export const fail = (error: string): ApplyResult => ({ ok: false, error });
+
+export function applySequentially(state: GameState, steps: readonly ((state: GameState) => ApplyResult)[]): ApplyResult {
+    let currentState = state;
+    const events: GameEvent[] = [];
+    let changesMade = false;
+    for (const step of steps) {
+        const result = step(currentState);
+        if (!result.ok) return result;
+        currentState = result.state;
+        events.push(...result.events);
+        if (result.changesMade) changesMade = true;
+    }
+    return ok(currentState, events, changesMade);
+}
+
 
 // ---------------------------------------------------------------------------
 // Entry points
@@ -166,18 +178,25 @@ function passPriority(state: GameState, player: PlayerId): ApplyResult {
 
   if (passes < state.turnOrder.length) {
     const holder = nextPlayer(state, player);
-    return ok(withPriorityDecision({ ...state, priority: { holder, consecutivePasses: passes } }), events);
+    const result = checkStateBasedActions(state, events);
+    if (!result.ok) return result;
+    return ok(withPriorityDecision({ ...result.state, priority: { holder, consecutivePasses: passes } }), result.events);
   }
 
   // Everyone passed in succession: resolve the top of the stack, or end the step.
   return state.stack.length > 0 ? resolveTopOfStack(state, events) : advanceStep(state, events);
 }
 
-function givePriorityToActivePlayer(state: GameState): GameState {
-  return withPriorityDecision({
-    ...state,
-    priority: { holder: state.turn.activePlayer, consecutivePasses: 0 },
-  });
+function givePriorityToActivePlayer(state: GameState, events: GameEvent[]): ApplyResult {
+    const result = checkStateBasedActions(state, []);
+    if (!result.ok) return result;
+    return ok(
+        withPriorityDecision({
+            ...result.state,
+            priority: { holder: state.turn.activePlayer, consecutivePasses: 0 },
+        }),
+        [...events, ...result.events],
+    );
 }
 
 function playLand(state: GameState, player: PlayerId, card: ObjectId): ApplyResult {
@@ -201,10 +220,9 @@ function playLand(state: GameState, player: PlayerId, card: ObjectId): ApplyResu
     players: withEntry(moved.state.players, player, { ...p, landsPlayedThisTurn: p.landsPlayedThisTurn + 1 }),
     priority: { holder: player, consecutivePasses: 0 },
   };
-  return ok(withPriorityDecision(next), [
-    ...moved.events,
-    { type: "landPlayed", player, card: moved.newId },
-  ]);
+  const result = checkStateBasedActions(state, []);
+  if (!result.ok) return result;
+  return ok(withPriorityDecision(next), [...moved.events, ...result.events, { type: "landPlayed", player, card: moved.newId }]);
 }
 
 function resolveTopOfStack(state: GameState, events: readonly GameEvent[]): ApplyResult {
@@ -230,7 +248,7 @@ function resolveTopOfStack(state: GameState, events: readonly GameEvent[]): Appl
   }
   // TODO: interpret the effects (spell abilities / entry.effects), then check state-based actions.
 
-  return ok(givePriorityToActivePlayer(next), out);
+  return givePriorityToActivePlayer(next, out);
 }
 
 // ---------------------------------------------------------------------------
@@ -263,7 +281,7 @@ function advanceStep(state: GameState, events: readonly GameEvent[]): ApplyResul
       const excess = handExcess(next);
       if (excess > 0) return ok(askDiscard(next, excess), out); // pauses until answered
     }
-    if (stepGrantsPriority(step)) return ok(givePriorityToActivePlayer(next), out);
+    if (stepGrantsPriority(step)) return givePriorityToActivePlayer(next, out);
   }
   return fail("Could not find the next step with priority");
 }
@@ -394,7 +412,8 @@ export function activateAbility(state: GameState, player: PlayerId, source: Obje
 }
 
 function activateAbilityForPriority(state: GameState, player: PlayerId, source: ObjectId, abilityIndex: number): ApplyResult {
-  const next = activateAbility(state, player, source, abilityIndex);
+  const steps = [(state: GameState) => activateAbility(state, player, source, abilityIndex), (state: GameState) => checkStateBasedActions(state, [])];
+  const next = applySequentially(state, steps);
   if (!next.ok) return next;
   return ok(withPriorityDecision(next.state), next.events);
 }
