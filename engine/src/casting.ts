@@ -1,4 +1,4 @@
-import type { CardType, Effect, TargetSpec } from "./cards";
+import type { CardType, Characteristics, Effect, TargetSpec } from "./cards";
 import { getCharacteristics, isPermanentType } from "./characteristics";
 import { chooseMany, chooseOne, manaAbilityChoice, objectChoice, playerChoice, yesNo, type Choice } from "./decisions";
 import { damageObject, damagePlayer } from "./effects";
@@ -22,22 +22,28 @@ export interface CastingInProgress {
 
 export function beginCast(state: GameState, player: PlayerId, card: ObjectId): ApplyResult {
     const rollback = state;
-    const spellAbilities = getCharacteristics(state, card)?.abilities;
-    const spell = spellAbilities?.find((a) => a.kind === "spell");
-    if (!spell) return fail("This card has no spell abilities to cast");
+    const spellInfo = getCharacteristics(state, card);
+    if (!spellInfo) return fail(`Unable to get characteristics of #${card}`);
+    let targetSpecs: boolean[] = [];
+    if (!spellInfo.types.some((t) => isPermanentType(t))) {
+        const spellAbilities = spellInfo.abilities;
+        const spell = spellAbilities?.find((a) => a.kind === "spell");
+        if (!spell) return fail("This card has no spell abilities to cast");
+        targetSpecs = new Array(spell.targets.length).fill(false);
+    }
     let currentState: GameState = {
         ...state,
         casting: {
             player,
             card,
             targets: [],
-            targetSpecsSelected: new Array(spell.targets.length).fill(false),
+            targetSpecsSelected: targetSpecs,
             cost: null,
             rollback,
             events: [{ type: "spellCastStart", player, card }],
         },
     };
-    if (spell.targets.length === 0) {
+    if (targetSpecs.length === 0) {
         // No targets, skip to mana payment step
         return payManaOptions(currentState);
     } else {
@@ -235,7 +241,9 @@ export function resolveSpell(state: GameState, spell: SpellOnStack): ApplyResult
     if (!spellInfo) return fail("This spell's card no longer exists");
     const isPermanentSpell = spellInfo.types.some((t) => isPermanentType(t));
     if (isPermanentSpell) {
-        return fail("Permanent spell resolution not implemented yet");
+        const moveResult = moveObject(state, spell.source, "battlefield");
+        if (!moveResult) return fail("Unable to move permanent from stack to battlefield");
+        return ok(moveResult.state, moveResult.events);
     }
     const steps = spellInfo.abilities.flatMap((ability) =>
         ability.kind === "spell" ? ability.effects.map((effect) => (currentState: GameState) => resolveEffect(currentState, spell.source, effect, spell.targets)) : [],

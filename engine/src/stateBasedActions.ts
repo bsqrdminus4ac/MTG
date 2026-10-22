@@ -100,7 +100,7 @@ function checkFor0Toughness(state: GameState): ApplyResult {
         const chars = getCharacteristics(state, obj.id);
         if (obj.zone !== "battlefield") continue;
         if (!chars) return fail(`Unable to locate characteristics of object #${obj.id}`);
-        if (chars.types.includes("Creature") && (chars.toughness ?? 0 <= 0)) {
+        if (chars.types.includes("Creature") && (chars.toughness ?? 0) <= 0) {
             idsToMove.push(obj.id);
         }
     }
