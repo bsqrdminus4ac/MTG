@@ -1,7 +1,7 @@
 import type { Action } from "./actions";
 import type { AbilityOfKind } from "./cards";
 import { applyTargetSelections, beginCast, cancelCast, payManaOptions, resolveSpell } from "./casting";
-import { getCharacteristics, isPermanentType } from "./characteristics";
+import { getCardName, getCharacteristics, isPermanentType } from "./characteristics";
 import {
   chooseMany, objectChoice, resolveChooseAnswer, resolvePriorityAnswer, resolveYesNoAnswer,
   type Choice, type Continuation, type Submission,
@@ -222,7 +222,7 @@ function playLand(state: GameState, player: PlayerId, card: ObjectId): ApplyResu
   };
   const result = checkStateBasedActions(state, []);
   if (!result.ok) return result;
-  return ok(withPriorityDecision(next), [...moved.events, ...result.events, { type: "landPlayed", player, card: moved.newId }]);
+  return ok(withPriorityDecision(next), [...moved.events, ...result.events, { type: "landPlayed", player, card: moved.newId, cardName: getCardName(result.state, moved.newId) }]);
 }
 
 function resolveTopOfStack(state: GameState, events: readonly GameEvent[]): ApplyResult {
@@ -230,7 +230,7 @@ function resolveTopOfStack(state: GameState, events: readonly GameEvent[]): Appl
   if (!entry) return fail("The stack is empty");
 
   let next: GameState = { ...state, stack: state.stack.slice(0, -1) };
-  const out: GameEvent[] = [...events, { type: "stackEntryResolved", id: entry.id }];
+  const out: GameEvent[] = [...events, { type: "stackEntryResolved", id: entry.id, spellName: getCardName(next, entry.source) }];
 
   if (entry.kind === "spell") {
       const result = resolveSpell(next, entry);
@@ -403,6 +403,7 @@ export function activateAbility(state: GameState, player: PlayerId, source: Obje
                 type: "abilityActivated",
                 player: player,
                 abilitySource: source,
+                cardName: chars.name,
             };
             return ok(next, [...payResult.events, ...resolveResult.events, event]);
         }
@@ -430,7 +431,7 @@ function payAbilityCosts(state: GameState, player: PlayerId, source: ObjectId, a
     if (obj.tapped) return fail("That object is already tapped");
     const tappedObj = withEntry(state.objects, source, { ...obj, tapped: true });
     currentState = { ...currentState, objects: tappedObj };
-    events.push({ type: "permanentTapped", object: source });
+    events.push({ type: "permanentTapped", object: source, cardName: getCardName(currentState, source) });
   }
   if (ability.cost.sacrificeSelf) {
     // TODO

@@ -1,5 +1,5 @@
 import type { CardType, Characteristics, Effect, TargetSpec } from "./cards";
-import { getCharacteristics, isPermanentType } from "./characteristics";
+import { getCardName, getCharacteristics, isPermanentType } from "./characteristics";
 import { chooseMany, chooseOne, manaAbilityChoice, objectChoice, playerChoice, yesNo, type Choice } from "./decisions";
 import { damageObject, damagePlayer } from "./effects";
 import { applySequentially, fail, ok, type ApplyResult } from "./engine";
@@ -40,7 +40,7 @@ export function beginCast(state: GameState, player: PlayerId, card: ObjectId): A
             targetSpecsSelected: targetSpecs,
             cost: null,
             rollback,
-            events: [{ type: "spellCastStart", player, card }],
+            events: [{ type: "spellCastStart", player, card, cardName: spellInfo.name }],
         },
     };
     if (targetSpecs.length === 0) {
@@ -59,6 +59,7 @@ export function cancelCast(state: GameState): ApplyResult {
             type: "spellCastCancelled",
             player: state.casting.player,
             card: state.casting.card,
+            cardName: getCardName(state, state.casting.card),
         },
     ]);
 }

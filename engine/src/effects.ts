@@ -1,4 +1,4 @@
-import { getCharacteristics } from "./characteristics";
+import { getCardName, getCharacteristics } from "./characteristics";
 import { fail, ok, type ApplyResult } from "./engine";
 import type { ObjectId, PlayerId } from "./ids";
 import type { GameState } from "./state";
@@ -8,7 +8,7 @@ export function damagePlayer(state: GameState, player: PlayerId, source: ObjectI
     const p = state.players[player];
     if (!p) return fail("Invalid player to damage");
     return ok({ ...state, players: withEntry(state.players, player, { ...p, life: p.life - amount }) }, [
-        { type: "damageDealt", source, amount, target: { kind: "player", id: player }, isCombatDamage },
+        { type: "damageDealt", source, sourceName: getCardName(state, source), amount, target: { kind: "player", id: player }, targetName: "", isCombatDamage },
     ]);
 }
 
@@ -27,7 +27,7 @@ function damageCreature(state: GameState, target: ObjectId, source: ObjectId, am
     const obj = state.objects[target];
     if (!obj) return fail("Damage target no longer exists");
     return ok({ ...state, objects: withEntry(state.objects, target, { ...obj, damage: obj.damage + amount }) }, [
-        { type: "damageDealt", source, amount, target: { kind: "object", id: target }, isCombatDamage },
+        { type: "damageDealt", source, sourceName: getCardName(state, source), amount, target: { kind: "object", id: target }, targetName: getCardName(state, target), isCombatDamage },
     ]);
 }
 
@@ -36,6 +36,6 @@ function damagePlaneswalker(state: GameState, target: ObjectId, source: ObjectId
     if (!obj) return fail("Damage target no longer exists");
     if (!("loyalty" in obj.counters)) return fail("Planeswalkers have to have loyalty counters defined");
     return ok({ ...state, objects: withEntry(state.objects, target, { ...obj, counters: withEntry(obj.counters, "loyalty", obj.counters["loyalty"] - amount) }) }, [
-        { type: "damageDealt", source, amount, target: { kind: "object", id: target }, isCombatDamage },
+        { type: "damageDealt", source, sourceName: getCardName(state, source), amount, target: { kind: "object", id: target }, targetName: getCardName(state, target), isCombatDamage },
     ]);
 }

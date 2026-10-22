@@ -1,3 +1,4 @@
+import { getCardName, getCharacteristics } from "./characteristics";
 import { fail, ok, type ApplyResult } from "./engine";
 import type { GameEvent } from "./events";
 import { nextID, type ObjectId, type PlayerId, type StackId, type Timestamp } from "./ids";
@@ -101,12 +102,11 @@ export function drawCard(state: GameState, player: PlayerId): { state: GameState
             events: [],
         };
     }
-
     const moved = moveObject(state, top, "hand");
     if (!moved) return { state, events: [] };
     return {
         state: moved.state,
-        events: [...moved.events, { type: "cardDrawn", player, card: moved.newId }],
+        events: [...moved.events, { type: "cardDrawn", player, card: moved.newId, cardName: getCardName(moved.state, moved.newId) }],
     };
 }
 
@@ -143,6 +143,7 @@ export function commitSpell(state: GameState): ApplyResult {
         card: moved.newId,
         player: castingInfo.player,
         targets: castingInfo.targets,
+        cardName: getCardName(currentState, moved.newId),
     };
     const addedToStack = [...currentState.stack, spell];
     const allEvents = [...castingInfo.events, ...moved.events, spellEvent];

@@ -226,23 +226,23 @@ export function describeEvent(state: GameState, e: GameEvent): string {
       case "cardMoved":
           return `${nameOf(state, e.newId)}: ${e.from} → ${e.to} (#${e.oldId} → #${e.newId})`;
       case "cardDrawn":
-          return `${e.player} draws ${nameOf(state, e.card)}`;
+          return `${e.player} draws ${e.cardName}`;
       case "landPlayed":
-          return `${e.player} plays ${nameOf(state, e.card)}`;
+          return `${e.player} plays ${e.cardName}`;
       case "spellCastSuccess":
-          return `${e.player} casts ${nameOf(state, e.card)}`;
+          return `${e.player} casts ${e.cardName}`;
       case "spellCastStart":
-          return `${e.player} starts casting ${nameOf(state, e.card)}`;
+          return `${e.player} starts casting ${e.cardName}`;
       case "spellTargetsSelected":
-          return `${e.player} selects targets for ${nameOf(state, e.card)}`; // Include target details later
+          return `${e.player} selects targets for ${e.cardName}`; // Include target details later
       case "spellManaPaid":
-          return `${e.player} pays mana for ${nameOf(state, e.card)}`;
+          return `${e.player} pays mana for ${e.cardName}`;
       case "spellCastCancelled":
-          return `${e.player} cancels casting of ${nameOf(state, e.card)}`;
+          return `${e.player} cancels casting of ${e.cardName}`;
       case "stackEntryResolved":
           return `Stack entry #${e.id} resolves`;
       case "damageDealt":
-          return `${nameOf(state, e.source)} deals ${e.amount} damage to ${describeTarget(state, e.target)}`;
+          return `${e.sourceName} deals ${e.amount} damage to ${describeTarget(state, e.target)}`;
       case "lifeChanged":
           return `${e.player} life ${signed(e.delta)}`;
       case "gameWon":
@@ -253,7 +253,7 @@ export function describeEvent(state: GameState, e: GameEvent): string {
           return `${nameOf(state, e.object)} is untapped`;
       case "abilityActivated":
           return (
-              `${e.player} activates ability of ${nameOf(state, e.abilitySource, true)}` +
+              `${e.player} activates ability of ${e.cardName} (#${e.abilitySource})` +
               (e.stackEntryId ? ` (#${e.stackEntryId})` : "") +
               (e.targets ? ` targeting ${e.targets.map((t) => describeTarget(state, t)).join(", ")}` : "")
           );

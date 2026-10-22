@@ -17,19 +17,19 @@ export type GameEvent =
           newId: ObjectId;
           owner: PlayerId;
       }>
-    | Readonly<{ type: "cardDrawn"; player: PlayerId; card: ObjectId }>
-    | Readonly<{ type: "landPlayed"; player: PlayerId; card: ObjectId }>
-    | Readonly<{ type: "spellCastSuccess"; player: PlayerId; card: ObjectId; targets: readonly Target[] }>
-    | Readonly<{ type: "spellCastStart"; player: PlayerId; card: ObjectId }>
-    | Readonly<{ type: "spellTargetsSelected"; player: PlayerId; card: ObjectId }>
-    | Readonly<{ type: "spellManaPaid"; player: PlayerId; card: ObjectId }>
-    | Readonly<{ type: "spellCastCancelled"; player: PlayerId; card: ObjectId }>
-    | Readonly<{ type: "stackEntryResolved"; id: StackId }>
-    | Readonly<{ type: "damageDealt"; source: ObjectId; target: Target; amount: number; isCombatDamage: boolean }>
+    | Readonly<{ type: "cardDrawn"; player: PlayerId; card: ObjectId; cardName: string }>
+    | Readonly<{ type: "landPlayed"; player: PlayerId; card: ObjectId; cardName: string }>
+    | Readonly<{ type: "spellCastSuccess"; player: PlayerId; card: ObjectId; cardName: string; targets: readonly Target[] }>
+    | Readonly<{ type: "spellCastStart"; player: PlayerId; card: ObjectId; cardName: string }>
+    | Readonly<{ type: "spellTargetsSelected"; player: PlayerId; card: ObjectId; cardName: string }>
+    | Readonly<{ type: "spellManaPaid"; player: PlayerId; card: ObjectId; cardName: string }>
+    | Readonly<{ type: "spellCastCancelled"; player: PlayerId; card: ObjectId; cardName: string }>
+    | Readonly<{ type: "stackEntryResolved"; id: StackId; spellName: string }>
+    | Readonly<{ type: "damageDealt"; source: ObjectId; sourceName: string; target: Target; targetName: string; amount: number; isCombatDamage: boolean }>
     | Readonly<{ type: "lifeChanged"; player: PlayerId; delta: number }>
     | Readonly<{ type: "gameWon"; winner: PlayerId }>
-    | Readonly<{ type: "permanentTapped"; object: ObjectId }>
-    | Readonly<{ type: "permanentUntapped"; object: ObjectId }>
-    | Readonly<{ type: "abilityActivated"; player: PlayerId; abilitySource: ObjectId; stackEntryId?: StackId; targets?: Target[] }>
+    | Readonly<{ type: "permanentTapped"; object: ObjectId; cardName: string }>
+    | Readonly<{ type: "permanentUntapped"; object: ObjectId; cardName: string }>
+    | Readonly<{ type: "abilityActivated"; player: PlayerId; abilitySource: ObjectId; cardName: string; stackEntryId?: StackId; targets?: Target[] }>
     | Readonly<{ type: "lostTheGame"; player: PlayerId; cause: string }>
     | Readonly<{ type: "wonTheGame"; player: PlayerId }>;
