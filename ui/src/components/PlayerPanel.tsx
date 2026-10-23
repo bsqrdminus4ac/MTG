@@ -1,4 +1,4 @@
-import type { GameState, ObjectId, PlayerState } from "@mtg/engine";
+import type { GameState, ObjectId, PlayerId, PlayerState } from "@mtg/engine";
 import { describePool } from "../describe";
 import { Bullets } from "./Bullets";
 import { ObjectCard } from "./ObjectCard";
@@ -9,10 +9,13 @@ interface PlayerPanelProps {
   readonly player: PlayerState;
   /** Seat number, only used to color the panel. */
   readonly seat: number;
+  readonly forcePassEnabled: boolean;
+  readonly forcePassAvailable: boolean;
+  readonly onToggleForcePass: (player: PlayerId) => void;
 }
 
 /** Everything that belongs to one player: their numbers, plus a container for each of their zones. */
-export function PlayerPanel({ state, player, seat }: PlayerPanelProps) {
+export function PlayerPanel({ state, player, seat, forcePassEnabled, forcePassAvailable, onToggleForcePass }: PlayerPanelProps) {
   const isActive = state.turn.activePlayer === player.id;
   const holdsPriority = state.priority?.holder === player.id;
   const mustDecide = state.pending?.player === player.id;
@@ -36,6 +39,19 @@ export function PlayerPanel({ state, player, seat }: PlayerPanelProps) {
         {isActive && <span className="badge accent">active player</span>}
         {holdsPriority && <span className="badge">has priority</span>}
         {mustDecide && <span className="badge hot">must decide</span>}
+        <button
+          type="button"
+          className={forcePassEnabled ? "force-pass-enabled" : undefined}
+          onClick={() => onToggleForcePass(player.id)}
+          disabled={!forcePassEnabled && !forcePassAvailable}
+          title={
+            forcePassEnabled
+              ? `Stop automatically passing for ${player.id}.`
+              : `Automatically pass ${player.id}'s priority decisions for the rest of this turn. Stops if another player puts something on the stack, attacks, or an error occurs.`
+          }
+        >
+          {forcePassEnabled ? "Stop force pass" : "Force pass"}
+        </button>
       </header>
 
       <Bullets

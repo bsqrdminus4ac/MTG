@@ -76,6 +76,14 @@ button[type="submit"] {
   color: var(--on-accent);
   font-weight: 600;
 }
+button.force-pass-enabled {
+  background: var(--warn-bg);
+  border-color: var(--warn);
+  color: var(--warn);
+}
+button.force-pass-enabled:hover:not(:disabled) {
+  border-color: var(--warn);
+}
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;

@@ -85,7 +85,17 @@ export function App() {
         <div className="players">
           {state.turnOrder.map((id, seat) => {
             const player = state.players[id];
-            return player ? <PlayerPanel key={id} state={state} player={player} seat={seat} /> : null;
+            return player ? (
+              <PlayerPanel
+                key={id}
+                state={state}
+                player={player}
+                seat={seat}
+                forcePassEnabled={game.forcePass[id] !== undefined}
+                forcePassAvailable={game.error === null && state.winner === null && game.forcePass[id] === undefined}
+                onToggleForcePass={game.toggleForcePass}
+              />
+            ) : null;
           })}
         </div>
         <aside className="side">

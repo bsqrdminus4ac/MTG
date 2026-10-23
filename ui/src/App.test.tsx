@@ -46,8 +46,8 @@ describe("zones", () => {
     render(<App />);
     const card = must(cardsIn(zoneOf(playerRegion(ALICE), "Hand"))[0]);
     const bullets = [...card.querySelectorAll(".bullets > li")].map((li) => li.textContent);
-    expect(bullets).toContain("Owneralice");
-    expect(bullets).toContain("Controlleralice");
+    expect(bullets).toContain("OwnerAlice");
+    expect(bullets).toContain("ControllerAlice");
     expect(bullets).toContain("Zonehand");
     expect(bullets).toContain("Tappedno");
     expect(bullets.some((b) => b?.startsWith("Abilities"))).toBe(true);
@@ -83,7 +83,7 @@ describe("decision panel", () => {
   test("a priority decision is answered by selecting an option and submitting", () => {
     render(<App />);
     const panel = screen.getByRole("region", { name: "Decision" });
-    expect(within(panel).getByText("alice must answer")).toBeTruthy();
+    expect(within(panel).getByText("Alice must answer")).toBeTruthy();
 
     const submit = within(panel).getByRole<HTMLButtonElement>("button", { name: "Submit answer" });
     expect(submit.disabled).toBe(true);
@@ -92,9 +92,9 @@ describe("decision panel", () => {
     expect(submit.disabled).toBe(false);
     fireEvent.click(submit);
 
-    expect(within(panel).getByText("bob must answer")).toBeTruthy();
+    expect(within(panel).getByText("Bob must answer")).toBeTruthy();
     expect(within(panel).getByRole<HTMLButtonElement>("button", { name: "Submit answer" }).disabled).toBe(true);
-    expect(within(screen.getByRole("region", { name: "Log" })).getByText("alice: Pass priority")).toBeTruthy();
+    expect(within(screen.getByRole("region", { name: "Log" })).getByText("Alice: Pass priority")).toBeTruthy();
   });
 
   test("auto-pass stops at the first real choice, and a land can be played from it", () => {
@@ -105,7 +105,7 @@ describe("decision panel", () => {
     expect(steps.querySelector("li.on")?.textContent).toBe("precombatMain");
 
     const panel = screen.getByRole("region", { name: "Decision" });
-    expect(within(panel).getByText("alice must answer")).toBeTruthy();
+    expect(within(panel).getByText("Alice must answer")).toBeTruthy();
     fireEvent.click(must(within(panel).getAllByLabelText(/^Play /)[0]));
     fireEvent.click(within(panel).getByRole("button", { name: "Submit answer" }));
 
@@ -115,6 +115,20 @@ describe("decision panel", () => {
     expect(screen.getByText("state consistent")).toBeTruthy();
     // The land drop is used up, so alice still has priority but only "pass" is left.
     expect(within(panel).queryAllByLabelText(/^Play /)).toHaveLength(0);
+  });
+
+  test("force pass continues across priority passes and stops at the next turn", () => {
+      render(<App />);
+      const panel = screen.getByRole("region", { name: "Decision" });
+
+      fireEvent.click(within(playerRegion(BOB)).getByRole("button", { name: "Force pass" }));
+      expect(within(playerRegion(BOB)).getByRole("button", { name: "Stop force pass" }).className).toBe("force-pass-enabled");
+      fireEvent.click(within(playerRegion(ALICE)).getByRole("button", { name: "Force pass" }));
+
+      expect(screen.getByText("2", { selector: ".turn b" })).toBeTruthy();
+      for (const player of [ALICE, BOB]) {
+          expect(within(playerRegion(player)).getByRole("button", { name: "Force pass" })).toBeTruthy();
+      }
   });
 
   test("a choose decision only enables Submit for a valid number of picks", () => {
@@ -149,11 +163,11 @@ describe("decision panel", () => {
 
   test("a cancelable decision submits a cancel answer", () => {
     const pending = yesNo({
-      id: 901 as DecisionId,
-      player: BOB,
-      prompt: "Keep this hand?",
-      then: { kind: "discardToHandSize" },
-      onCancel: { kind: "cancel" },
+        id: 901 as DecisionId,
+        player: BOB,
+        prompt: "Keep this hand?",
+        then: { kind: "discardToHandSize" },
+        onCancel: { kind: "cancelAbility" },
     });
     const onSubmit = vi.fn();
     render(<DecisionPanel state={{ ...newDemoGame(), pending }} error={null} onSubmit={onSubmit} />);
@@ -183,7 +197,7 @@ describe("decision panel", () => {
     expect(screen.getByRole("alert").textContent).toBe("That decision is no longer current");
 
     rerender(<DecisionPanel state={{ ...newDemoGame(), winner: BOB }} error={null} onSubmit={vi.fn()} />);
-    expect(screen.getByText("Game over: bob wins.")).toBeTruthy();
+    expect(screen.getByText("Game over: Bob wins.")).toBeTruthy();
   });
 });
 
@@ -194,37 +208,37 @@ describe("stack panel", () => {
   });
 
   test("lists entries with the top of the stack first", () => {
-    const base = newDemoGame();
-    const hand = must(base.players[ALICE]).hand;
-    const find = (def: string) => must(hand.find((id) => base.objects[id]?.definitionId === cardDefId(def)));
+      const base = newDemoGame();
+      const hand = must(base.players[ALICE]).hand;
+      const find = (def: string) => must(hand.find((id) => base.objects[id]?.definitionId === cardDefId(def)));
 
-    const bolt = must(moveObject(base, find("bolt"), "stack"));
-    const bear = must(moveObject(bolt.state, find("bear"), "stack"));
+      const bolt = must(moveObject(base, find("bolt"), "stack"));
+      const bear = must(moveObject(bolt.state, find("bear"), "stack"));
 
-    const state: GameState = {
-      ...bear.state,
-      stack: [
-        { kind: "spell", id: 1000 as StackId, controller: ALICE, source: bolt.newId, targets: [{ kind: "player", id: BOB }] },
-        {
-          kind: "ability",
-          id: 1001 as StackId,
-          controller: BOB,
-          source: bear.newId,
-          targets: [],
-          effects: [{ kind: "gainLife", who: "controller", amount: 2 }],
-        },
-      ],
-    };
-    render(<StackPanel state={state} />);
+      const state: GameState = {
+          ...bear.state,
+          stack: [
+              { kind: "spell", id: 1000 as StackId, controller: ALICE, source: bolt.newId, targets: [{ kind: "player", id: BOB }] },
+              {
+                  kind: "ability",
+                  id: 1001 as StackId,
+                  controller: BOB,
+                  source: bear.newId,
+                  targets: [],
+                  effects: [{ kind: "gainLife", who: "controller", amount: 2 }],
+              },
+          ],
+      };
+      render(<StackPanel state={state} />);
 
-    const region = screen.getByRole("region", { name: "Stack" });
-    const names = [...region.querySelectorAll("ol.stack-list > li > details > summary .name")].map((n) => n.textContent);
-    expect(names).toEqual(["Grizzly Bears", "Lightning Bolt"]); // last element of the array is the top
-    expect(must(region.querySelector("summary")).textContent).toContain("top");
+      const region = screen.getByRole("region", { name: "Stack" });
+      const names = [...region.querySelectorAll("ol.stack-list > li > details > summary .name")].map((n) => n.textContent);
+      expect(names).toEqual(["Grizzly Bears", "Lightning Bolt"]); // last element of the array is the top
+      expect(must(region.querySelector("summary")).textContent).toContain("top");
 
-    const text = region.textContent ?? "";
-    expect(text).toContain("deal 3 damage to target 1"); // the spell's effect, read from its card
-    expect(text).toContain("player bob"); // its target
-    expect(text).toContain("controller gains 2 life"); // the ability's own effects
+      const text = region.textContent ?? "";
+      expect(text).toContain("deal 3 damage to target 1"); // the spell's effect, read from its card
+      expect(text).toContain("player Bob"); // its target
+      expect(text).toContain("controller gains 2 life"); // the ability's own effects
   });
 });
