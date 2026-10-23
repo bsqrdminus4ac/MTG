@@ -1,8 +1,10 @@
 import type { CardDefId, ObjectId, Timestamp } from "./ids";
 import type { Color, ManaCost, ManaType } from "./mana";
 import type { GameEvent } from "./events";
-import { assertNever } from "./util";
-import type { Zone } from "./state";
+import { assertNever, withEntry } from "./util";
+import type { GameState, Zone } from "./state";
+import { getCardName, getCharacteristics } from "./characteristics";
+import { fail, ok, type ApplyResult } from "./engine";
 
 export type CardType =
   | "Artifact" | "Battle" | "Creature" | "Enchantment"
@@ -151,8 +153,32 @@ export interface Characteristics {
     readonly abilities: readonly Ability[];
 }
 
+export function hasKeyword(state: GameState, obj: ObjectId, keyword: Keyword): boolean {
+    const chars = getCharacteristics(state, obj);
+    if (!chars) return false;
+    return chars.abilities.some((a) => a.kind === "keyword" && a.keyword === keyword);
+}
+
+export function hasCardType(state: GameState, obj: ObjectId, type: CardType): boolean {
+    const chars = getCharacteristics(state, obj);
+    if (!chars) return false;
+    return chars.types.includes(type);
+}
+
 /** Static card data. Many game objects can share one definition. */
 export interface CardDefinition extends Characteristics {
     readonly id: CardDefId;
     readonly isToken?: boolean;
+}
+
+
+//----------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+export function tapPermanent(state: GameState, objId: ObjectId): ApplyResult {
+    const obj = state.objects[objId];
+    if (!obj) return fail(`Unable to find object #${objId}`);
+    if (obj.tapped) return fail("That object is already tapped");
+    const tappedObj = withEntry(state.objects, objId, { ...obj, tapped: true });
+    return ok({ ...state, objects: tappedObj }, [{ type: "permanentTapped", object: objId, cardName: getCardName(state, objId) }]);
 }

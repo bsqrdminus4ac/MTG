@@ -9,8 +9,8 @@ import {
 
 import { bear, bolt, DEFINITIONS, drake, forest, mountain } from "@mtg/definitions";
 
-export const ALICE = playerId("alice");
-export const BOB = playerId("bob");
+export const ALICE = playerId("Alice");
+export const BOB = playerId("Bob");
 
 
 

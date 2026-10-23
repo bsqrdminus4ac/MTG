@@ -96,9 +96,10 @@ function checkFor0Toughness(state: GameState): ApplyResult {
     let currentState = state;
     const events: GameEvent[] = [];
     const idsToMove: ObjectId[] = [];
-    for (const obj of Object.values(state.objects)) {
-        const chars = getCharacteristics(state, obj.id);
-        if (obj.zone !== "battlefield") continue;
+    for (const id of state.battlefield) {
+        const obj = state.objects[id];
+        if (!obj) return fail(`Unable to find obj ${id}`);
+        const chars = getCharacteristics(state, id);
         if (!chars) return fail(`Unable to locate characteristics of object #${obj.id}`);
         if (chars.types.includes("Creature") && (chars.toughness ?? 0) <= 0) {
             idsToMove.push(obj.id);
@@ -117,11 +118,12 @@ function checkForLethalDamage(state: GameState): ApplyResult {
     let currentState = state;
     const events: GameEvent[] = [];
     const idsToMove: ObjectId[] = [];
-    for (const obj of Object.values(state.objects)) {
+    for (const id of state.battlefield) {
+        const obj = state.objects[id];
+        if (!obj) return fail(`Unable to find obj ${id}`);
         const chars = getCharacteristics(state, obj.id);
-        if (obj.zone !== "battlefield") continue;
         if (!chars) return fail(`Unable to locate characteristics of object #${obj.id}`);
-        if (chars.types.includes("Creature") && (obj.damage >= (chars.toughness ?? 0))) {
+        if (chars.types.includes("Creature") && obj.damage >= (chars.toughness ?? 0)) {
             idsToMove.push(obj.id);
         }
     }
@@ -140,11 +142,12 @@ function checkFor0Loyalty(state: GameState): ApplyResult {
     let currentState = state;
     const events: GameEvent[] = [];
     const idsToMove: ObjectId[] = [];
-    for (const obj of Object.values(state.objects)) {
+    for (const id of state.battlefield) {
+        const obj = state.objects[id];
+        if (!obj) return fail(`Unable to find obj ${id}`);
         const chars = getCharacteristics(state, obj.id);
-        if (obj.zone !== "battlefield") continue;
         if (!chars) return fail(`Unable to locate characteristics of object #${obj.id}`);
-        if (chars.types.includes("Planeswalker") && ((obj.counters["loyalty"] ?? 0) <= 0)) {
+        if (chars.types.includes("Planeswalker") && (obj.counters["loyalty"] ?? 0) <= 0) {
             idsToMove.push(obj.id);
         }
     }
@@ -164,19 +167,20 @@ function checkFor0Loyalty(state: GameState): ApplyResult {
 //TODO: Equipment legality
 
 function combinePlusMinusCounters(state: GameState): ApplyResult {
-    let updatedObjects = {...state.objects};
+    let updatedObjects = { ...state.objects };
     let changesMade: boolean = false;
-    for (const obj of Object.values(state.objects)) {
-        if (obj.zone !== "battlefield") continue;
+    for (const id of state.battlefield) {
+        const obj = state.objects[id];
+        if (!obj) return fail(`Unable to find obj ${id}`);
         if (obj.counters["+1/+1"] && obj.counters["-1/-1"] && obj.counters["+1/+1"] > 0 && obj.counters["-1/-1"] > 0) {
             const toRemove = Math.min(obj.counters["+1/+1"], obj.counters["-1/-1"]);
             let counters: Readonly<Record<string, number>> = withEntry(obj.counters, "+1/+1", obj.counters["+1/+1"] - toRemove);
             counters = withEntry(obj.counters, "-1/-1", obj.counters["-1/-1"] - toRemove);
-            updatedObjects = withEntry(updatedObjects, obj.id, {...obj, counters});
+            updatedObjects = withEntry(updatedObjects, obj.id, { ...obj, counters });
             changesMade = true;
         }
     }
-    return ok({...state, objects: updatedObjects}, [], changesMade);
+    return ok({ ...state, objects: updatedObjects }, [], changesMade);
 }
 
 //TODO: Sagas

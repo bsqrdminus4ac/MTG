@@ -1,5 +1,6 @@
 import type { CardDefinition, ContinuousEffect, Effect } from "./cards";
 import type { CastingInProgress } from "./casting";
+import type { CombatInfo, CombatInProgress } from "./combat";
 import type { Decision } from "./decisions";
 import type { CardDefId, ObjectId, PlayerId, StackId, Timestamp } from "./ids";
 import type { ManaPool } from "./mana";
@@ -44,6 +45,7 @@ export interface GameObject {
     readonly damage: number;
     readonly counters: Readonly<Record<string, number>>;
     readonly turnEnteredZone?: number;
+    readonly combatInfo?: CombatInfo;
 }
 
 export interface PlayerState {
@@ -65,6 +67,8 @@ export type Target =
   | Readonly<{ kind: "object"; id: ObjectId }>
   | Readonly<{ kind: "player"; id: PlayerId }>
   | Readonly<{ kind: "stackEntry"; id: StackId}>;
+export type AttackableTarget = Exclude<Target, { kind: "stackEntry" }>;
+
 
 interface StackEntryBase {
   readonly id: StackId;
@@ -95,25 +99,26 @@ export interface PriorityState {
 }
 
 export interface GameState {
-  readonly definitions: Readonly<Record<CardDefId, CardDefinition>>;
-  readonly objects: Readonly<Record<ObjectId, GameObject>>;
-  readonly players: Readonly<Record<PlayerId, PlayerState>>;
-  readonly turnOrder: readonly PlayerId[];
+    readonly definitions: Readonly<Record<CardDefId, CardDefinition>>;
+    readonly objects: Readonly<Record<ObjectId, GameObject>>;
+    readonly players: Readonly<Record<PlayerId, PlayerState>>;
+    readonly turnOrder: readonly PlayerId[];
 
-  // Shared zones. Per-player zones (library, hand, graveyard) live on PlayerState.
-  readonly battlefield: readonly ObjectId[];
-  readonly exile: readonly ObjectId[];
-  readonly stack: readonly StackEntry[];
+    // Shared zones. Per-player zones (library, hand, graveyard) live on PlayerState.
+    readonly battlefield: readonly ObjectId[];
+    readonly exile: readonly ObjectId[];
+    readonly stack: readonly StackEntry[];
 
-  readonly continuousEffects: readonly ContinuousEffect[];
-  readonly turn: TurnState;
-  readonly priority: PriorityState | null;
-  /** The question the engine is waiting on, if any. See decisions.ts. */
-  readonly pending: Decision | null;
+    readonly continuousEffects: readonly ContinuousEffect[];
+    readonly turn: TurnState;
+    readonly priority: PriorityState | null;
+    /** The question the engine is waiting on, if any. See decisions.ts. */
+    readonly pending: Decision | null;
 
-  /** Single counter used to issue ObjectIds, StackIds and Timestamps, so everything is deterministic. */
-  readonly nextId: number;
-  readonly winner: PlayerId | null;
+    /** Single counter used to issue ObjectIds, StackIds and Timestamps, so everything is deterministic. */
+    readonly nextId: number;
+    readonly winner: PlayerId | null;
 
-  casting: CastingInProgress | null;
+    readonly casting: CastingInProgress | null;
+    readonly combat: CombatInProgress | null;
 }

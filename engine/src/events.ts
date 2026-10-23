@@ -1,5 +1,5 @@
 import { playerId, type ObjectId, type PlayerId, type StackId } from "./ids";
-import type { Step, Target, Zone } from "./state";
+import type { AttackableTarget, Step, Target, Zone } from "./state";
 
 /**
  * Facts about what just happened. The engine returns these alongside the new state.
@@ -31,5 +31,6 @@ export type GameEvent =
     | Readonly<{ type: "permanentTapped"; object: ObjectId; cardName: string }>
     | Readonly<{ type: "permanentUntapped"; object: ObjectId; cardName: string }>
     | Readonly<{ type: "abilityActivated"; player: PlayerId; abilitySource: ObjectId; cardName: string; stackEntryId?: StackId; targets?: Target[] }>
+    | Readonly<{ type: "attackDeclared"; player: PlayerId; object: ObjectId; cardName: string; target: AttackableTarget; targetName: string }>
     | Readonly<{ type: "lostTheGame"; player: PlayerId; cause: string }>
     | Readonly<{ type: "wonTheGame"; player: PlayerId }>;

@@ -1,7 +1,8 @@
 import type { Action } from "./actions";
-import type { AbilityOfKind } from "./cards";
+import { tapPermanent, type AbilityOfKind } from "./cards";
 import { applyTargetSelections, beginCast, cancelCast, payManaOptions, resolveSpell } from "./casting";
 import { getCardName, getCharacteristics, isPermanentType } from "./characteristics";
+import { applyAttackSelectionDecision, applyAttackTargetDecision, beginCombat, processCombatDamage } from "./combat";
 import {
   chooseMany, objectChoice, resolveChooseAnswer, resolvePriorityAnswer, resolveYesNoAnswer,
   type Choice, type Continuation, type Submission,
@@ -40,6 +41,7 @@ export function applySequentially(state: GameState, steps: readonly ((state: Gam
         currentState = result.state;
         events.push(...result.events);
         if (result.changesMade) changesMade = true;
+        if (currentState.winner) break; // Stop processing if a winner has been determined
     }
     return ok(currentState, events, changesMade);
 }
@@ -134,14 +136,14 @@ function resume(state: GameState, then: Continuation, answer: Resolved): ApplyRe
           if (answer.kind !== "choose") return fail("Expected a selection");
           return finishDiscard(state, answer.chosen);
       }
-      case "cancel": {
+      case "cancelAbility": {
           if (answer.kind !== "cancel") return fail("Expected a cancel answer");
           if (state.casting) {
               return cancelCast(state);
           }
           return fail("Cancelling non-casting decisions is not yet supported");
       }
-      case "selectTargets": {
+      case "selectAbilityTargets": {
           if (answer.kind !== "choose") return fail("Expected a selection");
           return applyTargetingDecision(state, answer.chosen);
       }
@@ -154,6 +156,14 @@ function resume(state: GameState, then: Continuation, answer: Resolved): ApplyRe
               return fail("Expected a selection or yes/no");
           }
       }
+      case "selectAttackers":
+          if (answer.kind !== "choose") return fail("Expected a selection");
+          return applyAttackSelectionDecision(state, answer.chosen);
+      case "selectAttackTargets":
+          if (answer.kind !== "choose") return fail("Expected a selection");
+          return applyAttackTargetDecision(state, answer.chosen);
+      case "cancelAttacks":
+          return fail("Canceling attacks not yet implemented");
       default:
           return assertNever(then); // narrows to never once every continuation kind has a case
   }
@@ -187,7 +197,7 @@ function passPriority(state: GameState, player: PlayerId): ApplyResult {
   return state.stack.length > 0 ? resolveTopOfStack(state, events) : advanceStep(state, events);
 }
 
-function givePriorityToActivePlayer(state: GameState, events: GameEvent[]): ApplyResult {
+export function givePriorityToActivePlayer(state: GameState, events: GameEvent[]): ApplyResult {
     const result = checkStateBasedActions(state, []);
     if (!result.ok) return result;
     return ok(
@@ -273,14 +283,37 @@ function advanceStep(state: GameState, events: readonly GameEvent[]): ApplyResul
       out.push({ type: "turnStarted", turn: number, activePlayer });
     }
 
-    next = { ...next, turn: { number, activePlayer, step } };
+    next = { ...next, turn: { number, activePlayer, step }, pending: null };
     out.push({ type: "stepStarted", step });
     next = onEnterStep(next, step, wrapped, out);
 
-    if (step === "cleanup") {
-      const excess = handExcess(next);
-      if (excess > 0) return ok(askDiscard(next, excess), out); // pauses until answered
+    if (step === "declareAttackers") {
+        const result = beginCombat(next);
+        if (!result.ok) return result;
+        out.push(...result.events);
+        // If no attackers to select, just skip to giving active player priority
+        if (result.state.pending) {
+            return ok(result.state, out);
+        } else {
+            next = result.state;
+        }
+    } else if (step === "declareBlockers") {
+        if (!next.combat) {
+            continue; // Skip declare blockers step if no attackers are declared
+        }
+    } else if (step === "combatDamage") {
+        if (!next.combat) {
+            continue; // Skip combat damage step if no attackers are declared
+        }
+        const result = processCombatDamage(next);
+        if (!result.ok) return result;
+        next = result.state;
+        out.push(...result.events);
+    } else if (step === "cleanup") {
+        const excess = handExcess(next);
+        if (excess > 0) return ok(askDiscard(next, excess), out); // pauses until answered
     }
+
     if (stepGrantsPriority(step)) return givePriorityToActivePlayer(next, out);
   }
   return fail("Could not find the next step with priority");
@@ -342,7 +375,10 @@ function onEnterStep(state: GameState, step: Step, newTurn: boolean, out: GameEv
       let objects = next.objects;
       for (const id of next.battlefield) {
         const o = objects[id];
-        if (o && o.controller === next.turn.activePlayer) objects = withEntry(objects, id, { ...o, tapped: false });
+        if (o && o.controller === next.turn.activePlayer && o.tapped) {
+            objects = withEntry(objects, id, { ...o, tapped: false });
+            out.push({ type: "permanentUntapped", object: id, cardName: getCardName(state, id) });
+        }
       }
       return { ...next, objects };
     }
@@ -420,23 +456,17 @@ function activateAbilityForPriority(state: GameState, player: PlayerId, source: 
 }
 
 function payAbilityCosts(state: GameState, player: PlayerId, source: ObjectId, ability: AbilityOfKind<"activated">): ApplyResult {
-  const obj = state.objects[source];
-  let events: GameEvent[] = [];
-  let currentState = state;
-  if (!obj) return fail("That object is gone");
+  let steps: ((state: GameState) => ApplyResult)[] = [];
   if (ability.cost.mana) {
     // TODO
   }
   if (ability.cost.tap) {
-    if (obj.tapped) return fail("That object is already tapped");
-    const tappedObj = withEntry(state.objects, source, { ...obj, tapped: true });
-    currentState = { ...currentState, objects: tappedObj };
-    events.push({ type: "permanentTapped", object: source, cardName: getCardName(currentState, source) });
+      steps.push((currentState: GameState) => tapPermanent(currentState, source));
   }
   if (ability.cost.sacrificeSelf) {
     // TODO
   }
-  return ok(currentState, events);
+  return applySequentially(state, steps);
 }
 
 function resolveManaAbility(state: GameState, player: PlayerId, source: ObjectId, ability: AbilityOfKind<"activated">): ApplyResult {

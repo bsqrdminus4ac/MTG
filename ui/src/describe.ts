@@ -261,6 +261,8 @@ export function describeEvent(state: GameState, e: GameEvent): string {
           return `${e.player} loses the game due to ${e.cause}!`;
       case "wonTheGame":
           return `${e.player} wins the game!`;
+      case "attackDeclared":
+          return `${e.player} attacks ${e.targetName} with ${e.cardName} (#${e.object})`;
       default:
           return unreachable(e);
   }

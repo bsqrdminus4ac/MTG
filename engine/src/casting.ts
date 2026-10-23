@@ -104,8 +104,8 @@ export function selectTargetOptions(state: GameState): ApplyResult {
             min: nextSpec.minCount,
             max: nextSpec.maxCount,
             player: player,
-            then: { kind: "selectTargets" },
-            onCancel: { kind: "cancel" },
+            then: { kind: "selectAbilityTargets" },
+            onCancel: { kind: "cancelAbility" },
         }),
     );
 
@@ -231,7 +231,7 @@ export function payManaOptions(state: GameState): ApplyResult {
             player,
             prompt: `Add mana to cast ${cardName}`,
             then: { kind: "costPayment" },
-            onCancel: { kind: "cancel" },
+            onCancel: { kind: "cancelAbility" },
         }),
     );
     return ok(decisionState, []);

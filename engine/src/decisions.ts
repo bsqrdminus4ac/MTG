@@ -69,7 +69,15 @@ export const manaAbilityChoice = (id: ObjectId, abilityIndex: number, label: str
  * callback so a paused game can be saved, restored, and replayed. Add a variant here, and a
  * case in engine.ts `resume`, for each new kind of question.
  */
-export type Continuation = Readonly<{ kind: "discardToHandSize" } | { kind: "cancel" } | { kind: "selectTargets" } | { kind: "costPayment" }>;
+export type Continuation = Readonly<
+    | { kind: "discardToHandSize" }
+    | { kind: "cancelAbility" }
+    | { kind: "selectAbilityTargets" }
+    | { kind: "costPayment" }
+    | { kind: "selectAttackers" }
+    | { kind: "selectAttackTargets" }
+    | { kind: "cancelAttacks" }
+>;
 
 interface DecisionBase {
   readonly id: DecisionId;
