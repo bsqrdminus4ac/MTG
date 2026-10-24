@@ -85,6 +85,7 @@ export type Continuation = Readonly<
     | { kind: "cancelAttacks" }
     | { kind: "selectBlockers"; blocker: ObjectId }
     | { kind: "cancelBlocks" }
+    | { kind: "selectDamageOrder"; attacker: ObjectId }
 >;
 
 interface DecisionBase {
@@ -115,7 +116,13 @@ export interface ChooseDecision extends DecisionBase {
   readonly then: Continuation;
 }
 
-export type Decision = PriorityDecision | YesNoDecision | ChooseDecision;
+export interface OrderingDecision extends DecisionBase {
+    readonly kind: "order";
+    readonly options: readonly Choice[];
+    readonly then: Continuation;
+}
+
+export type Decision = PriorityDecision | YesNoDecision | ChooseDecision | OrderingDecision;
 
 export const priorityDecision = (spec: Omit<PriorityDecision, "kind">): PriorityDecision => ({
   kind: "priority",
@@ -134,15 +141,18 @@ export function chooseMany(spec: Omit<ChooseDecision, "kind">): ChooseDecision {
 export const chooseOne = (spec: Omit<ChooseDecision, "kind" | "min" | "max">): ChooseDecision =>
   chooseMany({ ...spec, min: 1, max: 1 });
 
+export const orderingDecision = (spec: Omit<OrderingDecision, "kind">): OrderingDecision => ({ kind: "order", ...spec });
+
 // ---------------------------------------------------------------------------
 // Answers
 // ---------------------------------------------------------------------------
 
 export type Answer =
-  | Readonly<{ kind: "priority"; option: string }>
-  | Readonly<{ kind: "yesNo"; value: boolean }>
-  | Readonly<{ kind: "choose"; selected: readonly string[] }>
-  | Readonly<{ kind: "cancel" }>;
+    | Readonly<{ kind: "priority"; option: string }>
+    | Readonly<{ kind: "yesNo"; value: boolean }>
+    | Readonly<{ kind: "choose"; selected: readonly string[] }>
+    | Readonly<{ kind: "order"; order: readonly number[] }>
+    | Readonly<{ kind: "cancel" }>;
 
 /** The only thing a UI or AI sends to the engine. */
 export interface Submission {
@@ -187,12 +197,28 @@ export function resolveChooseAnswer(d: ChooseDecision, answer: Answer): Result<r
   return good(chosen);
 }
 
+export function resolveOrderingAnswer(d: OrderingDecision, answer: Answer): Result<readonly number[]> {
+    if (answer.kind !== "order") return bad("Expected an ordering answer");
+    if (answer.order.length !== d.options.length) return bad("Ordering length doesn't match number of options");
+    const n = answer.order.length;
+    const seen = new Array<boolean>(n).fill(false);
+    for (const x of answer.order) {
+        if (!Number.isInteger(x) || x < 0 || x >= n || seen[x]) return bad(`Ordering doesn't have each index from 0 to ${n - 1} once each`);
+        seen[x] = true;
+    }
+    return good(answer.order);
+}
+
 /** Is this answer acceptable for this decision? Handy for UIs that want to disable a Submit button. */
 export function validateAnswer(d: Decision, answer: Answer): Result<null> {
   if (answer.kind === "cancel") return d.onCancel ? good(null) : bad("This decision cannot be canceled");
   const r =
-    d.kind === "priority" ? resolvePriorityAnswer(d, answer)
-    : d.kind === "yesNo" ? resolveYesNoAnswer(d, answer)
-    : resolveChooseAnswer(d, answer);
+      d.kind === "priority"
+          ? resolvePriorityAnswer(d, answer)
+          : d.kind === "yesNo"
+            ? resolveYesNoAnswer(d, answer)
+            : d.kind === "order"
+              ? resolveOrderingAnswer(d, answer)
+              : resolveChooseAnswer(d, answer);
   return r.ok ? good(null) : r;
 }

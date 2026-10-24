@@ -1,6 +1,6 @@
 import { hasCardType, hasKeyword, tapPermanent } from "./cards";
 import { getCardName, getCharacteristics } from "./characteristics";
-import { chooseMany, chooseOne, nullChoice, objectChoice, playerChoice, type Choice } from "./decisions";
+import { chooseMany, chooseOne, nullChoice, objectChoice, orderingDecision, playerChoice, type Choice } from "./decisions";
 import { damageObject, damagePlayer } from "./effects";
 import { applySequentially, fail, givePriorityToActivePlayer, ok, type ApplyResult } from "./engine";
 import type { GameEvent } from "./events";
@@ -176,7 +176,7 @@ export function declareAttacks(state: GameState): ApplyResult {
 
 export function cancelAttacks(state: GameState, player: PlayerId): ApplyResult {
     if (!state.combat || !state.combat.rollback) return fail("Unable to roll back to before attackers were chosen");
-    return ok(state.combat.rollback, [{type: "attacksCancelled", player }]);
+    return ok(state.combat.rollback, [{ type: "attacksCancelled", player }]);
 }
 
 function canCreatureAttack(state: GameState, creature: ObjectId): boolean {
@@ -316,12 +316,12 @@ export function declareBlocks(state: GameState, player: PlayerId): ApplyResult {
             );
         }
     }
-    return givePriorityToActivePlayer({...state, combat: {...state.combat, rollback: null}}, events );
+    return givePriorityToActivePlayer({ ...state, combat: { ...state.combat, rollback: null } }, events);
 }
 
 export function cancelBlocks(state: GameState, player: PlayerId): ApplyResult {
     if (!state.combat || !state.combat.rollback) return fail("Unable to roll back to before blockers were chosen");
-    return ok(state.combat.rollback, [{type: "blocksCancelled", player }]);
+    return ok(state.combat.rollback, [{ type: "blocksCancelled", player }]);
 }
 
 function getPlayersBeingAttacked(state: GameState): PlayerId[] {
@@ -378,6 +378,38 @@ function canBlockThisAttacker(state: GameState, blocker: ObjectId, attacker: Com
 
 //#region Combat Damage
 
+export function startCombatDamage(state: GameState): ApplyResult {
+    if (state.turn.step !== "combatDamage") return fail("Combat damage can only be dealt during the combat damage step");
+    if (!state.combat) return fail("No combat in progress to process damage for");
+    if (!state.combat.attackers || Object.keys(state.combat.attackers).length === 0) return fail("No attackers have been declared");
+    for (const attacker of Object.values(state.combat.attackers)) {
+        if ((attacker.blockedBy?.length ?? 0) > 1 && !attacker.blockOrder) {
+            return ok(
+                openDecision(state, (id) =>
+                    orderingDecision({
+                        id,
+                        player: state.turn.activePlayer,
+                        options: attacker.blockedBy!.map((blocker): Choice => objectChoice(blocker, getCardName(state, blocker, true))),
+                        prompt: `Choose the order that ${getCardName(state, attacker.id, true)} will deal damage to its blockers`,
+                        then: { kind: "selectDamageOrder", attacker: attacker.id },
+                    }),
+                ),
+                [],
+            );
+        }
+    }
+    //TODO: Handle first strike
+    return processCombatDamage(state, false);
+}
+
+export function applyDamageOrderingDecision(state: GameState, attacker: ObjectId, order: readonly number[]): ApplyResult {
+    if (state.turn.step !== "combatDamage") return fail("Combat damage can only be dealt during the combat damage step");
+    if (!state.combat) return fail("No combat in progress to process damage for");
+    if (!state.combat.attackers || Object.keys(state.combat.attackers).length === 0) return fail("No attackers have been declared");
+    if (!(attacker in state.combat.attackers) || state.combat.attackers[attacker]?.blockedBy?.length !== order.length) return fail("Invalid ordering for combat damage");
+    return startCombatDamage({ ...state, combat: { ...state.combat, attackers: withEntry(state.combat.attackers, attacker, { ...state.combat.attackers[attacker], blockOrder: order }) } });
+}
+
 export function processCombatDamage(state: GameState, isFirstStrikeStep?: boolean): ApplyResult {
     if (state.turn.step !== "combatDamage") return fail("Combat damage can only be dealt during the combat damage step");
     if (!state.combat) return fail("No combat in progress to process damage for");
@@ -393,18 +425,88 @@ function dealCombatDamage(state: GameState, combatInfo: CombatInfo, isFirstStrik
     const obj = state.objects[combatInfo.id];
     if (!obj) return ok(state, []);
     if (obj.zone !== "battlefield") return ok(state, []);
+    if (obj.controller !== state.turn.activePlayer) return ok(state, []);
     const chars = getCharacteristics(state, combatInfo.id);
     if (!chars) return ok(state, []);
     if (!chars.power || chars.power <= 0) return ok(state, []);
-    //TODO: Check for blockers
-    if (combatInfo.attackTarget.kind === "object") {
-        return damageObject(state, combatInfo.attackTarget.id, combatInfo.id, chars.power, true);
-    } else {
-        return damagePlayer(state, combatInfo.attackTarget.id, combatInfo.id, chars.power, true);
+
+    let damageLeft = chars.power;
+    let currentState = { ...state };
+    let events: GameEvent[] = [];
+    const hasTrample = hasKeyword(currentState, combatInfo.id, "trample");
+    if (combatInfo.blockedBy) {
+        if (combatInfo.blockedBy.length === 1) {
+            const blocker = combatInfo.blockedBy[0];
+            let [result, newDamageLeft] = dealSingleCombatDamage(currentState, combatInfo.id, blocker, combatInfo.attackTarget, damageLeft, hasTrample, true);
+            if (!result.ok) return result;
+            currentState = result.state;
+            events.push(...result.events);
+            damageLeft = newDamageLeft;
+        } else {
+            if (combatInfo.blockedBy.length !== combatInfo.blockOrder?.length) return fail("Unable to determine order to deal combat damage in");
+            for (let orderIndex = 0; orderIndex < combatInfo.blockOrder.length; orderIndex++) {
+                const i = combatInfo.blockOrder[orderIndex]!;
+                const blocker = combatInfo.blockedBy[i];
+                let [result, newDamageLeft] = dealSingleCombatDamage(
+                    currentState,
+                    combatInfo.id,
+                    blocker,
+                    combatInfo.attackTarget,
+                    damageLeft,
+                    hasTrample,
+                    orderIndex === combatInfo.blockOrder.length - 1,
+                );
+                if (!result.ok) return result;
+                currentState = result.state;
+                events.push(...result.events);
+                damageLeft = newDamageLeft;
+            }
+        }
+        if (!hasTrample) {
+            return ok(currentState, events);
+        }
     }
+
+    const result =
+        combatInfo.attackTarget.kind === "object"
+            ? damageObject(currentState, combatInfo.attackTarget.id, combatInfo.id, damageLeft, true)
+            : damagePlayer(currentState, combatInfo.attackTarget.id, combatInfo.id, damageLeft, true);
+    return result.ok ? ok(result.state, [...events, ...result.events]) : result;
 }
 
-function isStillLegalTarget(state: GameState, objId: ObjectId, target: AttackableTarget): boolean {
+function dealSingleCombatDamage(
+    state: GameState,
+    attacker: ObjectId,
+    blocker: ObjectId | undefined,
+    attackTarget: AttackableTarget,
+    attackerDamageLeft: number,
+    hasTrample: boolean,
+    isLastBlocker: boolean,
+): [result: ApplyResult, damageLeft: number] {
+    if (blocker && isStillValidBlocker(state, attacker, blocker, attackTarget)) {
+        const blockerChars = getCharacteristics(state, blocker);
+        if (blockerChars) {
+            const blockerToughness = blockerChars?.toughness ?? 0;
+            const damageToDeal = !hasTrample && isLastBlocker ? attackerDamageLeft : blockerToughness;
+            const damageBlockerDeals = blockerChars.power ?? 0;
+            const result = applySequentially(state, [(s) => damageObject(s, blocker, attacker, damageToDeal, true), (s) => damageObject(s, attacker, blocker, damageBlockerDeals, true)]);
+            return [result, attackerDamageLeft - damageToDeal];
+        }
+    }
+    return [ok(state, []), attackerDamageLeft];
+}
+
+function isStillValidBlocker(state: GameState, attacker: ObjectId, blocker: ObjectId, attackTarget: AttackableTarget): boolean {
+    const obj = state.objects[blocker];
+    if (!obj) return false;
+    if (obj.zone !== "battlefield") return false;
+    if (!hasCardType(state, blocker, "Creature")) return false;
+    if (obj.controller !== (attackTarget.kind === "object" ? state.objects[attackTarget.id]?.controller : attackTarget.id)) return false;
+    //TODO: Re-evaluate block restrictions before damage
+    return true;
+}
+
+function isStillLegalTarget(state: GameState, attacker: ObjectId, target: AttackableTarget): boolean {
     //TODO: Re-evaluate target legality before damage
     return true;
 }

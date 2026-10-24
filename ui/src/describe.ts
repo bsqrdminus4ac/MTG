@@ -209,6 +209,13 @@ export function describeAnswer(d: Decision, a: Answer): string {
         d.kind === "choose" ? a.selected.map((id) => d.options.find((o) => o.id === id)?.label ?? id) : [...a.selected];
       return labels.length > 0 ? labels.join(", ") : "(nothing)";
     }
+    case "order": {
+      const labels =
+        d.kind === "order"
+          ? a.order.map((index) => d.options[index]?.label ?? String(index))
+          : a.order.map(String);
+      return labels.length > 0 ? labels.join(" → ") : "(nothing)";
+    }
     case "cancel":
       return "(canceled)";
     default:

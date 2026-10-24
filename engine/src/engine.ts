@@ -2,11 +2,18 @@ import type { Action } from "./actions";
 import { tapPermanent, type AbilityOfKind } from "./cards";
 import { applyTargetSelections, beginCast, cancelCast, payManaOptions, resolveSpell } from "./casting";
 import { getCardName, getCharacteristics, isPermanentType } from "./characteristics";
-import { applyAttackSelectionDecision, applyAttackTargetDecision, applyChooseBlocksDecision, beginCombat, beginDeclareBlockers, cancelAttacks, cancelBlocks, processCombatDamage } from "./combat";
 import {
-  chooseMany, objectChoice, resolveChooseAnswer, resolvePriorityAnswer, resolveYesNoAnswer,
-  type Choice, type Continuation, type Submission,
-} from "./decisions";
+    applyAttackSelectionDecision,
+    applyAttackTargetDecision,
+    applyChooseBlocksDecision,
+    applyDamageOrderingDecision,
+    beginCombat,
+    beginDeclareBlockers,
+    cancelAttacks,
+    cancelBlocks,
+    processCombatDamage,
+} from "./combat";
+import { chooseMany, objectChoice, resolveChooseAnswer, resolveOrderingAnswer, resolvePriorityAnswer, resolveYesNoAnswer, type Choice, type Continuation, type Submission } from "./decisions";
 import type { GameEvent } from "./events";
 import type { ObjectId, PlayerId } from "./ids";
 import { addMana, emptyPool } from "./mana";
@@ -71,20 +78,24 @@ export function submitAnswer(state: GameState, submission: Submission): ApplyRes
   }
 
   switch (d.kind) {
-    case "priority": {
-      const r = resolvePriorityAnswer(d, submission.answer);
-      return r.ok ? applyAction(state, r.value.action) : fail(r.error);
-    }
-    case "yesNo": {
-      const r = resolveYesNoAnswer(d, submission.answer);
-      return r.ok ? resume(state, d.then, d.player, { kind: "yesNo", value: r.value }) : fail(r.error);
-    }
-    case "choose": {
-      const r = resolveChooseAnswer(d, submission.answer);
-      return r.ok ? resume(state, d.then, d.player, { kind: "choose", chosen: r.value }) : fail(r.error);
-    }
-    default:
-      return assertNever(d);
+      case "priority": {
+          const r = resolvePriorityAnswer(d, submission.answer);
+          return r.ok ? applyAction(state, r.value.action) : fail(r.error);
+      }
+      case "yesNo": {
+          const r = resolveYesNoAnswer(d, submission.answer);
+          return r.ok ? resume(state, d.then, d.player, { kind: "yesNo", value: r.value }) : fail(r.error);
+      }
+      case "choose": {
+          const r = resolveChooseAnswer(d, submission.answer);
+          return r.ok ? resume(state, d.then, d.player, { kind: "choose", chosen: r.value }) : fail(r.error);
+      }
+      case "order": {
+          const r = resolveOrderingAnswer(d, submission.answer);
+          return r.ok ? resume(state, d.then, d.player, { kind: "order", options: d.options, order: r.value }) : fail(r.error);
+      }
+      default:
+          return assertNever(d);
   }
 }
 
@@ -128,6 +139,7 @@ export function applyAction(state: GameState, action: Action): ApplyResult {
 type Resolved =
     | Readonly<{ kind: "yesNo"; value: boolean }>
     | Readonly<{ kind: "choose"; chosen: readonly Choice[] }>
+    | Readonly<{ kind: "order"; options: readonly Choice[]; order: readonly number[] }>
     | Readonly<{ kind: "cancel" }>;
 
 function resume(state: GameState, then: Continuation, player: PlayerId, answer: Resolved): ApplyResult {
@@ -171,6 +183,9 @@ function resume(state: GameState, then: Continuation, player: PlayerId, answer: 
             return applyChooseBlocksDecision(state, player, then.blocker, answer.chosen);
         case "cancelBlocks":
             return applySequentially(state, [(currentState) => cancelBlocks(currentState, player), beginDeclareBlockers]);
+        case "selectDamageOrder":
+            if (answer.kind !== "order") return fail("Expected an ordering decision");
+            return applyDamageOrderingDecision(state, then.attacker, answer.order);
         default:
             return assertNever(then); // narrows to never once every continuation kind has a case
     }

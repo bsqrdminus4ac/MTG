@@ -211,6 +211,7 @@ describe("spell targeting", () => {
             type: "spellCastCancelled",
             player: alice,
             card: moved.newId,
+            cardName: "Target Spell",
         });
     });
 

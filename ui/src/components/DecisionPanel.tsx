@@ -10,6 +10,7 @@ import { describeAction, describeChoiceValue } from "../describe";
 interface Row {
     readonly key: string;
     readonly optionId?: string;
+    readonly optionIndex?: number;
     readonly label: string;
     readonly detail: string;
     readonly isCancel?: boolean;
@@ -46,6 +47,14 @@ function rowsFor(state: GameState, d: Decision): Row[] {
                 detail: describeChoiceValue(state, c.value),
             }));
             break;
+        case "order":
+            rows = d.options.map((c, index) => ({
+                key: `option:${index}`,
+                optionIndex: index,
+                label: c.label,
+                detail: describeChoiceValue(state, c.value),
+            }));
+            break;
     }
     return d.onCancel
         ? [
@@ -59,6 +68,7 @@ function buildAnswer(
     d: Decision,
     rows: readonly Row[],
     selected: readonly string[],
+    order: readonly number[],
 ): Answer | null {
     const selectedRows: Row[] = [];
     for (const key of selected) {
@@ -86,6 +96,8 @@ function buildAnswer(
                 : { kind: "yesNo", value: first === "yes" };
         case "choose":
             return { kind: "choose", selected: selectedOptionIds };
+        case "order":
+            return { kind: "order", order };
     }
 }
 
@@ -97,6 +109,13 @@ interface FormProps {
 
 function DecisionForm({ state, decision, onSubmit }: FormProps) {
     const [selected, setSelected] = useState<readonly string[]>([]);
+    const [order, setOrder] = useState<readonly number[]>(() =>
+        decision.kind === "order"
+            ? decision.options.map((_, index) => index)
+            : [],
+    );
+    const [dragging, setDragging] = useState<number | null>(null);
+    const [dragOver, setDragOver] = useState<number | null>(null);
 
     const rows = rowsFor(state, decision);
     // "Pick exactly one" reads best as radio buttons; anything with a range is checkboxes.
@@ -104,7 +123,7 @@ function DecisionForm({ state, decision, onSubmit }: FormProps) {
         decision.kind !== "choose" ||
         (decision.min === 1 && decision.max === 1);
 
-    const answer = buildAnswer(decision, rows, selected);
+    const answer = buildAnswer(decision, rows, selected, order);
     const check = answer === null ? null : validateAnswer(decision, answer);
     const ready = answer !== null && check !== null && check.ok;
     const hint =
@@ -125,6 +144,30 @@ function DecisionForm({ state, decision, onSubmit }: FormProps) {
                 : [...prev, row.key];
         });
 
+    const moveOption = (fromOption: number, toOption: number) =>
+        setOrder((prev) => {
+            const from = prev.indexOf(fromOption);
+            const to = prev.indexOf(toOption);
+            if (from < 0 || to < 0 || from === to) return prev;
+            const next = [...prev];
+            const [moved] = next.splice(from, 1);
+            if (moved === undefined) return prev;
+            next.splice(to, 0, moved);
+            return next;
+        });
+
+    const moveBy = (option: number, offset: number) =>
+        setOrder((prev) => {
+            const from = prev.indexOf(option);
+            const to = from + offset;
+            if (from < 0 || to < 0 || to >= prev.length) return prev;
+            const next = [...prev];
+            const [moved] = next.splice(from, 1);
+            if (moved === undefined) return prev;
+            next.splice(to, 0, moved);
+            return next;
+        });
+
     return (
         <form
             onSubmit={(e) => {
@@ -141,31 +184,165 @@ function DecisionForm({ state, decision, onSubmit }: FormProps) {
             <fieldset>
                 <legend>{decision.prompt}</legend>
                 <ul className="options">
-                    {rows.map((row) => {
-                        const on = selected.includes(row.key);
-                        return (
-                            <li key={row.key}>
-                                <label className={on ? "option on" : "option"}>
-                                    <input
-                                        type={single ? "radio" : "checkbox"}
-                                        name={`decision-${decision.id}`}
-                                        checked={on}
-                                        onChange={(e) =>
-                                            toggle(row, e.target.checked)
-                                        }
-                                    />
-                                    <span className="opt-label">
-                                        {row.label}
-                                    </span>
-                                    {row.detail !== "" && (
-                                        <span className="opt-detail">
-                                            {row.detail}
-                                        </span>
-                                    )}
-                                </label>
+                    {decision.kind === "order" ? (
+                        <>
+                            <li className="ordering-instructions">
+                                Drag choices into order, or use the move buttons.
                             </li>
-                        );
-                    })}
+                            {order.map((optionIndex, position) => {
+                                const row = rows.find(
+                                    (candidate) =>
+                                        candidate.optionIndex === optionIndex,
+                                );
+                                if (row === undefined) return null;
+                                return (
+                                    <li
+                                        key={row.key}
+                                        className={
+                                            dragging === optionIndex
+                                                ? "ordering-dragging"
+                                                : dragOver === optionIndex
+                                                  ? "ordering-over"
+                                                  : undefined
+                                        }
+                                        draggable
+                                        onDragStart={(event) => {
+                                            event.dataTransfer.effectAllowed =
+                                                "move";
+                                            event.dataTransfer.setData(
+                                                "text/plain",
+                                                String(optionIndex),
+                                            );
+                                            setDragging(optionIndex);
+                                        }}
+                                        onDragOver={(event) => {
+                                            event.preventDefault();
+                                            event.dataTransfer.dropEffect =
+                                                "move";
+                                            setDragOver(optionIndex);
+                                        }}
+                                        onDrop={(event) => {
+                                            event.preventDefault();
+                                            if (dragging !== null) {
+                                                moveOption(
+                                                    dragging,
+                                                    optionIndex,
+                                                );
+                                            }
+                                            setDragging(null);
+                                            setDragOver(null);
+                                        }}
+                                        onDragEnd={() => {
+                                            setDragging(null);
+                                            setDragOver(null);
+                                        }}
+                                    >
+                                        <div className="option ordering-option">
+                                            <span className="order-position">
+                                                {position + 1}.
+                                            </span>
+                                            <span className="opt-label">
+                                                {row.label}
+                                            </span>
+                                            {row.detail !== "" && (
+                                                <span className="opt-detail">
+                                                    {row.detail}
+                                                </span>
+                                            )}
+                                            <span className="order-controls">
+                                                <button
+                                                    type="button"
+                                                    aria-label={`Move ${row.label} up`}
+                                                    disabled={position === 0}
+                                                    onClick={() =>
+                                                        moveBy(optionIndex, -1)
+                                                    }
+                                                >
+                                                    Move up
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    aria-label={`Move ${row.label} down`}
+                                                    disabled={
+                                                        position ===
+                                                        order.length - 1
+                                                    }
+                                                    onClick={() =>
+                                                        moveBy(optionIndex, 1)
+                                                    }
+                                                >
+                                                    Move down
+                                                </button>
+                                            </span>
+                                        </div>
+                                    </li>
+                                );
+                            })}
+                            {rows
+                                .filter((row) => row.isCancel)
+                                .map((row) => (
+                                    <li key={row.key}>
+                                        <label
+                                            className={
+                                                selected.includes(row.key)
+                                                    ? "option on"
+                                                    : "option"
+                                            }
+                                        >
+                                            <input
+                                                type="radio"
+                                                name={`decision-${decision.id}`}
+                                                checked={selected.includes(
+                                                    row.key,
+                                                )}
+                                                onChange={(event) =>
+                                                    toggle(
+                                                        row,
+                                                        event.target.checked,
+                                                    )
+                                                }
+                                            />
+                                            <span className="opt-label">
+                                                {row.label}
+                                            </span>
+                                        </label>
+                                    </li>
+                                ))}
+                        </>
+                    ) : (
+                        rows.map((row) => {
+                            const on = selected.includes(row.key);
+                            return (
+                                <li key={row.key}>
+                                    <label
+                                        className={
+                                            on ? "option on" : "option"
+                                        }
+                                    >
+                                        <input
+                                            type={single ? "radio" : "checkbox"}
+                                            name={`decision-${decision.id}`}
+                                            checked={on}
+                                            onChange={(event) =>
+                                                toggle(
+                                                    row,
+                                                    event.target.checked,
+                                                )
+                                            }
+                                        />
+                                        <span className="opt-label">
+                                            {row.label}
+                                        </span>
+                                        {row.detail !== "" && (
+                                            <span className="opt-detail">
+                                                {row.detail}
+                                            </span>
+                                        )}
+                                    </label>
+                                </li>
+                            );
+                        })
+                    )}
                 </ul>
             </fieldset>
 

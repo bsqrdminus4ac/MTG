@@ -48,7 +48,7 @@ export function createGame(
     }
     players[setup.id] = {
         id: setup.id,
-        life: 2,
+        life: 20,
         manaPool: emptyPool(),
         library,
         hand: [],

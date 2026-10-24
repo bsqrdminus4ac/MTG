@@ -5,6 +5,7 @@ import {
   chooseMany,
   indexChoice,
   moveObject,
+  orderingDecision,
   yesNo,
   type DecisionId,
   type GameState,
@@ -159,6 +160,46 @@ describe("decision panel", () => {
     fireEvent.click(screen.getByLabelText(/Green/));
     fireEvent.click(submit);
     expect(onSubmit).toHaveBeenCalledWith({ kind: "choose", selected: ["index:0", "index:1"] });
+  });
+
+  test("an ordering decision submits the dragged option order", () => {
+    const pending = orderingDecision({
+      id: 903 as DecisionId,
+      player: ALICE,
+      prompt: "Set the order",
+      options: [
+        indexChoice(0, "First"),
+        indexChoice(1, "Second"),
+        indexChoice(2, "Third"),
+      ],
+      then: { kind: "discardToHandSize" },
+    });
+    const onSubmit = vi.fn();
+    render(<DecisionPanel state={{ ...newDemoGame(), pending }} error={null} onSubmit={onSubmit} />);
+
+    const orderingRows = () => [
+      ...document.querySelectorAll<HTMLElement>(".ordering-option .opt-label"),
+    ].map((label) => label.textContent);
+    const draggableRows = () =>
+      screen.getAllByRole("listitem").filter((row) => row.hasAttribute("draggable"));
+    const dataTransfer = {
+      effectAllowed: "none",
+      dropEffect: "none",
+      setData: vi.fn(),
+    };
+
+    expect(orderingRows()).toEqual(["First", "Second", "Third"]);
+    fireEvent.click(screen.getByRole("button", { name: "Move Second up" }));
+    expect(orderingRows()).toEqual(["Second", "First", "Third"]);
+
+    const rows = draggableRows();
+    fireEvent.dragStart(rows[1]!, { dataTransfer });
+    fireEvent.dragOver(rows[2]!, { dataTransfer });
+    fireEvent.drop(rows[2]!, { dataTransfer });
+    expect(orderingRows()).toEqual(["Second", "Third", "First"]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Submit answer" }));
+    expect(onSubmit).toHaveBeenCalledWith({ kind: "order", order: [1, 2, 0] });
   });
 
   test("a cancelable decision submits a cancel answer", () => {

@@ -439,6 +439,35 @@ legend {
 .option input {
   margin: 0;
 }
+.ordering-instructions {
+  color: var(--muted);
+  font-size: 12px;
+}
+.ordering-option {
+  cursor: grab;
+}
+.ordering-option:active {
+  cursor: grabbing;
+}
+.ordering-dragging {
+  opacity: 0.5;
+}
+.ordering-over .ordering-option {
+  border-color: var(--accent);
+}
+.order-position {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.order-controls {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+.order-controls button {
+  padding: 2px 6px;
+  font-size: 12px;
+}
 .opt-label {
   font-weight: 600;
 }
