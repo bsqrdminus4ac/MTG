@@ -32,5 +32,8 @@ export type GameEvent =
     | Readonly<{ type: "permanentUntapped"; object: ObjectId; cardName: string }>
     | Readonly<{ type: "abilityActivated"; player: PlayerId; abilitySource: ObjectId; cardName: string; stackEntryId?: StackId; targets?: Target[] }>
     | Readonly<{ type: "attackDeclared"; player: PlayerId; object: ObjectId; cardName: string; target: AttackableTarget; targetName: string }>
+    | Readonly<{ type: "attacksCancelled"; player: PlayerId }>
+    | Readonly<{ type: "blockDeclared"; player: PlayerId; blocker: ObjectId; blockerName: string; attacker: ObjectId; attackerName: string }>
+    | Readonly<{ type: "blocksCancelled"; player: PlayerId }>
     | Readonly<{ type: "lostTheGame"; player: PlayerId; cause: string }>
     | Readonly<{ type: "wonTheGame"; player: PlayerId }>;

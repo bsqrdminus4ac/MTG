@@ -161,16 +161,18 @@ export function describeTarget(state: GameState, t: Target): string {
 
 export function describeChoiceValue(state: GameState, v: ChoiceValue): string {
   switch (v.kind) {
-    case "object":
-      return `${nameOf(state, v.id)} (#${v.id})`;
-    case "player":
-      return `player ${v.id}`;
-    case "index":
-      return `option ${v.index}`;
-    case "ability":
-      return  `activate ability ${v.index+1} of ${nameOf(state, v.id)} (#${v.id})`;
-    default:
-      return unreachable(v);
+      case "object":
+          return `${nameOf(state, v.id)} (#${v.id})`;
+      case "player":
+          return `player ${v.id}`;
+      case "index":
+          return `option ${v.index}`;
+      case "ability":
+          return `activate ability ${v.index + 1} of ${nameOf(state, v.id)} (#${v.id})`;
+      case "null":
+          return "";
+      default:
+          return unreachable(v);
   }
 }
 
@@ -263,6 +265,12 @@ export function describeEvent(state: GameState, e: GameEvent): string {
           return `${e.player} wins the game!`;
       case "attackDeclared":
           return `${e.player} attacks ${e.targetName} with ${e.cardName} (#${e.object})`;
+      case "attacksCancelled":
+          return `${e.player} cancels their attacks`;
+      case "blockDeclared":
+          return `${e.player} blocks ${e.attackerName} (#${e.attacker}) with ${e.blockerName} (#${e.blocker})`;
+      case "blocksCancelled":
+          return `${e.player} cancels their blocks`;
       default:
           return unreachable(e);
   }

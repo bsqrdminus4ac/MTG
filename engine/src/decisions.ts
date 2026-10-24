@@ -19,10 +19,11 @@ import type { DecisionId, ObjectId, PlayerId } from "./ids";
 
 /** What an option refers to. UIs can look objects and players up in GameState to show them. */
 export type ChoiceValue =
-  | Readonly<{ kind: "object"; id: ObjectId }>
-  | Readonly<{ kind: "player"; id: PlayerId }>
-  | Readonly<{ kind: "index"; index: number }> // e.g. which mode of a modal spell
-  | Readonly<{ kind: "ability"; id: ObjectId; index: number}>;
+    | Readonly<{ kind: "object"; id: ObjectId }>
+    | Readonly<{ kind: "player"; id: PlayerId }>
+    | Readonly<{ kind: "index"; index: number }> // e.g. which mode of a modal spell
+    | Readonly<{ kind: "ability"; id: ObjectId; index: number }>
+    | Readonly<{ kind: "null" }>;
 
 export interface Choice {
   /** Unique within its decision. This is what answers quote. */
@@ -59,6 +60,11 @@ export const manaAbilityChoice = (id: ObjectId, abilityIndex: number, label: str
   label,
   value: {kind: "ability", id, index: abilityIndex}
 });
+export const nullChoice = (id: string, label: string): Choice => ({
+    id,
+    label,
+    value: { kind: "null" },
+});
 
 // ---------------------------------------------------------------------------
 // Decisions
@@ -77,16 +83,18 @@ export type Continuation = Readonly<
     | { kind: "selectAttackers" }
     | { kind: "selectAttackTargets" }
     | { kind: "cancelAttacks" }
+    | { kind: "selectBlockers"; blocker: ObjectId }
+    | { kind: "cancelBlocks" }
 >;
 
 interface DecisionBase {
-  readonly id: DecisionId;
-  /** The player who must answer. */
-  readonly player: PlayerId;
-  /** Text to show the player. */
-  readonly prompt: string;
+    readonly id: DecisionId;
+    /** The player who must answer. */
+    readonly player: PlayerId;
+    /** Text to show the player. */
+    readonly prompt: string;
 
-  readonly onCancel?: Continuation;
+    readonly onCancel?: Continuation | undefined;
 }
 
 export interface PriorityDecision extends DecisionBase {

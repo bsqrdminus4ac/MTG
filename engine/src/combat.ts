@@ -1,17 +1,19 @@
 import { hasCardType, hasKeyword, tapPermanent } from "./cards";
 import { getCardName, getCharacteristics } from "./characteristics";
-import { chooseMany, chooseOne, objectChoice, playerChoice, type Choice } from "./decisions";
+import { chooseMany, chooseOne, nullChoice, objectChoice, playerChoice, type Choice } from "./decisions";
 import { damageObject, damagePlayer } from "./effects";
 import { applySequentially, fail, givePriorityToActivePlayer, ok, type ApplyResult } from "./engine";
 import type { GameEvent } from "./events";
-import type { ObjectId } from "./ids";
+import type { ObjectId, PlayerId } from "./ids";
 import { openDecision } from "./prompts";
 import type { AttackableTarget, GameState, Target } from "./state";
+import { keysOf, withEntry } from "./util";
 
 export interface CombatInProgress {
-    rollback: GameState;
+    rollback: GameState | null;
     attackers: Readonly<Record<ObjectId, CombatInfo>>;
     currentTargetDecision?: ObjectId | undefined;
+    blocksChosen?: Readonly<Record<ObjectId, boolean>>;
 }
 
 export interface CombatInfo {
@@ -19,6 +21,7 @@ export interface CombatInfo {
     attackableTargets?: AttackableTarget[] | undefined;
     attackTarget?: AttackableTarget;
     blockedBy?: readonly ObjectId[];
+    blockOrder?: readonly number[];
 }
 
 export const isAttacking = (state: GameState, object: ObjectId): boolean => state.combat !== null && state.combat.attackers[object]?.attackTarget !== undefined;
@@ -171,6 +174,11 @@ export function declareAttacks(state: GameState): ApplyResult {
     return givePriorityToActivePlayer(result.state, [...result.events, ...attackEvents]);
 }
 
+export function cancelAttacks(state: GameState, player: PlayerId): ApplyResult {
+    if (!state.combat || !state.combat.rollback) return fail("Unable to roll back to before attackers were chosen");
+    return ok(state.combat.rollback, [{type: "attacksCancelled", player }]);
+}
+
 function canCreatureAttack(state: GameState, creature: ObjectId): boolean {
     const obj = state.objects[creature];
     if (!obj) return false;
@@ -202,6 +210,169 @@ function getAttackableTargets(state: GameState, creature: ObjectId): AttackableT
 //#endregion
 
 //#region Declare Blockers
+
+export function beginDeclareBlockers(state: GameState): ApplyResult {
+    if (state.turn.step !== "declareBlockers") return fail("Blockers can only be declared during the declare blockers step");
+    if (!state.combat) return fail("No combat in progress to declare blockers for");
+    if (!state.combat.attackers || Object.keys(state.combat.attackers).length === 0) return fail("No attackers have been declared this combat");
+    const currentCombat = { ...state.combat };
+    currentCombat.rollback = state;
+    const playersBeingAttacked = getPlayersBeingAttacked(state);
+    if (playersBeingAttacked.length === 0) return fail("No players are being attacked");
+    if (playersBeingAttacked.length > 1) return fail("Attacking multiple opponents at once is not yet implemented");
+
+    const blocker = playersBeingAttacked[0]!;
+    const availableBlockers = getAllAvailableBlockers(state, blocker);
+    if (availableBlockers.length === 0) return givePriorityToActivePlayer(state, []);
+    currentCombat.blocksChosen = Object.fromEntries(availableBlockers.map((b) => [b, false]));
+
+    return chooseBlockers({ ...state, combat: currentCombat }, blocker);
+}
+
+const SKIP_BLOCKS_ID = "SkipBlocks";
+
+export function chooseBlockers(state: GameState, player: PlayerId): ApplyResult {
+    if (state.turn.step !== "declareBlockers") return fail("Blockers can only be declared during the declare blockers step");
+    if (!state.combat) return fail("No combat in progress to declare blockers for");
+    if (!state.combat.attackers || Object.keys(state.combat.attackers).length === 0) return fail("No attackers have been declared this combat");
+    if (!state.combat.blocksChosen || Object.keys(state.combat.blocksChosen).length === 0) return fail("No blockers available to choose");
+    let currentBlocks = { ...state.combat.blocksChosen };
+    let currentState = { ...state };
+    const isFirstChoice = !Object.values(state.combat.blocksChosen).includes(true);
+    for (const blocker of keysOf(state.combat.blocksChosen)) {
+        if (!state.combat.blocksChosen[blocker]) {
+            const blockOptions = getBlockableAttackers(state, blocker);
+            if (blockOptions.length === 0) {
+                currentBlocks = withEntry(currentBlocks, blocker, true);
+                currentState = { ...state, combat: { ...state.combat, blocksChosen: currentBlocks } };
+            } else {
+                const options = [
+                    ...blockOptions.map((attacker) => objectChoice(attacker, `Block ${getCardName(currentState, attacker)} (#${attacker})`)),
+                    nullChoice(SKIP_BLOCKS_ID, "Don't block anything"),
+                ];
+                return ok(
+                    openDecision(currentState, (id) =>
+                        chooseOne({
+                            id,
+                            options,
+                            player: player,
+                            prompt: `Choose which attacker to block with ${getCardName(currentState, blocker, true)}`,
+                            then: { kind: "selectBlockers", blocker },
+                            onCancel: isFirstChoice ? undefined : { kind: "cancelBlocks" },
+                        }),
+                    ),
+                    [],
+                );
+            }
+        }
+    }
+    // All blocks have been chosen
+    return declareBlocks(currentState, player);
+}
+
+export function applyChooseBlocksDecision(state: GameState, player: PlayerId, blocker: ObjectId, answer: readonly Choice[]): ApplyResult {
+    if (state.turn.step !== "declareBlockers") return fail("Blockers can only be declared during the declare blockers step");
+    if (!state.combat) return fail("No combat in progress to declare blockers for");
+    if (!state.combat.attackers || Object.keys(state.combat.attackers).length === 0) return fail("No attackers have been declared this combat");
+    if (!state.combat.blocksChosen || !(blocker in state.combat.blocksChosen)) return fail("No blockers available to choose");
+    if (answer.length !== 1 || !answer[0]) return fail("Each creature can only block exactly one creature");
+    const currentBlockers = { ...state.combat.blocksChosen };
+    const currentAttackers = { ...state.combat.attackers };
+    if (answer[0].value.kind === "object") {
+        const attacker = answer[0].value.id;
+        if (!(attacker in currentAttackers)) {
+            return fail("Chose to block a nonexistant attacker");
+        }
+        if (currentAttackers[attacker]?.blockedBy) {
+            currentAttackers[attacker].blockedBy = [...currentAttackers[attacker].blockedBy, blocker];
+        } else {
+            currentAttackers[attacker] = { ...currentAttackers[attacker], id: attacker, blockedBy: [blocker] };
+        }
+    }
+    currentBlockers[blocker] = true;
+    return chooseBlockers({ ...state, combat: { ...state.combat, attackers: currentAttackers, blocksChosen: currentBlockers } }, player);
+}
+
+export function declareBlocks(state: GameState, player: PlayerId): ApplyResult {
+    if (state.turn.step !== "declareBlockers") return fail("Blockers can only be declared during the declare blockers step");
+    if (!state.combat) return fail("No combat in progress to declare blockers for");
+    if (!state.combat.attackers || Object.keys(state.combat.attackers).length === 0) return fail("No attackers have been declared this combat");
+    if (!state.combat.blocksChosen || Object.values(state.combat.blocksChosen).includes(false)) return fail("Blocks have not yet been chosen");
+
+    const events: GameEvent[] = [];
+    for (const attacker of Object.values(state.combat.attackers)) {
+        if (attacker.blockedBy) {
+            events.push(
+                ...attacker.blockedBy.map(
+                    (blocker): GameEvent => ({
+                        type: "blockDeclared",
+                        player,
+                        blocker,
+                        blockerName: getCardName(state, blocker),
+                        attacker: attacker.id,
+                        attackerName: getCardName(state, attacker.id),
+                    }),
+                ),
+            );
+        }
+    }
+    return givePriorityToActivePlayer({...state, combat: {...state.combat, rollback: null}}, events );
+}
+
+export function cancelBlocks(state: GameState, player: PlayerId): ApplyResult {
+    if (!state.combat || !state.combat.rollback) return fail("Unable to roll back to before blockers were chosen");
+    return ok(state.combat.rollback, [{type: "blocksCancelled", player }]);
+}
+
+function getPlayersBeingAttacked(state: GameState): PlayerId[] {
+    if (!state.combat?.attackers) return [];
+    return [
+        ...new Set(
+            Object.values(state.combat.attackers).flatMap((a) => {
+                if (a.attackTarget?.kind === "player") {
+                    return a.attackTarget.id;
+                } else if (a.attackTarget?.kind === "object") {
+                    const obj = state.objects[a.attackTarget.id];
+                    if (!obj) return [];
+                    return obj.controller;
+                } else {
+                    return [];
+                }
+            }),
+        ),
+    ];
+}
+
+function getAllAvailableBlockers(state: GameState, player: PlayerId): ObjectId[] {
+    const blockers: ObjectId[] = [];
+    for (const objId of state.battlefield) {
+        const obj = state.objects[objId];
+        if (!obj) continue;
+        if (obj.controller !== player) continue;
+        if (!hasCardType(state, objId, "Creature")) continue;
+        if (obj.tapped) continue;
+        blockers.push(objId);
+    }
+    return blockers;
+}
+
+function getBlockableAttackers(state: GameState, blocker: ObjectId): ObjectId[] {
+    if (!state.combat?.attackers) return [];
+    return Object.values(state.combat.attackers).flatMap((a) => (canBlockThisAttacker(state, blocker, a) ? a.id : []));
+}
+
+function canBlockThisAttacker(state: GameState, blocker: ObjectId, attacker: CombatInfo): boolean {
+    // Just sanity checks for now, will hook in restriction checks later
+    const blockObj = state.objects[blocker];
+    const attackObj = state.objects[attacker.id];
+    if (!blockObj) return false;
+    if (!attackObj) return false;
+    if (blockObj.zone !== "battlefield" || attackObj.zone !== "battlefield") return false;
+    if (blockObj.tapped) return false;
+    if (!hasCardType(state, blocker, "Creature") || !hasCardType(state, attacker.id, "Creature")) return false;
+    if (blockObj.controller === attackObj.controller) return false;
+    return true;
+}
 
 //#endregion
 
@@ -238,4 +409,4 @@ function isStillLegalTarget(state: GameState, objId: ObjectId, target: Attackabl
     return true;
 }
 
-////#endregion
+//#endregion

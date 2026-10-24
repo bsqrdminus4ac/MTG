@@ -2,7 +2,7 @@ import type { Action } from "./actions";
 import { tapPermanent, type AbilityOfKind } from "./cards";
 import { applyTargetSelections, beginCast, cancelCast, payManaOptions, resolveSpell } from "./casting";
 import { getCardName, getCharacteristics, isPermanentType } from "./characteristics";
-import { applyAttackSelectionDecision, applyAttackTargetDecision, beginCombat, processCombatDamage } from "./combat";
+import { applyAttackSelectionDecision, applyAttackTargetDecision, applyChooseBlocksDecision, beginCombat, beginDeclareBlockers, cancelAttacks, cancelBlocks, processCombatDamage } from "./combat";
 import {
   chooseMany, objectChoice, resolveChooseAnswer, resolvePriorityAnswer, resolveYesNoAnswer,
   type Choice, type Continuation, type Submission,
@@ -67,7 +67,7 @@ export function submitAnswer(state: GameState, submission: Submission): ApplyRes
       if (!d.onCancel) {
           return fail("This decision cannot be canceled");
       }
-      return resume(state, d.onCancel, { kind: "cancel" });
+      return resume(state, d.onCancel, d.player, { kind: "cancel" });
   }
 
   switch (d.kind) {
@@ -77,11 +77,11 @@ export function submitAnswer(state: GameState, submission: Submission): ApplyRes
     }
     case "yesNo": {
       const r = resolveYesNoAnswer(d, submission.answer);
-      return r.ok ? resume(state, d.then, { kind: "yesNo", value: r.value }) : fail(r.error);
+      return r.ok ? resume(state, d.then, d.player, { kind: "yesNo", value: r.value }) : fail(r.error);
     }
     case "choose": {
       const r = resolveChooseAnswer(d, submission.answer);
-      return r.ok ? resume(state, d.then, { kind: "choose", chosen: r.value }) : fail(r.error);
+      return r.ok ? resume(state, d.then, d.player, { kind: "choose", chosen: r.value }) : fail(r.error);
     }
     default:
       return assertNever(d);
@@ -130,43 +130,50 @@ type Resolved =
     | Readonly<{ kind: "choose"; chosen: readonly Choice[] }>
     | Readonly<{ kind: "cancel" }>;
 
-function resume(state: GameState, then: Continuation, answer: Resolved): ApplyResult {
-  switch (then.kind) {
-      case "discardToHandSize": {
-          if (answer.kind !== "choose") return fail("Expected a selection");
-          return finishDiscard(state, answer.chosen);
-      }
-      case "cancelAbility": {
-          if (answer.kind !== "cancel") return fail("Expected a cancel answer");
-          if (state.casting) {
-              return cancelCast(state);
-          }
-          return fail("Cancelling non-casting decisions is not yet supported");
-      }
-      case "selectAbilityTargets": {
-          if (answer.kind !== "choose") return fail("Expected a selection");
-          return applyTargetingDecision(state, answer.chosen);
-      }
-      case "costPayment": {
-          if (answer.kind === "choose") {
-              return applyAddManaDecision(state, answer.chosen);
-          } else if (answer.kind === "yesNo") {
-              return applyCommitSpellDecision(state, answer.value);
-          } else {
-              return fail("Expected a selection or yes/no");
-          }
-      }
-      case "selectAttackers":
-          if (answer.kind !== "choose") return fail("Expected a selection");
-          return applyAttackSelectionDecision(state, answer.chosen);
-      case "selectAttackTargets":
-          if (answer.kind !== "choose") return fail("Expected a selection");
-          return applyAttackTargetDecision(state, answer.chosen);
-      case "cancelAttacks":
-          return fail("Canceling attacks not yet implemented");
-      default:
-          return assertNever(then); // narrows to never once every continuation kind has a case
-  }
+function resume(state: GameState, then: Continuation, player: PlayerId, answer: Resolved): ApplyResult {
+    switch (then.kind) {
+        case "discardToHandSize": {
+            if (answer.kind !== "choose") return fail("Expected a selection");
+            return finishDiscard(state, answer.chosen);
+        }
+        case "cancelAbility": {
+            if (answer.kind !== "cancel") return fail("Expected a cancel answer");
+            if (state.casting) {
+                return cancelCast(state);
+            }
+            return fail("Cancelling non-casting decisions is not yet supported");
+        }
+        case "selectAbilityTargets": {
+            if (answer.kind !== "choose") return fail("Expected a selection");
+            return applyTargetingDecision(state, answer.chosen);
+        }
+        case "costPayment": {
+            if (answer.kind === "choose") {
+                return applyAddManaDecision(state, answer.chosen);
+            } else if (answer.kind === "yesNo") {
+                return applyCommitSpellDecision(state, answer.value);
+            } else {
+                return fail("Expected a selection or yes/no");
+            }
+        }
+        case "selectAttackers":
+            if (answer.kind === "cancel") return cancelAttacks(state, player);
+            if (answer.kind !== "choose") return fail("Expected a selection");
+            return applyAttackSelectionDecision(state, answer.chosen);
+        case "selectAttackTargets":
+            if (answer.kind !== "choose") return fail("Expected a selection");
+            return applyAttackTargetDecision(state, answer.chosen);
+        case "cancelAttacks":
+            return applySequentially(state, [(currentState) => cancelAttacks(currentState, player), beginCombat]);
+        case "selectBlockers":
+            if (answer.kind === "cancel") return cancelBlocks(state, player);
+            if (answer.kind !== "choose") return fail("Expected a selection");
+            return applyChooseBlocksDecision(state, player, then.blocker, answer.chosen);
+        case "cancelBlocks":
+            return applySequentially(state, [(currentState) => cancelBlocks(currentState, player), beginDeclareBlockers]);
+        default:
+            return assertNever(then); // narrows to never once every continuation kind has a case
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -300,6 +307,13 @@ function advanceStep(state: GameState, events: readonly GameEvent[]): ApplyResul
     } else if (step === "declareBlockers") {
         if (!next.combat) {
             continue; // Skip declare blockers step if no attackers are declared
+        }
+        const result = beginDeclareBlockers(next);
+        if (!result.ok) return result;
+        if (result.state.pending) {
+            return ok(result.state, out);
+        } else {
+            next = result.state;
         }
     } else if (step === "combatDamage") {
         if (!next.combat) {
