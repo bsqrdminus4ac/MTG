@@ -254,19 +254,20 @@ describe("stack panel", () => {
       const find = (def: string) => must(hand.find((id) => base.objects[id]?.definitionId === cardDefId(def)));
 
       const bolt = must(moveObject(base, find("bolt"), "stack"));
-      const bear = must(moveObject(bolt.state, find("bear"), "stack"));
+      const forest = must(moveObject(bolt.state, find("forest"), "stack"));
 
       const state: GameState = {
-          ...bear.state,
+          ...forest.state,
           stack: [
               { kind: "spell", id: 1000 as StackId, controller: ALICE, source: bolt.newId, targets: [{ kind: "player", id: BOB }] },
               {
                   kind: "ability",
                   id: 1001 as StackId,
                   controller: BOB,
-                  source: bear.newId,
+                  source: forest.newId,
                   targets: [],
-                  effects: [{ kind: "gainLife", who: "controller", amount: 2 }],
+                  definitionId: forest.newId,
+                  abilityIndex: 0,
               },
           ],
       };
@@ -274,12 +275,12 @@ describe("stack panel", () => {
 
       const region = screen.getByRole("region", { name: "Stack" });
       const names = [...region.querySelectorAll("ol.stack-list > li > details > summary .name")].map((n) => n.textContent);
-      expect(names).toEqual(["Grizzly Bears", "Lightning Bolt"]); // last element of the array is the top
+      expect(names).toEqual(["Forest", "Lightning Bolt"]); // last element of the array is the top
       expect(must(region.querySelector("summary")).textContent).toContain("top");
 
       const text = region.textContent ?? "";
       expect(text).toContain("deal 3 damage to target 1"); // the spell's effect, read from its card
       expect(text).toContain("player Bob"); // its target
-      expect(text).toContain("controller gains 2 life"); // the ability's own effects
+      expect(text).toContain("Mana ability: {T} → add 1× {G}"); // the ability is read from its source card
   });
 });

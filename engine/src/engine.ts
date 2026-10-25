@@ -14,6 +14,7 @@ import {
     processCombatDamage,
 } from "./combat";
 import { chooseMany, objectChoice, resolveChooseAnswer, resolveOrderingAnswer, resolvePriorityAnswer, resolveYesNoAnswer, type Choice, type Continuation, type Submission } from "./decisions";
+import { addManaEffect } from "./effects";
 import type { GameEvent } from "./events";
 import type { ObjectId, PlayerId } from "./ids";
 import { addMana, emptyPool } from "./mana";
@@ -29,7 +30,7 @@ import {
 } from "./state";
 import { checkStateBasedActions } from "./stateBasedActions";
 import { assertNever, withEntry } from "./util";
-import { commitSpell, drawCard, moveObject } from "./zones";
+import { commitSpell, drawCard, drawCardResult, moveObject } from "./zones";
 
 export const MAX_HAND_SIZE = 7;
 
@@ -290,7 +291,10 @@ function advanceStep(state: GameState, events: readonly GameEvent[]): ApplyResul
 
     next = { ...next, turn: { number, activePlayer, step }, pending: null };
     out.push({ type: "stepStarted", step });
-    next = onEnterStep(next, step, wrapped, out);
+    const result = onEnterStep(next, step, wrapped);
+    if (!result.ok) return result;
+    next = result.state;
+    out.push(...result.events);
 
     if (step === "declareAttackers") {
         const result = beginCombat(next);
@@ -365,56 +369,57 @@ function finishDiscard(state: GameState, chosen: readonly Choice[]): ApplyResult
   return advanceStep(next, out); // we paused in cleanup, so this moves on to the next turn
 }
 
-function onEnterStep(state: GameState, step: Step, newTurn: boolean, out: GameEvent[]): GameState {
-  let next = state;
-
-  // Mana empties at the end of every step and phase (CR 500.4).
-  let players = next.players;
-  for (const id of next.turnOrder) {
-    const p = players[id];
-    if (p) {
-      players = withEntry(players, id, {
-        ...p,
-        manaPool: emptyPool(),
-        landsPlayedThisTurn: newTurn ? 0 : p.landsPlayedThisTurn,
-      });
-    }
-  }
-  next = { ...next, players };
-
-  switch (step) {
-    case "untap": {
-      let objects = next.objects;
-      for (const id of next.battlefield) {
-        const o = objects[id];
-        if (o && o.controller === next.turn.activePlayer && o.tapped) {
-            objects = withEntry(objects, id, { ...o, tapped: false });
-            out.push({ type: "permanentUntapped", object: id, cardName: getCardName(state, id) });
+function onEnterStep(state: GameState, step: Step, newTurn: boolean): ApplyResult {
+    let next = state;
+    const out: GameEvent[] = [];
+    // Mana empties at the end of every step and phase (CR 500.4).
+    let players = next.players;
+    for (const id of next.turnOrder) {
+        const p = players[id];
+        if (p) {
+            players = withEntry(players, id, {
+                ...p,
+                manaPool: emptyPool(),
+                landsPlayedThisTurn: newTurn ? 0 : p.landsPlayedThisTurn,
+            });
         }
-      }
-      return { ...next, objects };
     }
-    case "draw": {
-      if (next.turn.number === 1) return next; // the starting player skips their first draw (2-player rule)
-      const drawn = drawCard(next, next.turn.activePlayer);
-      out.push(...drawn.events);
-      return drawn.state;
+    next = { ...next, players };
+
+    switch (step) {
+        case "untap": {
+            let objects = next.objects;
+            for (const id of next.battlefield) {
+                const o = objects[id];
+                if (o && o.controller === next.turn.activePlayer && o.tapped) {
+                    objects = withEntry(objects, id, { ...o, tapped: false });
+                    out.push({ type: "permanentUntapped", object: id, cardName: getCardName(state, id) });
+                }
+            }
+            return ok({ ...next, objects }, out);
+        }
+        case "draw": {
+            if (next.turn.number === 1) return ok(next, out); // the starting player skips their first draw (2-player rule)
+            return drawCardResult(next, next.turn.activePlayer);
+        }
+        case "cleanup": {
+            let objects = next.objects;
+            for (const id of next.battlefield) {
+                const o = objects[id];
+                if (o) objects = withEntry(objects, id, { ...o, damage: 0 });
+            }
+            return ok(
+                {
+                    ...next,
+                    objects,
+                    continuousEffects: next.continuousEffects.filter((e) => e.duration !== "untilEndOfTurn"),
+                },
+                out,
+            );
+        }
+        default:
+            return ok(next, out);
     }
-    case "cleanup": {
-      let objects = next.objects;
-      for (const id of next.battlefield) {
-        const o = objects[id];
-        if (o) objects = withEntry(objects, id, { ...o, damage: 0 });
-      }
-      return {
-        ...next,
-        objects,
-        continuousEffects: next.continuousEffects.filter((e) => e.duration !== "untilEndOfTurn"),
-      };
-    }
-    default:
-      return next;
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -453,7 +458,7 @@ export function activateAbility(state: GameState, player: PlayerId, source: Obje
                 abilitySource: source,
                 cardName: chars.name,
             };
-            return ok(next, [...payResult.events, ...resolveResult.events, event]);
+            return ok(next, [...payResult.events, event, ...resolveResult.events]);
         }
     }
 
@@ -486,10 +491,7 @@ function resolveManaAbility(state: GameState, player: PlayerId, source: ObjectId
   let currentState = state;
   for (const effect of ability.effects) {
     if (effect.kind === "addMana") {
-      const p = currentState.players[player];
-      if (!p) return fail("Unknown player");
-      currentState = { ...currentState, players: withEntry(currentState.players, player, addMana(p, effect.mana, effect.amount)) };      
-      // Maybe add a GameEvent for mana added? Not strictly necessary, but could be useful for UI.
+      return addManaEffect(currentState, player, effect.mana, effect.amount);
     } else {
       return fail("Unimplemented effect kind for mana ability: " + effect.kind);  
     }

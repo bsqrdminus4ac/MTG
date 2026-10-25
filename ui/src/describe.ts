@@ -134,21 +134,22 @@ const describeTargetSpecs = (specs?: TargetSpec[]): string => {
 }
 const describeEffects = (effects: readonly Effect[]): string => effects.map(describeEffect).join("; ");
 
-export function describeAbility(a: Ability): string {
-  switch (a.kind) {
-    case "keyword":
-      return `Keyword: ${a.keyword}`;
-    case "spell":
-      return `Spell${describeTargetSpecs(a.targets)}: ${describeEffects(a.effects)}`;
-    case "activated":
-      return `${a.isManaAbility ? "Mana ability" : "Activated"}${describeTargetSpecs(a.targets)}: ${describeCost(a.cost)} → ${describeEffects(a.effects)}`;
-    case "triggered":
-      return `Triggered${describeTargetSpecs(a.targets)}: when ${a.trigger.event} (${a.trigger.scope}) → ${describeEffects(a.effects)}`;
-    case "static":
-      return `Static: ${describeTemplate(a.effect)}`;
-    default:
-      return unreachable(a);
-  }
+export function describeAbility(a: Ability | undefined): string {
+    if (!a) return "";
+    switch (a.kind) {
+        case "keyword":
+            return `Keyword: ${a.keyword}`;
+        case "spell":
+            return `Spell${describeTargetSpecs(a.targets)}: ${describeEffects(a.effects)}`;
+        case "activated":
+            return `${a.isManaAbility ? "Mana ability" : "Activated"}${describeTargetSpecs(a.targets)}: ${describeCost(a.cost)} → ${describeEffects(a.effects)}`;
+        case "triggered":
+            return `Triggered${describeTargetSpecs(a.targets)}: when ${a.trigger.event} (${a.trigger.scope}) → ${describeEffects(a.effects)}`;
+        case "static":
+            return `Static: ${describeTemplate(a.effect)}`;
+        default:
+            return unreachable(a);
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -226,6 +227,7 @@ export function describeAnswer(d: Decision, a: Answer): string {
 /** Describes an event using the state AFTER it happened, so moved cards can be looked up by their new ids. */
 export function describeEvent(state: GameState, e: GameEvent): string {
   switch (e.type) {
+      // Steps
       case "turnStarted":
           return `Turn ${e.turn} begins (${e.activePlayer})`;
       case "stepStarted":
@@ -234,10 +236,28 @@ export function describeEvent(state: GameState, e: GameEvent): string {
           return `${e.player} passes priority (${e.step})`;
       case "cardMoved":
           return `${nameOf(state, e.newId)}: ${e.from} → ${e.to} (#${e.oldId} → #${e.newId})`;
+
+      // Player effects
       case "cardDrawn":
           return `${e.player} draws ${e.cardName}`;
       case "landPlayed":
           return `${e.player} plays ${e.cardName}`;
+      case "lifeChanged":
+          return `${e.player} life ${signed(e.delta)}`;
+      case "manaAdded":
+          return `${e.player} adds ${e.amount}x ${e.mana}`;
+
+      // Object effects
+      case "damageDealt":
+          return `${e.sourceName} deals ${e.amount} damage to ${describeTarget(state, e.target)}`;
+      case "permanentTapped":
+          return `${nameOf(state, e.object)} is tapped`;
+      case "permanentUntapped":
+          return `${nameOf(state, e.object)} is untapped`;
+      case "permanentDestroyed":
+          return `${e.cardName} (#${e.object}) is destroyed` + e.source ? ` by ${e.source}` : "";
+
+      // Spells & Abilities
       case "spellCastSuccess":
           return `${e.player} casts ${e.cardName}`;
       case "spellCastStart":
@@ -248,28 +268,16 @@ export function describeEvent(state: GameState, e: GameEvent): string {
           return `${e.player} pays mana for ${e.cardName}`;
       case "spellCastCancelled":
           return `${e.player} cancels casting of ${e.cardName}`;
-      case "stackEntryResolved":
-          return `${e.spellName} (stack entry #${e.id}) resolves`;
-      case "damageDealt":
-          return `${e.sourceName} deals ${e.amount} damage to ${describeTarget(state, e.target)}`;
-      case "lifeChanged":
-          return `${e.player} life ${signed(e.delta)}`;
-      case "gameWon":
-          return `${e.winner} wins`;
-      case "permanentTapped":
-          return `${nameOf(state, e.object)} is tapped`;
-      case "permanentUntapped":
-          return `${nameOf(state, e.object)} is untapped`;
       case "abilityActivated":
           return (
               `${e.player} activates ability of ${e.cardName} (#${e.abilitySource})` +
               (e.stackEntryId ? ` (#${e.stackEntryId})` : "") +
               (e.targets ? ` targeting ${e.targets.map((t) => describeTarget(state, t)).join(", ")}` : "")
           );
-      case "lostTheGame":
-          return `${e.player} loses the game due to ${e.cause}!`;
-      case "wonTheGame":
-          return `${e.player} wins the game!`;
+      case "stackEntryResolved":
+          return `${e.spellName} (stack entry #${e.id}) resolves`;
+
+      // Attacks
       case "attackDeclared":
           return `${e.player} attacks ${e.targetName} with ${e.cardName} (#${e.object})`;
       case "attacksCancelled":
@@ -278,6 +286,12 @@ export function describeEvent(state: GameState, e: GameEvent): string {
           return `${e.player} blocks ${e.attackerName} (#${e.attacker}) with ${e.blockerName} (#${e.blocker})`;
       case "blocksCancelled":
           return `${e.player} cancels their blocks`;
+
+      // Game win/lose
+      case "lostTheGame":
+          return `${e.player} loses the game due to ${e.cause}!`;
+      case "wonTheGame":
+          return `${e.player} wins the game!`;
       default:
           return unreachable(e);
   }

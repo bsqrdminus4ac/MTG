@@ -87,6 +87,11 @@ export function moveObject(state: GameState, id: ObjectId, to: Zone): MoveResult
     };
 }
 
+export function drawCardResult(state: GameState, player: PlayerId): ApplyResult {
+    const draw = drawCard(state, player);
+    return ok(draw.state, draw.events);
+}
+
 export function drawCard(state: GameState, player: PlayerId): { state: GameState; events: readonly GameEvent[] } {
     const p = state.players[player];
     if (!p) return { state, events: [] };
