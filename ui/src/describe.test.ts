@@ -54,7 +54,7 @@ describe("findProblems", () => {
     const obj = game.objects[id]!;
     const problems = findProblems({ ...game, objects: { ...game.objects, [id]: { ...obj, zone: "graveyard" } } });
 
-    expect(problems.some((p) => p.includes("is in alice's hand but its zone says \"graveyard\""))).toBe(true);
+    expect(problems.some((p) => p.includes('is in Alice\'s hand but its zone says "graveyard"'))).toBe(true);
     expect(problems.some((p) => p.includes("no graveyard lists it"))).toBe(true);
   });
 });

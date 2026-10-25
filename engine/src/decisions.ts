@@ -86,6 +86,7 @@ export type Continuation = Readonly<
     | { kind: "selectBlockers"; blocker: ObjectId }
     | { kind: "cancelBlocks" }
     | { kind: "selectDamageOrder"; attacker: ObjectId }
+    | { kind: "resolveEffect" }
 >;
 
 interface DecisionBase {

@@ -231,7 +231,7 @@ export function describeEvent(state: GameState, e: GameEvent): string {
       case "stepStarted":
           return `Step: ${e.step}`;
       case "priorityPassed":
-          return `${e.player} passes priority`;
+          return `${e.player} passes priority (${e.step})`;
       case "cardMoved":
           return `${nameOf(state, e.newId)}: ${e.from} → ${e.to} (#${e.oldId} → #${e.newId})`;
       case "cardDrawn":
@@ -249,7 +249,7 @@ export function describeEvent(state: GameState, e: GameEvent): string {
       case "spellCastCancelled":
           return `${e.player} cancels casting of ${e.cardName}`;
       case "stackEntryResolved":
-          return `Stack entry #${e.id} resolves`;
+          return `${e.spellName} (stack entry #${e.id}) resolves`;
       case "damageDealt":
           return `${e.sourceName} deals ${e.amount} damage to ${describeTarget(state, e.target)}`;
       case "lifeChanged":

@@ -18,6 +18,7 @@ import type { GameEvent } from "./events";
 import type { ObjectId, PlayerId } from "./ids";
 import { addMana, emptyPool } from "./mana";
 import { canPlayLand, openDecision, withPriorityDecision } from "./prompts";
+import { beginResolution, handleResolutionDecision } from "./resolution";
 import {
     STEPS,
     stepGrantsPriority,
@@ -136,7 +137,7 @@ export function applyAction(state: GameState, action: Action): ApplyResult {
 // Resuming after a yesNo / choose decision
 // ---------------------------------------------------------------------------
 
-type Resolved =
+export type Resolved =
     | Readonly<{ kind: "yesNo"; value: boolean }>
     | Readonly<{ kind: "choose"; chosen: readonly Choice[] }>
     | Readonly<{ kind: "order"; options: readonly Choice[]; order: readonly number[] }>
@@ -168,6 +169,8 @@ function resume(state: GameState, then: Continuation, player: PlayerId, answer: 
                 return fail("Expected a selection or yes/no");
             }
         }
+        case "resolveEffect":
+            return handleResolutionDecision(state, answer);
         case "selectAttackers":
             if (answer.kind === "cancel") return cancelAttacks(state, player);
             if (answer.kind !== "choose") return fail("Expected a selection");
@@ -205,7 +208,7 @@ function passPriority(state: GameState, player: PlayerId): ApplyResult {
   if (!priority) return fail("Nobody has priority right now");
   if (priority.holder !== player) return fail("You don't have priority");
 
-  const events: GameEvent[] = [{ type: "priorityPassed", player }];
+  const events: GameEvent[] = [{ type: "priorityPassed", player, step: state.turn.step }];
   const passes = priority.consecutivePasses + 1;
 
   if (passes < state.turnOrder.length) {
@@ -258,29 +261,9 @@ function playLand(state: GameState, player: PlayerId, card: ObjectId): ApplyResu
 }
 
 function resolveTopOfStack(state: GameState, events: readonly GameEvent[]): ApplyResult {
-  const entry = state.stack[state.stack.length - 1];
-  if (!entry) return fail("The stack is empty");
-
-  let next: GameState = { ...state, stack: state.stack.slice(0, -1) };
-  const out: GameEvent[] = [...events, { type: "stackEntryResolved", id: entry.id, spellName: getCardName(next, entry.source) }];
-
-  if (entry.kind === "spell") {
-      const result = resolveSpell(next, entry);
-      if (!result.ok) return result;
-      next = result.state;
-      out.push(...result.events);
-
-      const chars = getCharacteristics(next, entry.source);
-      const dest: Zone = chars?.types.some(isPermanentType) ? "battlefield" : "graveyard";
-      const moved = moveObject(next, entry.source, dest);
-      if (moved) {
-          next = moved.state;
-          out.push(...moved.events);
-      }
-  }
-  // TODO: interpret the effects (spell abilities / entry.effects), then check state-based actions.
-
-  return givePriorityToActivePlayer(next, out);
+  const result = beginResolution(state);
+  if (!result.ok) return result;
+  return ok(result.state, [...events, ...result.events]);
 }
 
 // ---------------------------------------------------------------------------

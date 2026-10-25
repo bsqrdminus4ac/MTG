@@ -75,5 +75,6 @@ export function createGame(
       winner: null,
       casting: null,
       combat: null,
+      resolving: null,
   };  return withPriorityDecision(state);
 }

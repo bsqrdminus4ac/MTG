@@ -8,7 +8,7 @@ import type { AttackableTarget, Step, Target, Zone } from "./state";
 export type GameEvent =
     | Readonly<{ type: "turnStarted"; turn: number; activePlayer: PlayerId }>
     | Readonly<{ type: "stepStarted"; step: Step }>
-    | Readonly<{ type: "priorityPassed"; player: PlayerId }>
+    | Readonly<{ type: "priorityPassed"; player: PlayerId; step: Step }>
     | Readonly<{
           type: "cardMoved";
           from: Zone;

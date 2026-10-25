@@ -1,7 +1,7 @@
 import type { CardDefinition, ContinuousEffect, Effect } from "./cards";
 import type { CastingInProgress } from "./casting";
 import type { CombatInfo, CombatInProgress } from "./combat";
-import type { Decision } from "./decisions";
+import type { ChoiceValue, Decision } from "./decisions";
 import type { CardDefId, ObjectId, PlayerId, StackId, Timestamp } from "./ids";
 import type { ManaPool } from "./mana";
 
@@ -78,11 +78,13 @@ interface StackEntryBase {
   readonly targets: readonly Target[];
 }
 export interface SpellOnStack extends StackEntryBase {
-  readonly kind: "spell";
+    readonly kind: "spell";
+    readonly spellIndex?: number; // Placeholder for if a card contains more than one spell (MDFC, adventures, etc.)
 }
 export interface AbilityOnStack extends StackEntryBase {
-  readonly kind: "ability";
-  readonly effects: readonly Effect[];
+    readonly kind: "ability";
+    readonly definitionId: ObjectId;
+    readonly abilityIndex: number;
 }
 export type StackEntry = SpellOnStack | AbilityOnStack;
 
@@ -97,6 +99,15 @@ export interface PriorityState {
   readonly holder: PlayerId;
   readonly consecutivePasses: number;
 }
+
+export interface ResolutionInProgress {
+    entry: StackEntry;
+    effects: readonly Effect[];
+    pc: number;
+    bindings: Readonly<Record<string, Binding>>;
+}
+
+export type Binding = readonly ChoiceValue[] | boolean | number;
 
 export interface GameState {
     readonly definitions: Readonly<Record<CardDefId, CardDefinition>>;
@@ -121,4 +132,5 @@ export interface GameState {
 
     readonly casting: CastingInProgress | null;
     readonly combat: CombatInProgress | null;
+    readonly resolving: ResolutionInProgress | null;
 }
