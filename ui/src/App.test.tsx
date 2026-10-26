@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 import {
   cardDefId,
@@ -11,7 +11,7 @@ import {
   type GameState,
   type StackId,
 } from "@mtg/engine";
-import { App } from "./App";
+import { App, ProgressState } from "./App";
 import { DecisionPanel } from "./components/DecisionPanel";
 import { StackPanel } from "./components/StackPanel";
 import { ALICE, BOB, newDemoGame } from "./demo";
@@ -30,6 +30,28 @@ function zoneOf(region: HTMLElement, title: string): HTMLDetailsElement {
 }
 
 const cardsIn = (zone: HTMLElement) => [...zone.querySelectorAll<HTMLDetailsElement>("details.obj")];
+
+describe("in-progress state panels", () => {
+  test("hides states when they are null", () => {
+    render(<App />);
+    expect(screen.queryByText("Casting")).toBeNull();
+    expect(screen.queryByText("Combat")).toBeNull();
+    expect(screen.queryByText("Resolving")).toBeNull();
+  });
+
+  test("shows progress JSON while abbreviating rollback state", async () => {
+    render(<ProgressState title="Casting" value={{ player: "Alice", rollback: { privateState: "omit this" } }} />);
+    const casting = screen.getByText("Casting");
+    const panel = must(casting.closest("details"));
+    fireEvent.click(casting);
+    await waitFor(() => {
+      const json = panel.querySelector("pre")?.textContent;
+      expect(json).toContain('"player": "Alice"');
+      expect(json).toContain('"rollback": "[...]"');
+      expect(json).not.toContain("omit this");
+    });
+  });
+});
 
 describe("zones", () => {
   test("each player gets their own containers, with one collapsible element per card", () => {

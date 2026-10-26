@@ -7,13 +7,27 @@ import { StackPanel } from "./components/StackPanel";
 import { findProblems } from "./describe";
 import { useGame } from "./useGame";
 
+function stringifyForDisplay(value: object): string {
+  return JSON.stringify(value, (key, nestedValue) => (key === "rollback" ? "[...]" : nestedValue), 2);
+}
+
 /** The whole state as JSON. Only built while open, since it includes every card definition. */
 function RawState({ state }: { readonly state: GameState }) {
   const [open, setOpen] = useState(false);
   return (
     <details className="panel" onToggle={(e) => setOpen(e.currentTarget.open)}>
       <summary>Raw game state (JSON)</summary>
-      {open && <pre>{JSON.stringify(state, null, 2)}</pre>}
+      {open && <pre>{stringifyForDisplay(state)}</pre>}
+    </details>
+  );
+}
+
+export function ProgressState({ title, value }: { readonly title: string; readonly value: object }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <details className="panel" onToggle={(e) => setOpen(e.currentTarget.open)}>
+      <summary>{title}</summary>
+      {open && <pre>{stringifyForDisplay(value)}</pre>}
     </details>
   );
 }
@@ -102,6 +116,11 @@ export function App() {
           <DecisionPanel state={state} error={game.error} onSubmit={game.submit} />
           <StackPanel state={state} />
           <EventLog log={game.log} />
+        </aside>
+        <aside className="progress-side" aria-label="In-progress state">
+          {state.casting !== null && <ProgressState title="Casting" value={state.casting} />}
+          {state.combat !== null && <ProgressState title="Combat" value={state.combat} />}
+          {state.resolving !== null && <ProgressState title="Resolving" value={state.resolving} />}
           <RawState state={state} />
         </aside>
       </main>

@@ -161,7 +161,7 @@ button.force-pass-enabled:hover:not(:disabled) {
 
 .layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 390px;
+  grid-template-columns: minmax(0, 1fr) 390px 300px;
   gap: 16px;
   align-items: start;
 }
@@ -180,12 +180,22 @@ button.force-pass-enabled:hover:not(:disabled) {
   max-height: calc(100vh - 24px);
   overflow-y: auto;
 }
+.progress-side {
+  position: sticky;
+  top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: calc(100vh - 24px);
+  overflow-y: auto;
+}
 
-@media (max-width: 1000px) {
+@media (max-width: 1200px) {
   .layout {
     grid-template-columns: 1fr;
   }
-  .side {
+  .side,
+  .progress-side {
     position: static;
     max-height: none;
     overflow: visible;
