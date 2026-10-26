@@ -118,7 +118,7 @@ function resume(state: GameState, then: Continuation, player: PlayerId, answer: 
             }
         }
         case "resolveEffect":
-            return handleResolutionDecision(state, answer);
+            return handleResolutionDecision(state, then.bindAs, answer);
         case "selectAttackers":
             if (answer.kind === "cancel") return cancelAttacks(state, player);
             if (answer.kind !== "choose") return fail("Expected a selection");

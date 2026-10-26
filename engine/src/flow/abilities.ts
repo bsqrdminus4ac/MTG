@@ -1,5 +1,5 @@
 import { type ApplyResult, applySequentially, fail, ok } from "../core/result";
-import type { AbilityOfKind, ActivatableAbilityInfo } from "../model/cards";
+import type { AbilityOfKind, ActivatableAbilityInfo } from "../model/abilities";
 import { getCharacteristics } from "../model/characteristics";
 import type { GameEvent } from "../model/events";
 import type { ObjectId, PlayerId } from "../model/ids";

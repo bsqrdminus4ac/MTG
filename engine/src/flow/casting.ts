@@ -1,6 +1,7 @@
 import { fail, ok, type ApplyResult } from "../core/result";
 import { withEntry } from "../core/util";
-import type { CardType, TargetSpec } from "../model/cards";
+import type { TargetSpec } from "../model/effects";
+import type { CardType } from "../model/vocabulary";
 import { getCardName, getCharacteristics, isPermanentType } from "../model/characteristics";
 import { chooseMany, chooseOne, manaAbilityChoice, objectChoice, playerChoice, yesNo, type Choice } from "../model/decisions";
 import type { GameEvent } from "../model/events";

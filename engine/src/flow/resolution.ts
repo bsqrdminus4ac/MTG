@@ -1,10 +1,12 @@
-import { type ApplyResult, fail, ok } from "../core/result";
+import { fail, ok, type ApplyResult } from "../core/result";
+import { withEntry } from "../core/util";
 import { getCharacteristics, isPermanentType } from "../model/characteristics";
 import type { ResolvedAnswer } from "../model/decisions";
 import type { GameEvent } from "../model/events";
-import type { GameState, ResolutionInProgress, Zone } from "../model/state";
+import type { Binding, GameState, ResolutionInProgress } from "../model/state";
+import type { Zone } from "../model/vocabulary";
 import { moveObject } from "../model/zones";
-import { contextOf, executeEffect, resolveStackEntryEffects } from "./effects";
+import { contextOf, executeEffect, resolveStackEntryEffects, type EffectContext } from "./effects";
 import { givePriorityToActivePlayer } from "./priority";
 
 export function beginResolution(state: GameState): ApplyResult {
@@ -41,14 +43,14 @@ export function runResolution(state: GameState): ApplyResult {
     }
 }
 
-export function handleResolutionDecision(state: GameState, answer: ResolvedAnswer): ApplyResult {
-    if (!state.resolving) return fail("Nothing is resolving");
-    const effect = state.resolving.effects[state.resolving.pc];
-    if (effect) {
-        //TODO: handle decision (via bindings?)
-    }
-
-    return runResolution({ ...state, resolving: { ...state.resolving, pc: state.resolving.pc + 1 } });
+export function handleResolutionDecision(state: GameState, bindAs: string, answer: ResolvedAnswer): ApplyResult {
+    const resolving = state.resolving;
+    if (!resolving) return fail("Nothing is resolving");
+    let binding: Binding;
+    if (answer.kind === "choose") binding = answer.chosen.map((c) => c.value);
+    else if (answer.kind === "yesNo") binding = answer.value;
+    else return fail("Unsupported answer for a resolution decision");
+    return runResolution({ ...state, resolving: { ...resolving, pc: resolving.pc + 1, bindings: withEntry(resolving.bindings, bindAs, binding) } });
 }
 
 export function finishResolution(state: GameState, events: readonly GameEvent[]): ApplyResult {
@@ -72,4 +74,14 @@ export function finishResolution(state: GameState, events: readonly GameEvent[])
         out.push({ type: "stackEntryResolved", id: resolving.entry.id, spellName: "TODO: Ability event names" });
     }
     return givePriorityToActivePlayer(currentState, out);
+}
+
+export function getBinding(ctx: EffectContext, name: string): { ok: true; binding: Binding } | { ok: false; error: string } {
+    if (name in ctx.bindings) {
+        const binding = ctx.bindings[name];
+        if (binding === undefined) return { ok: false, error: `Empty binding for name ${name}` };
+        return { ok: true, binding };
+    } else {
+        return { ok: false, error: `Unbound name ${name}` };
+    }
 }

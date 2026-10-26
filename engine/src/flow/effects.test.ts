@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { type CardDefinition, type Effect } from "../model/cards";
+import type { CardDefinition } from "../model/cardDefinition";
+import type { Effect } from "../model/effects";
 import { cardDefId, playerId, type CardDefId, type ObjectId } from "../model/ids";
 import type { GameState, Target } from "../model/state";
 import { moveObject } from "../model/zones";

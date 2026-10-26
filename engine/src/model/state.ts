@@ -1,38 +1,11 @@
-import type { CardDefinition, ContinuousEffect, Effect } from "./cards";
+import type { CardDefinition } from "./cardDefinition";
+import type { ContinuousEffect } from "./continuous";
 import type { ChoiceValue, Decision } from "./decisions";
+import type { Effect } from "./effects";
 import type { GameEvent } from "./events";
 import type { CardDefId, ObjectId, PlayerId, StackId, Timestamp } from "./ids";
 import type { ManaCost, ManaPool } from "./mana";
-
-/**
- * Ordering convention: for library, graveyard and stack, the LAST element is the top.
- * Hand and battlefield order carry no rules meaning.
- */
-export type Zone = "library" | "hand" | "battlefield" | "graveyard" | "stack" | "exile";
-
-/** Main phases are modeled as steps here to keep the turn structure a flat list. */
-export const STEPS = ["untap", "upkeep", "draw", "precombatMain", "beginningOfCombat", "declareAttackers", "declareBlockers", "combatDamage", "endOfCombat", "postcombatMain", "end", "cleanup"] as const;
-export type Step = (typeof STEPS)[number];
-
-export type Phase = "beginning" | "precombatMain" | "combat" | "postcombatMain" | "ending";
-
-export const PHASE_OF: Readonly<Record<Step, Phase>> = {
-    untap: "beginning",
-    upkeep: "beginning",
-    draw: "beginning",
-    precombatMain: "precombatMain",
-    beginningOfCombat: "combat",
-    declareAttackers: "combat",
-    declareBlockers: "combat",
-    combatDamage: "combat",
-    endOfCombat: "combat",
-    postcombatMain: "postcombatMain",
-    end: "ending",
-    cleanup: "ending",
-};
-
-/** Players normally don't get priority during untap or cleanup (CR 502.4, 514.3). */
-export const stepGrantsPriority = (step: Step): boolean => step !== "untap" && step !== "cleanup";
+import type { Step, Zone } from "./vocabulary";
 
 /** A card (or token) in some zone. Everything mutable about it lives here, not on the definition. */
 export interface GameObject {

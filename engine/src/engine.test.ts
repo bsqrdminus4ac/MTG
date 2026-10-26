@@ -1,7 +1,8 @@
 import { describe, expect, test, vi } from "vitest";
 import { applySequentially, fail, ok } from "./core/result";
 import { applyAction, submitAnswer } from "./engine";
-import type { CardDefinition, ContinuousEffect } from "./model/cards";
+import type { CardDefinition } from "./model/cardDefinition";
+import type { ContinuousEffect } from "./model/continuous";
 import { getCharacteristics } from "./model/characteristics";
 import { cardDefId, playerId, type Timestamp } from "./model/ids";
 import type { GameState } from "./model/state";

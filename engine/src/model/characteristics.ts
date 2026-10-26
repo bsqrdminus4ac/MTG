@@ -1,7 +1,9 @@
 import { assertNever } from "../core/util";
-import { LAYER_ORDER, layerOf, type CardType, type Characteristics, type Keyword, type Modification } from "./cards";
+import type { Characteristics } from "./cardDefinition";
+import { type Modification, LAYER_ORDER, layerOf } from "./continuous";
 import type { ObjectId } from "./ids";
 import type { GameState } from "./state";
+import type { CardType, Keyword } from "./vocabulary";
 
 export const isPermanentType = (t: CardType): boolean => t !== "Instant" && t !== "Sorcery";
 

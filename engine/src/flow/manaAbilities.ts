@@ -1,4 +1,4 @@
-import type { ActivatableAbilityInfo } from "../model/cards";
+import type { ActivatableAbilityInfo } from "../model/abilities";
 import type { PlayerId } from "../model/ids";
 import { type ManaCost, type ManaPool, canPayMana } from "../model/mana";
 import type { GameState } from "../model/state";

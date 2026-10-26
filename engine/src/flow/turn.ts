@@ -4,7 +4,8 @@ import { getCardName, getCharacteristics } from "../model/characteristics";
 import { type Choice, chooseMany, objectChoice } from "../model/decisions";
 import type { GameEvent } from "../model/events";
 import { emptyPool } from "../model/mana";
-import { type GameState, STEPS, type Step, nextPlayer, stepGrantsPriority } from "../model/state";
+import { type GameState, nextPlayer } from "../model/state";
+import { STEPS, type Step } from "../model/vocabulary";
 import { drawCardResult, moveObject } from "../model/zones";
 import { openDecision } from "../rules/pending";
 import { beginCombat, beginDeclareBlockers, processCombatDamage } from "./combat";
@@ -13,68 +14,71 @@ import { givePriorityToActivePlayer } from "./priority";
 export const MAX_HAND_SIZE = 7;
 
 export function advanceStep(state: GameState, events: readonly GameEvent[]): ApplyResult {
-  let next = state;
-  const out: GameEvent[] = [...events];
+    let next = state;
+    const out: GameEvent[] = [...events];
 
-  // Keep going until we land on a step where players receive priority.
-  for (let guard = 0; guard < STEPS.length + 1; guard++) {
-    const index = STEPS.indexOf(next.turn.step) + 1;
-    const wrapped = index >= STEPS.length;
-    const step: Step = STEPS[wrapped ? 0 : index] ?? "untap";
+    // Keep going until we land on a step where players receive priority.
+    for (let guard = 0; guard < STEPS.length + 1; guard++) {
+        const index = STEPS.indexOf(next.turn.step) + 1;
+        const wrapped = index >= STEPS.length;
+        const step: Step = STEPS[wrapped ? 0 : index] ?? "untap";
 
-    let activePlayer = next.turn.activePlayer;
-    let number = next.turn.number;
-    if (wrapped) {
-      activePlayer = nextPlayer(next, activePlayer);
-      number += 1;
-      out.push({ type: "turnStarted", turn: number, activePlayer });
-    }
+        let activePlayer = next.turn.activePlayer;
+        let number = next.turn.number;
+        if (wrapped) {
+            activePlayer = nextPlayer(next, activePlayer);
+            number += 1;
+            out.push({ type: "turnStarted", turn: number, activePlayer });
+        }
 
-    next = { ...next, turn: { number, activePlayer, step }, pending: null };
-    out.push({ type: "stepStarted", step });
-    const result = onEnterStep(next, step, wrapped);
-    if (!result.ok) return result;
-    next = result.state;
-    out.push(...result.events);
-
-    if (step === "declareAttackers") {
-        const result = beginCombat(next);
-        if (!result.ok) return result;
-        out.push(...result.events);
-        // If no attackers to select, just skip to giving active player priority
-        if (result.state.pending) {
-            return ok(result.state, out);
-        } else {
-            next = result.state;
-        }
-    } else if (step === "declareBlockers") {
-        if (!next.combat) {
-            continue; // Skip declare blockers step if no attackers are declared
-        }
-        const result = beginDeclareBlockers(next);
-        if (!result.ok) return result;
-        if (result.state.pending) {
-            return ok(result.state, out);
-        } else {
-            next = result.state;
-        }
-    } else if (step === "combatDamage") {
-        if (!next.combat) {
-            continue; // Skip combat damage step if no attackers are declared
-        }
-        const result = processCombatDamage(next);
+        next = { ...next, turn: { number, activePlayer, step }, pending: null };
+        out.push({ type: "stepStarted", step });
+        const result = onEnterStep(next, step, wrapped);
         if (!result.ok) return result;
         next = result.state;
         out.push(...result.events);
-    } else if (step === "cleanup") {
-        const excess = handExcess(next);
-        if (excess > 0) return ok(askDiscard(next, excess), out); // pauses until answered
-    }
 
-    if (stepGrantsPriority(step)) return givePriorityToActivePlayer(next, out);
-  }
-  return fail("Could not find the next step with priority");
+        if (step === "declareAttackers") {
+            const result = beginCombat(next);
+            if (!result.ok) return result;
+            out.push(...result.events);
+            // If no attackers to select, just skip to giving active player priority
+            if (result.state.pending) {
+                return ok(result.state, out);
+            } else {
+                next = result.state;
+            }
+        } else if (step === "declareBlockers") {
+            if (!next.combat) {
+                continue; // Skip declare blockers step if no attackers are declared
+            }
+            const result = beginDeclareBlockers(next);
+            if (!result.ok) return result;
+            if (result.state.pending) {
+                return ok(result.state, out);
+            } else {
+                next = result.state;
+            }
+        } else if (step === "combatDamage") {
+            if (!next.combat) {
+                continue; // Skip combat damage step if no attackers are declared
+            }
+            const result = processCombatDamage(next);
+            if (!result.ok) return result;
+            next = result.state;
+            out.push(...result.events);
+        } else if (step === "cleanup") {
+            const excess = handExcess(next);
+            if (excess > 0) return ok(askDiscard(next, excess), out); // pauses until answered
+        }
+
+        if (stepGrantsPriority(step)) return givePriorityToActivePlayer(next, out);
+    }
+    return fail("Could not find the next step with priority");
 }
+
+const stepGrantsPriority = (step: Step): boolean => step !== "untap" && step !== "cleanup";
+
 
 function handExcess(state: GameState): number {
   return (state.players[state.turn.activePlayer]?.hand.length ?? 0) - MAX_HAND_SIZE;

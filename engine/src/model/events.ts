@@ -1,6 +1,7 @@
 import { type ObjectId, type PlayerId, type StackId } from "./ids";
 import type { ManaType } from "./mana";
-import type { AttackableTarget, Step, Target, Zone } from "./state";
+import type { AttackableTarget, Target } from "./state";
+import type { Step, Zone } from "./vocabulary";
 
 /**
  * Facts about what just happened. The engine returns these alongside the new state.

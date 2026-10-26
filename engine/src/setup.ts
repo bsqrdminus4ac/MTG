@@ -1,5 +1,5 @@
 import { withPriorityDecision } from "./flow/priority";
-import type { CardDefinition } from "./model/cards";
+import type { CardDefinition } from "./model/cardDefinition";
 import type { CardDefId, ObjectId, PlayerId, Timestamp } from "./model/ids";
 import { emptyPool } from "./model/mana";
 import type { GameObject, GameState, PlayerState } from "./model/state";

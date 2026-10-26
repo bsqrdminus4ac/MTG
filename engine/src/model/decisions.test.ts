@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 import { applyAction, submitAnswer } from "../engine";
 import { priorityOptions, withPriorityDecision } from "../flow/priority";
 import { createGame } from "../setup";
-import type { CardDefinition } from "./cards";
+import type { CardDefinition } from "./cardDefinition";
 import { type Answer, chooseMany, chooseOne, indexChoice, resolveChooseAnswer, resolveYesNoAnswer, validateAnswer, yesNo } from "./decisions";
 import { cardDefId, type DecisionId, playerId, type PlayerId } from "./ids";
 import type { GameState } from "./state";

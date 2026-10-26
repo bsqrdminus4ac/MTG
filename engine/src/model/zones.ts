@@ -3,7 +3,8 @@ import { assertNever, withEntry, without } from "../core/util";
 import { getCardName } from "./characteristics";
 import type { GameEvent } from "./events";
 import { type ObjectId, type PlayerId, type Timestamp } from "./ids";
-import type { GameObject, GameState, Zone } from "./state";
+import type { GameObject, GameState } from "./state";
+import type { Zone } from "./vocabulary";
 
 function updateZone(state: GameState, owner: PlayerId, zone: Zone, fn: (list: readonly ObjectId[]) => readonly ObjectId[]): GameState {
     switch (zone) {

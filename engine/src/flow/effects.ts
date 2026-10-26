@@ -1,6 +1,7 @@
 import { applySequentially, fail, type ApplyResult } from "../core/result";
 import { assertNever } from "../core/util";
-import { type Ability, type Effect, type EffectTarget, type PlayerRef } from "../model/cards";
+import type { Ability } from "../model/abilities";
+import type { Effect, EffectTarget, PlayerRef } from "../model/effects";
 import { getCharacteristics } from "../model/characteristics";
 import type { GameEvent } from "../model/events";
 import type { ObjectId, PlayerId } from "../model/ids";

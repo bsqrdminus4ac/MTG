@@ -13,9 +13,7 @@ import type { DecisionId, ObjectId, PlayerId } from "./ids";
  *   - choose:   pick between `min` and `max` of the listed options (chooseOne is min = max = 1)
  */
 
-// ---------------------------------------------------------------------------
-// Options
-// ---------------------------------------------------------------------------
+//#region  Options
 
 /** What an option refers to. UIs can look objects and players up in GameState to show them. */
 export type ChoiceValue =
@@ -66,9 +64,8 @@ export const nullChoice = (id: string, label: string): Choice => ({
     value: { kind: "null" },
 });
 
-// ---------------------------------------------------------------------------
-// Decisions
-// ---------------------------------------------------------------------------
+//#endregion
+//#region Decisions
 
 /**
  * What the engine does once a yesNo or choose decision is answered. This is data rather than a
@@ -86,7 +83,7 @@ export type Continuation = Readonly<
     | { kind: "selectBlockers"; blocker: ObjectId }
     | { kind: "cancelBlocks" }
     | { kind: "selectDamageOrder"; attacker: ObjectId }
-    | { kind: "resolveEffect" }
+    | { kind: "resolveEffect"; bindAs: string }
 >;
 
 interface DecisionBase {
@@ -144,9 +141,8 @@ export const chooseOne = (spec: Omit<ChooseDecision, "kind" | "min" | "max">): C
 
 export const orderingDecision = (spec: Omit<OrderingDecision, "kind">): OrderingDecision => ({ kind: "order", ...spec });
 
-// ---------------------------------------------------------------------------
-// Answers
-// ---------------------------------------------------------------------------
+//#endregion
+//#region Answers
 
 export type Answer =
     | Readonly<{ kind: "priority"; option: string }>
@@ -230,3 +226,5 @@ export function validateAnswer(d: Decision, answer: Answer): Result<null> {
               : resolveChooseAnswer(d, answer);
   return r.ok ? good(null) : r;
 }
+
+//#endregion

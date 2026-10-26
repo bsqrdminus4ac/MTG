@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { submitAnswer } from "../engine";
-import type { CardDefinition } from "../model/cards";
+import type { CardDefinition } from "../model/cardDefinition";
 import type { GameEvent } from "../model/events";
 import { cardDefId, playerId, type ObjectId } from "../model/ids";
 import type { GameState } from "../model/state";

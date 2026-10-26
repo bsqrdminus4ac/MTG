@@ -1,4 +1,4 @@
-import type { AbilityOfKind } from "../model/cards";
+import type { AbilityOfKind } from "../model/abilities";
 import type { PlayerId } from "../model/ids";
 import type { GameObject, GameState } from "../model/state";
 
