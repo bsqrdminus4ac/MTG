@@ -83,7 +83,7 @@ export interface SpellOnStack extends StackEntryBase {
 }
 export interface AbilityOnStack extends StackEntryBase {
     readonly kind: "ability";
-    readonly definitionId: ObjectId;
+    readonly definitionId: CardDefId;
     readonly abilityIndex: number;
 }
 export type StackEntry = SpellOnStack | AbilityOnStack;
@@ -99,6 +99,21 @@ export interface PriorityState {
   readonly holder: PlayerId;
   readonly consecutivePasses: number;
 }
+
+export function nextPlayer(state: GameState, from: PlayerId): PlayerId {
+    const i = state.turnOrder.indexOf(from);
+    return state.turnOrder[(i + 1) % state.turnOrder.length] ?? from;
+}
+
+export const getRemainingPlayersInTurnOrder = (state: GameState): PlayerId[] => {
+    let p: PlayerId = state.turn.activePlayer;
+    const order = [p]; // Assumes active player hasn't lost the game
+    do {
+        p = nextPlayer(state, p);
+        if (state.players[p] && !state.players[p]?.hasLostTheGame) order.push(p);
+    } while (p !== state.turn.activePlayer);
+    return order;
+};
 
 export interface ResolutionInProgress {
     entry: StackEntry;

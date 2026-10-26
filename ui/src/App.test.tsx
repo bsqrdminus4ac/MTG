@@ -266,7 +266,7 @@ describe("stack panel", () => {
                   controller: BOB,
                   source: forest.newId,
                   targets: [],
-                  definitionId: forest.newId,
+                  definitionId: forest.state.objects[forest.newId]!.definitionId,
                   abilityIndex: 0,
               },
           ],

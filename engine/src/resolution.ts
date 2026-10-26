@@ -41,7 +41,7 @@ const contextOf = (resolving: ResolutionInProgress): EffectContext => ({
     controller: resolving.entry.controller,
     targets: resolving.entry.targets,
     legalTargets: resolving.entry.targets.map(() => true), // real check arrives with isTargetLegal
-    bindings: {},
+    bindings: resolving.bindings,
 });
 
 export function beginResolution(state: GameState): ApplyResult {
@@ -82,10 +82,10 @@ export function handleResolutionDecision(state: GameState, answer: Resolved): Ap
     if (!state.resolving) return fail("Nothing is resolving");
     const effect = state.resolving.effects[state.resolving.pc];
     if (effect) {
-         //TODO: handle decision (via bindings?)
+        //TODO: handle decision (via bindings?)
     }
-    
-    return runResolution({...state, resolving: {...state.resolving, pc: state.resolving.pc + 1}});
+
+    return runResolution({ ...state, resolving: { ...state.resolving, pc: state.resolving.pc + 1 } });
 }
 
 export function finishResolution(state: GameState, events: readonly GameEvent[]): ApplyResult {
@@ -97,13 +97,16 @@ export function finishResolution(state: GameState, events: readonly GameEvent[])
     if (resolving.entry.kind === "spell" && currentState.objects[resolving.entry.source]?.zone === "stack") {
         const chars = getCharacteristics(currentState, resolving.entry.source);
         if (!chars) return fail("Unable to identify characteristics of resolving spell");
-        out.push({type: "stackEntryResolved", id: resolving.entry.id, spellName: chars.name });
+        out.push({ type: "stackEntryResolved", id: resolving.entry.id, spellName: chars.name });
         const dest: Zone = chars.types.some((t) => isPermanentType(t)) ? "battlefield" : "graveyard";
         const moved = moveObject(currentState, resolving.entry.source, dest);
         if (moved) {
             currentState = moved.state;
             out.push(...moved.events);
         }
+    } else if (resolving.entry.kind === "ability") {
+        // TODO: Ability resolution
+        out.push({ type: "stackEntryResolved", id: resolving.entry.id, spellName: "TODO: Ability event names" });
     }
     return givePriorityToActivePlayer(currentState, out);
 }

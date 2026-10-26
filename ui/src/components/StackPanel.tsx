@@ -15,7 +15,7 @@ function StackEntryCard({ state, entry, top }: EntryProps) {
   // A spell's effects live on its card; an ability on the stack carries its own copy.
   const effects =
       entry.kind === "ability"
-          ? [describeAbility(getCharacteristics(state, entry.definitionId)?.abilities[entry.abilityIndex])]
+          ? [describeAbility(state.definitions[entry.definitionId]?.abilities[entry.abilityIndex])]
           : (getCharacteristics(state, entry.source)?.abilities ?? []).filter((a) => a.kind === "spell").map(describeAbility);
 
   return (

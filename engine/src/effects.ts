@@ -5,14 +5,14 @@ import type { GameEvent } from "./events";
 import type { ObjectId, PlayerId } from "./ids";
 import { addMana, type ManaType } from "./mana";
 import { stepFromApply, type EffectContext, type StepResult } from "./resolution";
-import type { GameState, StackEntry, Target } from "./state";
+import { getRemainingPlayersInTurnOrder, type GameState, type StackEntry, type Target } from "./state";
 import { assertNever, withEntry } from "./util";
-import { drawCard, drawCardResult, moveObject } from "./zones";
+import { drawCardResult, moveObject } from "./zones";
 
 export function resolvePlayers(state: GameState, ctx: EffectContext, ref: PlayerRef): PlayerId[] {
     if (ref === "controller") return [ctx.controller];
-    if (ref === "opponent") return Object.keys(state.players).filter((p) => p !== ctx.controller) as PlayerId[];
-    return Object.keys(state.players) as PlayerId[];
+    if (ref === "opponent") return getRemainingPlayersInTurnOrder(state).filter((p) => p !== ctx.controller) as PlayerId[];
+    return getRemainingPlayersInTurnOrder(state) as PlayerId[];
 }
 
 export function resolveStackEntryEffects(state: GameState, entry: StackEntry): readonly Effect[] {

@@ -237,28 +237,3 @@ export function payManaOptions(state: GameState): ApplyResult {
     );
     return ok(decisionState, []);
 }
-
-export function resolveSpell(state: GameState, spell: SpellOnStack): ApplyResult {
-    const spellInfo = getCharacteristics(state, spell.source);
-    if (!spellInfo) return fail("This spell's card no longer exists");
-    const isPermanentSpell = spellInfo.types.some((t) => isPermanentType(t));
-    if (isPermanentSpell) {
-        const moveResult = moveObject(state, spell.source, "battlefield");
-        if (!moveResult) return fail("Unable to move permanent from stack to battlefield");
-        return ok(moveResult.state, moveResult.events);
-    }
-    const steps = spellInfo.abilities.flatMap((ability) =>
-        ability.kind === "spell" ? ability.effects.map((effect) => (currentState: GameState) => executeEffect(currentState, contextOf(spell), effect)) : [],
-    );
-    return applySequentially(state, steps);
-}
-
-function contextOf(spell: SpellOnStack): EffectContext {
-    return {
-        controller: spell.controller,
-        source: spell.source,
-        targets: spell.targets,
-        legalTargets: spell.targets.map(() => true), // real check arrives with isTargetLegal
-        bindings: {},
-    };
-}

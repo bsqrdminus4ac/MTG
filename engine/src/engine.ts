@@ -1,7 +1,7 @@
 import type { Action } from "./actions";
 import { tapPermanent, type AbilityOfKind } from "./cards";
-import { applyTargetSelections, beginCast, cancelCast, payManaOptions, resolveSpell } from "./casting";
-import { getCardName, getCharacteristics, isPermanentType } from "./characteristics";
+import { applyTargetSelections, beginCast, cancelCast, payManaOptions } from "./casting";
+import { getCardName, getCharacteristics } from "./characteristics";
 import {
     applyAttackSelectionDecision,
     applyAttackTargetDecision,
@@ -14,20 +14,13 @@ import {
     processCombatDamage,
 } from "./combat";
 import { chooseMany, objectChoice, resolveChooseAnswer, resolveOrderingAnswer, resolvePriorityAnswer, resolveYesNoAnswer, type Choice, type Continuation, type Submission } from "./decisions";
-import { addManaEffect } from "./effects";
+import { addManaEffect, executeEffect } from "./effects";
 import type { GameEvent } from "./events";
 import type { ObjectId, PlayerId } from "./ids";
 import { addMana, emptyPool } from "./mana";
 import { canPlayLand, openDecision, withPriorityDecision } from "./prompts";
-import { beginResolution, handleResolutionDecision } from "./resolution";
-import {
-    STEPS,
-    stepGrantsPriority,
-    type GameState,
-    type Step,
-    type Target,
-    type Zone,
-} from "./state";
+import { beginResolution, handleResolutionDecision, type EffectContext } from "./resolution";
+import { STEPS, nextPlayer, stepGrantsPriority, type GameState, type Step, type Target, type Zone } from "./state";
 import { checkStateBasedActions } from "./stateBasedActions";
 import { assertNever, withEntry } from "./util";
 import { commitSpell, drawCard, drawCardResult, moveObject } from "./zones";
@@ -198,11 +191,6 @@ function resume(state: GameState, then: Continuation, player: PlayerId, answer: 
 // ---------------------------------------------------------------------------
 // Priority and the stack
 // ---------------------------------------------------------------------------
-
-function nextPlayer(state: GameState, from: PlayerId): PlayerId {
-  const i = state.turnOrder.indexOf(from);
-  return state.turnOrder[(i + 1) % state.turnOrder.length] ?? from;
-}
 
 function passPriority(state: GameState, player: PlayerId): ApplyResult {
   const priority = state.priority;
@@ -446,7 +434,25 @@ export function activateAbility(state: GameState, player: PlayerId, source: Obje
             // Mana abilities don't use the stack (CR 605). We just resolve it immediately.
             const payResult = payAbilityCosts(state, player, source, ability);
             if (!payResult.ok) return fail(payResult.error);
-            const resolveResult = resolveManaAbility(payResult.state, player, source, ability);
+            const resolveResult = applySequentially(
+                payResult.state,
+                ability.effects
+                    .filter((e) => e.kind === "addMana")
+                    .map((e) => {
+                        return (s) =>
+                            executeEffect(
+                                s,
+                                {
+                                    controller: player,
+                                    source,
+                                    targets: [],
+                                    legalTargets: [],
+                                    bindings: {},
+                                },
+                                e,
+                            );
+                    }),
+            );
             if (!resolveResult.ok) return fail(resolveResult.error);
             const next = {
                 ...resolveResult.state,
@@ -484,19 +490,6 @@ function payAbilityCosts(state: GameState, player: PlayerId, source: ObjectId, a
     // TODO
   }
   return applySequentially(state, steps);
-}
-
-function resolveManaAbility(state: GameState, player: PlayerId, source: ObjectId, ability: AbilityOfKind<"activated">): ApplyResult {
-  let events: GameEvent[] = [];
-  let currentState = state;
-  for (const effect of ability.effects) {
-    if (effect.kind === "addMana") {
-      return addManaEffect(currentState, player, effect.mana, effect.amount);
-    } else {
-      return fail("Unimplemented effect kind for mana ability: " + effect.kind);  
-    }
-  }
-  return ok(currentState, events);
 }
 
 // ---------------------------------------------------------------------------
