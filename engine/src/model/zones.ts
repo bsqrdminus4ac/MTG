@@ -1,11 +1,9 @@
-import { getCardName, getCharacteristics } from "./characteristics";
-import { fail, ok, type ApplyResult } from "./engine";
+import { type ApplyResult, ok } from "../core/result";
+import { assertNever, withEntry, without } from "../core/util";
+import { getCardName } from "./characteristics";
 import type { GameEvent } from "./events";
-import { nextID, type ObjectId, type PlayerId, type StackId, type Timestamp } from "./ids";
-import { payMana } from "./mana";
-import { withPriorityDecision } from "./prompts";
-import type { GameObject, GameState, SpellOnStack, Zone } from "./state";
-import { assertNever, withEntry, without } from "./util";
+import { type ObjectId, type PlayerId, type Timestamp } from "./ids";
+import type { GameObject, GameState, Zone } from "./state";
 
 function updateZone(state: GameState, owner: PlayerId, zone: Zone, fn: (list: readonly ObjectId[]) => readonly ObjectId[]): GameState {
     switch (zone) {
@@ -113,45 +111,4 @@ export function drawCard(state: GameState, player: PlayerId): { state: GameState
         state: moved.state,
         events: [...moved.events, { type: "cardDrawn", player, card: moved.newId, cardName: getCardName(moved.state, moved.newId) }],
     };
-}
-
-export function commitSpell(state: GameState): ApplyResult {
-    const castingInfo = state.casting;
-    if (!castingInfo) return fail("No spell is being cast");
-
-    const p = state.players[castingInfo.player];
-    if (!p) return fail("Invalid player");
-    let currentState = state;
-    if (castingInfo.cost) {
-        const playerPaid = payMana(p, castingInfo.cost);
-        if (!playerPaid) return fail("Unable to pay for the spell");
-        currentState = {
-            ...currentState,
-            players: withEntry(state.players, castingInfo.player, playerPaid),
-        };
-    }
-
-    const [stackState, stackID] = nextID<StackId>(currentState);
-    currentState = stackState;
-    const moved = moveObject(currentState, castingInfo.card, "stack");
-    if (!moved) return fail("Unable to move spell to the stack");
-    currentState = moved.state;
-    const spell: SpellOnStack = {
-        controller: castingInfo.player,
-        id: stackID,
-        kind: "spell",
-        source: moved.newId,
-        targets: castingInfo.targets,
-    };
-    const spellEvent: GameEvent = {
-        type: "spellCastSuccess",
-        card: moved.newId,
-        player: castingInfo.player,
-        targets: castingInfo.targets,
-        cardName: getCardName(currentState, moved.newId),
-    };
-    const addedToStack = [...currentState.stack, spell];
-    const allEvents = [...castingInfo.events, ...moved.events, spellEvent];
-    currentState = { ...currentState, stack: addedToStack, casting: null };
-    return ok(withPriorityDecision(currentState), allEvents);
 }

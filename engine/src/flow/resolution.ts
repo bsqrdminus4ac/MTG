@@ -1,48 +1,11 @@
-import { getCharacteristics, isPermanentType } from "./characteristics";
-import { executeEffect, resolveStackEntryEffects } from "./effects";
-import { fail, givePriorityToActivePlayer, ok, type ApplyResult, type Resolved } from "./engine";
-import type { GameEvent } from "./events";
-import type { ObjectId, PlayerId } from "./ids";
-import type { Target, GameState, ResolutionInProgress, Binding, Zone } from "./state";
-import { moveObject } from "./zones";
-
-/** Enough to evaluate predicates, amounts and player references. Usable at targeting time too. */
-interface EvalContext {
-    readonly source: ObjectId;
-    readonly controller: PlayerId;
-}
-
-/** Everything an effect can see while its ability resolves. */
-export interface EffectContext extends EvalContext {
-    readonly targets: readonly Target[];
-    readonly legalTargets: readonly boolean[]; // per target index, computed once when resolution starts
-    readonly bindings: Readonly<Record<string, Binding>>;
-}
-
-export type StepResult =
-    | Readonly<{ ok: true; waiting: false; state: GameState; events: readonly GameEvent[] }>
-    | Readonly<{ ok: true; waiting: true; state: GameState; events: readonly GameEvent[] }>
-    | Extract<ApplyResult, { ok: false }>;
-
-export const done = (state: GameState, events: readonly GameEvent[] = []): StepResult => ({ ok: true, waiting: false, state, events });
-
-export const ask = (state: GameState, events: readonly GameEvent[] = []): StepResult => {
-    if (!state.pending) return { ok: false, error: "ask() requires a pending decision" };
-    return { ok: true, waiting: true, state, events };
-};
-
-export const stepFromApply = (result: ApplyResult): StepResult => {
-    if (!result.ok) return result;
-    return done(result.state, result.events);
-};
-
-const contextOf = (resolving: ResolutionInProgress): EffectContext => ({
-    source: resolving.entry.source,
-    controller: resolving.entry.controller,
-    targets: resolving.entry.targets,
-    legalTargets: resolving.entry.targets.map(() => true), // real check arrives with isTargetLegal
-    bindings: resolving.bindings,
-});
+import { type ApplyResult, fail, ok } from "../core/result";
+import { getCharacteristics, isPermanentType } from "../model/characteristics";
+import type { ResolvedAnswer } from "../model/decisions";
+import type { GameEvent } from "../model/events";
+import type { GameState, ResolutionInProgress, Zone } from "../model/state";
+import { moveObject } from "../model/zones";
+import { contextOf, executeEffect, resolveStackEntryEffects } from "./effects";
+import { givePriorityToActivePlayer } from "./priority";
 
 export function beginResolution(state: GameState): ApplyResult {
     const entry = state.stack[state.stack.length - 1];
@@ -78,7 +41,7 @@ export function runResolution(state: GameState): ApplyResult {
     }
 }
 
-export function handleResolutionDecision(state: GameState, answer: Resolved): ApplyResult {
+export function handleResolutionDecision(state: GameState, answer: ResolvedAnswer): ApplyResult {
     if (!state.resolving) return fail("Nothing is resolving");
     const effect = state.resolving.effects[state.resolving.pc];
     if (effect) {

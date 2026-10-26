@@ -1,11 +1,11 @@
 import { describe, expect, test } from "vitest";
-import { type CardDefinition, type Effect } from "./cards";
-import { damageObject, damagePlayer, executeEffect } from "./effects";
-import { cardDefId, playerId, type CardDefId, type ObjectId } from "./ids";
-import { type EffectContext, type StepResult } from "./resolution";
-import type { GameState, Target } from "./state";
-import { createGame } from "./setup";
-import { moveObject } from "./zones";
+import { type CardDefinition, type Effect } from "../model/cards";
+import { cardDefId, playerId, type CardDefId, type ObjectId } from "../model/ids";
+import type { GameState, Target } from "../model/state";
+import { moveObject } from "../model/zones";
+import { damageObject, damagePlayer } from "../rules/primitives";
+import { createGame } from "../setup";
+import { executeEffect, type EffectContext, type StepResult } from "./effects";
 
 const alice = playerId("alice");
 const bob = playerId("bob");

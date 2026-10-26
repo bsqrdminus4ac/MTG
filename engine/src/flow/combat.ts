@@ -1,28 +1,13 @@
-import { hasCardType, hasKeyword, tapPermanent } from "./cards";
-import { getCardName, getCharacteristics } from "./characteristics";
-import { chooseMany, chooseOne, nullChoice, objectChoice, orderingDecision, playerChoice, type Choice } from "./decisions";
-import { damageObject, damagePlayer } from "./effects";
-import { applySequentially, fail, givePriorityToActivePlayer, ok, type ApplyResult } from "./engine";
-import type { GameEvent } from "./events";
-import type { ObjectId, PlayerId } from "./ids";
-import { openDecision } from "./prompts";
-import type { AttackableTarget, GameState, Target } from "./state";
-import { keysOf, withEntry } from "./util";
-
-export interface CombatInProgress {
-    rollback: GameState | null;
-    attackers: Readonly<Record<ObjectId, CombatInfo>>;
-    currentTargetDecision?: ObjectId | undefined;
-    blocksChosen?: Readonly<Record<ObjectId, boolean>>;
-}
-
-export interface CombatInfo {
-    id: ObjectId;
-    attackableTargets?: AttackableTarget[] | undefined;
-    attackTarget?: AttackableTarget;
-    blockedBy?: readonly ObjectId[];
-    blockOrder?: readonly number[];
-}
+import { applySequentially, fail, ok, type ApplyResult } from "../core/result";
+import { keysOf, withEntry } from "../core/util";
+import { getCardName, getCharacteristics, hasCardType, hasKeyword } from "../model/characteristics";
+import { chooseMany, chooseOne, nullChoice, objectChoice, orderingDecision, playerChoice, type Choice } from "../model/decisions";
+import type { GameEvent } from "../model/events";
+import type { ObjectId, PlayerId } from "../model/ids";
+import type { AttackableTarget, CombatInfo, CombatInProgress, GameState } from "../model/state";
+import { openDecision } from "../rules/pending";
+import { damageObject, damagePlayer, tapPermanent } from "../rules/primitives";
+import { givePriorityToActivePlayer } from "./priority";
 
 export const isAttacking = (state: GameState, object: ObjectId): boolean => state.combat !== null && state.combat.attackers[object]?.attackTarget !== undefined;
 export const isBlocking = (state: GameState, object: ObjectId): boolean => {

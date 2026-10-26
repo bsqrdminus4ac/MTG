@@ -169,6 +169,13 @@ export type Result<T> =
 const good = <T>(value: T): Result<T> => ({ ok: true, value });
 const bad = (error: string): Result<never> => ({ ok: false, error });
 
+
+export type ResolvedAnswer =
+    | Readonly<{ kind: "yesNo"; value: boolean }>
+    | Readonly<{ kind: "choose"; chosen: readonly Choice[] }>
+    | Readonly<{ kind: "order"; options: readonly Choice[]; order: readonly number[] }>
+    | Readonly<{ kind: "cancel" }>;
+
 // Validation turns a raw answer (ids and booleans) into the thing it refers to.
 
 export function resolvePriorityAnswer(d: PriorityDecision, answer: Answer): Result<PriorityOption> {

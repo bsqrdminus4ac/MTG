@@ -1,28 +1,30 @@
-import { getCharacteristics } from "./characteristics";
-import { applySequentially, fail, ok, type ApplyResult } from "./engine";
-import type { GameEvent } from "./events";
-import type { ObjectId } from "./ids";
-import type { GameState } from "./state";
-import { withEntry } from "./util";
-import { moveObject } from "./zones";
-
+import { type ApplyResult, applySequentially, fail, ok } from "../core/result";
+import { withEntry } from "../core/util";
+import { getCharacteristics } from "../model/characteristics";
+import type { GameEvent } from "../model/events";
+import type { ObjectId } from "../model/ids";
+import type { GameState } from "../model/state";
+import { moveObject } from "../model/zones";
 
 export function checkStateBasedActions(state: GameState, eventsSoFar: GameEvent[]): ApplyResult {
-    const nextState = applySequentially(state, 
-        [
-            checkFor0Life, checkDrawFromEmptyLibrary, checkPoison, 
-            clearTokens, checkFor0Toughness, checkForLethalDamage,
-            checkFor0Loyalty, combinePlusMinusCounters,
-            checkForWinner
-        ]
-    );
+    const nextState = applySequentially(state, [
+        checkFor0Life,
+        checkDrawFromEmptyLibrary,
+        checkPoison,
+        clearTokens,
+        checkFor0Toughness,
+        checkForLethalDamage,
+        checkFor0Loyalty,
+        combinePlusMinusCounters,
+        checkForWinner,
+    ]);
     if (!nextState.ok) return nextState;
-    
+
     if (nextState.changesMade && !nextState.state.winner) {
         eventsSoFar.push(...nextState.events);
         return checkStateBasedActions(nextState.state, eventsSoFar);
     }
-    return ok(nextState.state, [...eventsSoFar, ...nextState.events ]);
+    return ok(nextState.state, [...eventsSoFar, ...nextState.events]);
 }
 
 function checkForWinner(state: GameState): ApplyResult {
@@ -30,8 +32,12 @@ function checkForWinner(state: GameState): ApplyResult {
     for (const p of Object.values(state.players)) {
         if (!p.hasLostTheGame) stillActive.push(p.id);
     }
-    if (stillActive.length === 0) { return fail("No active players remain"); }
-    if (stillActive.length === 1) { return ok({...state, winner: stillActive[0]!}, [{type:"wonTheGame", player: stillActive[0]!}]); }
+    if (stillActive.length === 0) {
+        return fail("No active players remain");
+    }
+    if (stillActive.length === 1) {
+        return ok({ ...state, winner: stillActive[0]! }, [{ type: "wonTheGame", player: stillActive[0]! }]);
+    }
     return ok(state, []);
 }
 
@@ -41,8 +47,8 @@ function checkFor0Life(state: GameState): ApplyResult {
     for (const p of Object.values(state.players)) {
         if (p.hasLostTheGame) continue;
         if (p.life <= 0) {
-            currentState = {...currentState, players: withEntry(currentState.players, p.id, {...p, hasLostTheGame: true})};
-            events.push({type: "lostTheGame", player: p.id, cause: "having 0 or less life"});
+            currentState = { ...currentState, players: withEntry(currentState.players, p.id, { ...p, hasLostTheGame: true }) };
+            events.push({ type: "lostTheGame", player: p.id, cause: "having 0 or less life" });
         }
     }
     return ok(currentState, events, events.length > 0);
@@ -54,8 +60,8 @@ function checkDrawFromEmptyLibrary(state: GameState): ApplyResult {
     for (const p of Object.values(state.players)) {
         if (p.hasLostTheGame) continue;
         if (p.drewFromEmptyLibrary) {
-            currentState = {...currentState, players: withEntry(currentState.players, p.id, {...p, hasLostTheGame: true})};
-            events.push({type: "lostTheGame", player: p.id, cause: "drawing from an empty library"});
+            currentState = { ...currentState, players: withEntry(currentState.players, p.id, { ...p, hasLostTheGame: true }) };
+            events.push({ type: "lostTheGame", player: p.id, cause: "drawing from an empty library" });
         }
     }
     return ok(currentState, events, events.length > 0);
@@ -67,8 +73,8 @@ function checkPoison(state: GameState): ApplyResult {
     for (const p of Object.values(state.players)) {
         if (p.hasLostTheGame) continue;
         if (p.counters["poison"] ?? 0 >= 10) {
-            currentState = {...currentState, players: withEntry(currentState.players, p.id, {...p, hasLostTheGame: true})};
-            events.push({type: "lostTheGame", player: p.id, cause: "having 10 or more poison counters"});
+            currentState = { ...currentState, players: withEntry(currentState.players, p.id, { ...p, hasLostTheGame: true }) };
+            events.push({ type: "lostTheGame", player: p.id, cause: "having 10 or more poison counters" });
         }
     }
     return ok(currentState, events, events.length > 0);
@@ -85,9 +91,9 @@ function clearTokens(state: GameState): ApplyResult {
             idsToRemove.push(obj.id);
         }
     }
-    const updatedObjects = {...state.objects};
+    const updatedObjects = { ...state.objects };
     for (const id of idsToRemove) delete updatedObjects[id];
-    return ok({...currentState, objects: updatedObjects}, events, idsToRemove.length > 0);
+    return ok({ ...currentState, objects: updatedObjects }, events, idsToRemove.length > 0);
 }
 
 //TODO: Spell copying

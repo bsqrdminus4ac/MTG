@@ -1,21 +1,12 @@
 import { describe, expect, test, vi } from "vitest";
-import {
-    applyAction,
-    applySequentially,
-    cardDefId,
-    createGame,
-    drawCard,
-    fail,
-    getCharacteristics,
-    moveObject,
-    ok,
-    playerId,
-    submitAnswer,
-    type CardDefinition,
-    type ContinuousEffect,
-    type GameState,
-    type Timestamp,
-} from "./index";
+import { applySequentially, fail, ok } from "./core/result";
+import { applyAction, submitAnswer } from "./engine";
+import type { CardDefinition, ContinuousEffect } from "./model/cards";
+import { getCharacteristics } from "./model/characteristics";
+import { cardDefId, playerId, type Timestamp } from "./model/ids";
+import type { GameState } from "./model/state";
+import { drawCard, moveObject } from "./model/zones";
+import { createGame } from "./setup";
 
 const alice = playerId("alice");
 const bob = playerId("bob");

@@ -1,9 +1,8 @@
 import type { CardDefinition, ContinuousEffect, Effect } from "./cards";
-import type { CastingInProgress } from "./casting";
-import type { CombatInfo, CombatInProgress } from "./combat";
 import type { ChoiceValue, Decision } from "./decisions";
+import type { GameEvent } from "./events";
 import type { CardDefId, ObjectId, PlayerId, StackId, Timestamp } from "./ids";
-import type { ManaPool } from "./mana";
+import type { ManaCost, ManaPool } from "./mana";
 
 /**
  * Ordering convention: for library, graveyard and stack, the LAST element is the top.
@@ -12,22 +11,24 @@ import type { ManaPool } from "./mana";
 export type Zone = "library" | "hand" | "battlefield" | "graveyard" | "stack" | "exile";
 
 /** Main phases are modeled as steps here to keep the turn structure a flat list. */
-export const STEPS = [
-  "untap", "upkeep", "draw", "precombatMain",
-  "beginningOfCombat", "declareAttackers", "declareBlockers", "combatDamage", "endOfCombat",
-  "postcombatMain", "end", "cleanup",
-] as const;
+export const STEPS = ["untap", "upkeep", "draw", "precombatMain", "beginningOfCombat", "declareAttackers", "declareBlockers", "combatDamage", "endOfCombat", "postcombatMain", "end", "cleanup"] as const;
 export type Step = (typeof STEPS)[number];
 
 export type Phase = "beginning" | "precombatMain" | "combat" | "postcombatMain" | "ending";
 
 export const PHASE_OF: Readonly<Record<Step, Phase>> = {
-  untap: "beginning", upkeep: "beginning", draw: "beginning",
-  precombatMain: "precombatMain",
-  beginningOfCombat: "combat", declareAttackers: "combat", declareBlockers: "combat",
-  combatDamage: "combat", endOfCombat: "combat",
-  postcombatMain: "postcombatMain",
-  end: "ending", cleanup: "ending",
+    untap: "beginning",
+    upkeep: "beginning",
+    draw: "beginning",
+    precombatMain: "precombatMain",
+    beginningOfCombat: "combat",
+    declareAttackers: "combat",
+    declareBlockers: "combat",
+    combatDamage: "combat",
+    endOfCombat: "combat",
+    postcombatMain: "postcombatMain",
+    end: "ending",
+    cleanup: "ending",
 };
 
 /** Players normally don't get priority during untap or cleanup (CR 502.4, 514.3). */
@@ -63,19 +64,15 @@ export interface PlayerState {
     readonly hasLostTheGame?: boolean;
 }
 
-export type Target =
-  | Readonly<{ kind: "object"; id: ObjectId }>
-  | Readonly<{ kind: "player"; id: PlayerId }>
-  | Readonly<{ kind: "stackEntry"; id: StackId}>;
+export type Target = Readonly<{ kind: "object"; id: ObjectId }> | Readonly<{ kind: "player"; id: PlayerId }> | Readonly<{ kind: "stackEntry"; id: StackId }>;
 export type AttackableTarget = Exclude<Target, { kind: "stackEntry" }>;
 
-
 interface StackEntryBase {
-  readonly id: StackId;
-  readonly controller: PlayerId;
-  /** For a spell, this is the card object itself (whose zone is "stack"). */
-  readonly source: ObjectId;
-  readonly targets: readonly Target[];
+    readonly id: StackId;
+    readonly controller: PlayerId;
+    /** For a spell, this is the card object itself (whose zone is "stack"). */
+    readonly source: ObjectId;
+    readonly targets: readonly Target[];
 }
 export interface SpellOnStack extends StackEntryBase {
     readonly kind: "spell";
@@ -89,15 +86,15 @@ export interface AbilityOnStack extends StackEntryBase {
 export type StackEntry = SpellOnStack | AbilityOnStack;
 
 export interface TurnState {
-  readonly number: number;
-  readonly activePlayer: PlayerId;
-  readonly step: Step;
+    readonly number: number;
+    readonly activePlayer: PlayerId;
+    readonly step: Step;
 }
 
 /** Who may act, and how many players in a row have passed since the last stack change (CR 117.4). */
 export interface PriorityState {
-  readonly holder: PlayerId;
-  readonly consecutivePasses: number;
+    readonly holder: PlayerId;
+    readonly consecutivePasses: number;
 }
 
 export function nextPlayer(state: GameState, from: PlayerId): PlayerId {
@@ -114,6 +111,31 @@ export const getRemainingPlayersInTurnOrder = (state: GameState): PlayerId[] => 
     } while (p !== state.turn.activePlayer);
     return order;
 };
+
+export interface CombatInProgress {
+    rollback: GameState | null;
+    attackers: Readonly<Record<ObjectId, CombatInfo>>;
+    currentTargetDecision?: ObjectId | undefined;
+    blocksChosen?: Readonly<Record<ObjectId, boolean>>;
+}
+
+export interface CombatInfo {
+    id: ObjectId;
+    attackableTargets?: AttackableTarget[] | undefined;
+    attackTarget?: AttackableTarget;
+    blockedBy?: readonly ObjectId[];
+    blockOrder?: readonly number[];
+}
+
+export interface CastingInProgress {
+    player: PlayerId;
+    card: ObjectId; // still in hand until commit
+    targets: readonly Target[];
+    targetSpecsSelected: readonly boolean[];
+    cost: ManaCost | null; // total cost, determined after targets
+    rollback: GameState; // state before casting began
+    events: readonly GameEvent[]; // buffered until commit
+}
 
 export interface ResolutionInProgress {
     entry: StackEntry;

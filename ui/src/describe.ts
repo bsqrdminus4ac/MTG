@@ -186,13 +186,7 @@ export function describeAction(state: GameState, a: Action): string {
     case "castSpell":
       return `cast ${nameOf(state, a.card)} (#${a.card})`;
     case "activateAbility":
-      return `activate ability ${a.abilityIndex+1} of ${nameOf(state, a.source)} (#${a.source})`;
-    case "declareAttackers":
-      return `declare ${a.attackers.length} attacker(s)`;
-    case "declareBlockers":
-      return `declare ${a.blocks.length} blocker(s)`;
-    case "cancelSpellCast":
-      return `cancel casting of ${nameOf(state, a.card)} (#${a.card})`;
+      return `activate ability ${a.abilityIndex + 1} of ${nameOf(state, a.source)} (#${a.source})`;
     default:
       return unreachable(a);
   }

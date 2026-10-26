@@ -1,7 +1,7 @@
-import { LAYER_ORDER, layerOf, type CardType, type Characteristics, type Modification } from "./cards";
+import { assertNever } from "../core/util";
+import { LAYER_ORDER, layerOf, type CardType, type Characteristics, type Keyword, type Modification } from "./cards";
 import type { ObjectId } from "./ids";
 import type { GameState } from "./state";
-import { assertNever } from "./util";
 
 export const isPermanentType = (t: CardType): boolean => t !== "Instant" && t !== "Sorcery";
 
@@ -51,4 +51,16 @@ export function getCardName(state: GameState, id: ObjectId, withId?: boolean): s
     const chars = getCharacteristics(state, id);
     if (!chars) return "";
     return chars.name + (withId ? ` (#${id})` : "");
+}
+
+export function hasKeyword(state: GameState, obj: ObjectId, keyword: Keyword): boolean {
+    const chars = getCharacteristics(state, obj);
+    if (!chars) return false;
+    return chars.abilities.some((a) => a.kind === "keyword" && a.keyword === keyword);
+}
+
+export function hasCardType(state: GameState, obj: ObjectId, type: CardType): boolean {
+    const chars = getCharacteristics(state, obj);
+    if (!chars) return false;
+    return chars.types.includes(type);
 }
