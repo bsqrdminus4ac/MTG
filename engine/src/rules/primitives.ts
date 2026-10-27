@@ -46,6 +46,15 @@ export function addManaEffect(state: GameState, player: PlayerId, mana: ManaType
     return ok({ ...state, players: withEntry(state.players, player, addMana(p, mana, amount)) }, [{ type: "manaAdded", player, mana, amount }]);
 }
 
+export function discardCard(state: GameState, player: PlayerId, card: ObjectId, cause?: string): ApplyResult {
+    if (!state.players[player]?.hand.includes(card)) return fail("Card to discard was not in that player's hand");
+    const cardName = getCardName(state, card);
+    const moveResult = moveObject(state, card, "graveyard");
+    if (!moveResult) return fail("Unable to move card from hand to graveyard");
+    const discardEvent: GameEvent = cause ? { type: "cardDiscarded", player, card, cardName, cause } : { type: "cardDiscarded", player, card, cardName };
+    return ok(moveResult.state, [discardEvent, ...moveResult.events]);
+}
+
 export function damageObject(state: GameState, target: ObjectId, source: ObjectId, amount: number, isCombatDamage: boolean): ApplyResult {
     const obj = state.objects[target];
     if (!obj) return ok(state, []);

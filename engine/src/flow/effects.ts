@@ -1,4 +1,4 @@
-import { applySequentially, badResult, fail, goodResult, type ApplyResult, type Failure, type Result } from "../core/result";
+import { applySequentially, fail, goodResult, type ApplyResult, type Failure, type Result } from "../core/result";
 import { assertNever } from "../core/util";
 import type { Ability } from "../model/abilities";
 import { getCardName, getCharacteristics } from "../model/characteristics";
@@ -6,10 +6,11 @@ import { chooseMany, objectChoice } from "../model/decisions";
 import type { Amount, Effect, EffectTarget, PlayerRef } from "../model/effects";
 import type { GameEvent } from "../model/events";
 import type { ObjectId, PlayerId } from "../model/ids";
-import { getRemainingPlayersInTurnOrder, type Binding, type GameState, type ResolutionInProgress, type StackEntry, type Target } from "../model/state";
+import { getRemainingPlayersInTurnOrder, type Binding, type Bindings, type GameState, type ResolutionInProgress, type StackEntry, type Target } from "../model/state";
 import { drawCardResult } from "../model/zones";
+import { getChoiceBinding, getNumberBinding, getObjectIdsFromBinding } from "../rules/bindings";
 import { openDecision } from "../rules/pending";
-import { addManaEffect, damageObject, damagePlayer, destroyPermanent, gainLife, loseLife } from "../rules/primitives";
+import { addManaEffect, damageObject, damagePlayer, destroyPermanent, discardCard, gainLife, loseLife } from "../rules/primitives";
 
 /** Enough to evaluate predicates, amounts and player references. Usable at targeting time too. */
 interface EvalContext {
@@ -21,7 +22,7 @@ interface EvalContext {
 export interface EffectContext extends EvalContext {
     readonly targets: readonly Target[];
     readonly legalTargets: readonly boolean[]; // per target index, computed once when resolution starts
-    readonly bindings: Readonly<Record<string, Binding>>;
+    readonly bindings: Bindings;
 }
 
 export type StepResult =
@@ -49,7 +50,7 @@ export function executeEffect(state: GameState, ctx: EffectContext, effect: Effe
     switch (effect.kind) {
         case "damage": {
             const a = resolveAmount(currentState, ctx, effect.amount);
-            if (!a.ok) return fail(a.error);
+            if (!a.ok) return a;
             return withTargets(currentState, ctx, effect.to, (targets) => {
                 return applySequentially(
                     currentState,
@@ -63,7 +64,7 @@ export function executeEffect(state: GameState, ctx: EffectContext, effect: Effe
         }
         case "draw": {
             const a = resolveAmount(currentState, ctx, effect.count);
-            if (!a.ok) return fail(a.error);
+            if (!a.ok) return a;
             return withTargets(currentState, ctx, { kind: "player", who: effect.who }, (targets) => {
                 return applySequentially(
                     currentState,
@@ -76,7 +77,7 @@ export function executeEffect(state: GameState, ctx: EffectContext, effect: Effe
         }
         case "gainLife": {
             const a = resolveAmount(currentState, ctx, effect.amount);
-            if (!a.ok) return fail(a.error);
+            if (!a.ok) return a;
             return withTargets(currentState, ctx, { kind: "player", who: effect.who }, (targets) => {
                 return applySequentially(
                     currentState,
@@ -89,7 +90,7 @@ export function executeEffect(state: GameState, ctx: EffectContext, effect: Effe
         }
         case "loseLife": {
             const a = resolveAmount(currentState, ctx, effect.amount);
-            if (!a.ok) return fail(a.error);
+            if (!a.ok) return a;
             return withTargets(currentState, ctx, { kind: "player", who: effect.who }, (targets) => {
                 return applySequentially(
                     currentState,
@@ -113,8 +114,23 @@ export function executeEffect(state: GameState, ctx: EffectContext, effect: Effe
         }
         case "addMana": {
             const a = resolveAmount(currentState, ctx, effect.amount);
-            if (!a.ok) return fail(a.error);
+            if (!a.ok) return a;
             return stepFromApply(addManaEffect(currentState, ctx.controller, effect.mana, a.value));
+        }
+        case "discard": {
+            const cards = getObjectIdsFromBinding(ctx.bindings, effect.cards.name);
+            if (!cards.ok) return cards;
+            const discardPlayer = resolveEffectTargets(currentState, ctx, { kind: "player", who: effect.who });
+            if (!discardPlayer.ok) return discardPlayer;
+            if (discardPlayer.value.length !== 1 || discardPlayer.value[0]?.kind !== "player") return fail("Discarding cards must be done by exactly one player");
+            const who = discardPlayer.value[0].id;
+            const cause = `${ctx.controller}'s ${getCardName(currentState, ctx.source)}`;
+            return stepFromApply(
+                applySequentially(
+                    currentState,
+                    cards.value.map((card) => (s) => discardCard(s, who, card, cause)),
+                ),
+            );
         }
         case "choose": {
             return executeChoiceEffect(state, ctx, effect);
@@ -174,30 +190,13 @@ export const contextOf = (resolving: ResolutionInProgress): EffectContext => ({
 });
 
 export const resolveAmount = (state: GameState, ctx: EffectContext, amount: Amount): Result<number> => {
-    if (typeof amount === "number") {
-        return goodResult(amount);
-    }
-    const a = getBinding(ctx, amount.name);
-    if (!a.ok) return a;
-    if (typeof a.value === "number") return goodResult(a.value);
-    else if (typeof a.value === "boolean") return badResult(`Invalid numeric value stored for name ${amount.name}`);
-    else return goodResult(a.value.length);
+    return typeof amount === "number" ? goodResult(amount) : getNumberBinding(ctx.bindings, amount.name);
 };
 
 export function resolvePlayers(state: GameState, ctx: EffectContext, ref: PlayerRef): PlayerId[] {
     if (ref === "controller") return [ctx.controller];
     if (ref === "opponent") return getRemainingPlayersInTurnOrder(state).filter((p) => p !== ctx.controller) as PlayerId[];
     return getRemainingPlayersInTurnOrder(state) as PlayerId[];
-}
-
-export function getBinding(ctx: EffectContext, name: string): Result<Binding> {
-    if (name in ctx.bindings) {
-        const binding = ctx.bindings[name];
-        if (binding === undefined) return badResult(`Empty binding for name ${name}`);
-        return goodResult(binding);
-    } else {
-        return badResult(`Unbound name ${name}`);
-    }
 }
 
 export function resolveStackEntryEffects(state: GameState, entry: StackEntry): readonly Effect[] {
@@ -238,14 +237,10 @@ function resolveEffectTargets(state: GameState, ctx: EffectContext, t: EffectTar
 }
 
 function targetsFromBinding(ctx: EffectContext, name: string): Result<Target[]> {
-    const b = getBinding(ctx, name);
-    if (!b.ok) return b;
-    const binding = b.value;
-    if (typeof binding === "boolean" || typeof binding === "number") {
-        return badResult(`'${name}' holds a ${typeof binding}, expected a list of choices`);
-    }
+    const choices = getChoiceBinding(ctx.bindings, name);
+    if (!choices.ok) return choices;
     const targets: Target[] = [];
-    for (const choice of binding) {
+    for (const choice of choices.value) {
         if (choice.kind === "object") targets.push({ kind: "object", id: choice.id });
         else if (choice.kind === "player") targets.push({ kind: "player", id: choice.id });
     }

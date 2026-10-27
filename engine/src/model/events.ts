@@ -25,6 +25,7 @@ export type GameEvent =
     | Readonly<{ type: "landPlayed"; player: PlayerId; card: ObjectId; cardName: string }>
     | Readonly<{ type: "lifeChanged"; player: PlayerId; delta: number }>
     | Readonly<{ type: "manaAdded"; player: PlayerId; mana: ManaType; amount: number }>
+    | Readonly<{ type: "cardDiscarded"; player: PlayerId; card: ObjectId; cardName: string; cause?: string }>
 
     // Object effects
     | Readonly<{ type: "damageDealt"; source: ObjectId; sourceName: string; target: Target; targetName: string; amount: number; isCombatDamage: boolean }>

@@ -115,6 +115,8 @@ export function describeEffect(e: Effect): string {
           return `apply ${describeTemplate(e.template)}`;
       case "choose":
           return describeEffectChoice(e);
+      case "discard":
+          return `${e.who} discards the cards chosen as ${e.cards.name}`;
       default:
           return unreachable(e);
   }
@@ -263,6 +265,8 @@ export function describeEvent(state: GameState, e: GameEvent): string {
           return `${nameOf(state, e.object)} is untapped`;
       case "permanentDestroyed":
           return `${e.cardName} (#${e.object}) is destroyed` + e.source ? ` by ${e.source}` : "";
+      case "cardDiscarded":
+          return e.cause ? `${e.cause} causes ${e.player} to discard ${e.cardName} (#${e.card})` : `${e.player} discards ${e.cardName} (#${e.card})`;
 
       // Spells & Abilities
       case "spellCastSuccess":

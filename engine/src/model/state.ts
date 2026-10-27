@@ -114,10 +114,11 @@ export interface ResolutionInProgress {
     entry: StackEntry;
     effects: readonly Effect[];
     pc: number;
-    bindings: Readonly<Record<string, Binding>>;
+    bindings: Bindings;
 }
 
 export type Binding = readonly ChoiceValue[] | boolean | number;
+export type Bindings = Readonly<Record<string, Binding>>;
 
 export interface GameState {
     readonly definitions: Readonly<Record<CardDefId, CardDefinition>>;
