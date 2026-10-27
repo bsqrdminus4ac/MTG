@@ -39,7 +39,8 @@ export function runResolution(state: GameState): ApplyResult {
         if (!step.ok) return step;
         out.push(...step.events);
         if (step.waiting) return ok(step.state, out); // paused for a decision
-        currentState = { ...step.state, resolving: { ...resolving, pc: resolving.pc + 1 } };
+        const bindings = step.bind ? withEntry(resolving.bindings, step.bind.bindAs, step.bind.value) : resolving.bindings;
+        currentState = { ...step.state, resolving: { ...resolving, pc: resolving.pc + 1, bindings } };
     }
 }
 

@@ -1,12 +1,14 @@
 import { applySequentially, badResult, fail, goodResult, type ApplyResult, type Failure, type Result } from "../core/result";
 import { assertNever } from "../core/util";
 import type { Ability } from "../model/abilities";
-import { getCharacteristics } from "../model/characteristics";
+import { getCardName, getCharacteristics } from "../model/characteristics";
+import { chooseMany, objectChoice } from "../model/decisions";
 import type { Amount, Effect, EffectTarget, PlayerRef } from "../model/effects";
 import type { GameEvent } from "../model/events";
 import type { ObjectId, PlayerId } from "../model/ids";
 import { getRemainingPlayersInTurnOrder, type Binding, type GameState, type ResolutionInProgress, type StackEntry, type Target } from "../model/state";
 import { drawCardResult } from "../model/zones";
+import { openDecision } from "../rules/pending";
 import { addManaEffect, damageObject, damagePlayer, destroyPermanent, gainLife, loseLife } from "../rules/primitives";
 
 /** Enough to evaluate predicates, amounts and player references. Usable at targeting time too. */
@@ -23,11 +25,12 @@ export interface EffectContext extends EvalContext {
 }
 
 export type StepResult =
-    | Readonly<{ ok: true; waiting: false; state: GameState; events: readonly GameEvent[] }>
+    | Readonly<{ ok: true; waiting: false; state: GameState; events: readonly GameEvent[]; bind?: Readonly<{ bindAs: string; value: Binding }> }>
     | Readonly<{ ok: true; waiting: true; state: GameState; events: readonly GameEvent[] }>
     | Failure;
 
-export const done = (state: GameState, events: readonly GameEvent[] = []): StepResult => ({ ok: true, waiting: false, state, events });
+export const done = (state: GameState, events: readonly GameEvent[] = [], bind?: { bindAs: string; value: Binding }): StepResult =>
+    bind === undefined ? { ok: true, waiting: false, state, events } : { ok: true, waiting: false, state, events, bind };
 
 export const ask = (state: GameState, events: readonly GameEvent[] = []): StepResult => {
     if (!state.pending) return { ok: false, error: "ask() requires a pending decision" };
@@ -113,9 +116,49 @@ export function executeEffect(state: GameState, ctx: EffectContext, effect: Effe
             if (!a.ok) return fail(a.error);
             return stepFromApply(addManaEffect(currentState, ctx.controller, effect.mana, a.value));
         }
+        case "choose": {
+            return executeChoiceEffect(state, ctx, effect);
+        }
         default:
             return fail(`Resolving effects of kind ${effect.kind} is not implemented yet`);
     }
+}
+
+function executeChoiceEffect(state: GameState, ctx: EffectContext, effect: Extract<Effect, { kind: "choose" }>): StepResult {
+    const chooserResult = resolveEffectTargets(state, ctx, effect.chooser);
+    if (!chooserResult.ok) return fail(chooserResult.error);
+    if (chooserResult.value.length !== 1 || chooserResult.value[0]?.kind !== "player") return fail("Chooser of effects must be a single player");
+    const chooser = chooserResult.value[0].id;
+    if (effect.from.kind === "hand") {
+        // Only option for now
+        const whoseHandResult = resolveEffectTargets(state, ctx, effect.from.of);
+        if (!whoseHandResult.ok) return fail(whoseHandResult.error);
+        if (whoseHandResult.value.length !== 1 || whoseHandResult.value[0]?.kind !== "player") return fail("Target of a single hand effect must be a single player");
+        const whoseHand = whoseHandResult.value[0].id;
+
+        const minAmount = resolveAmount(state, ctx, effect.min);
+        if (!minAmount.ok) return fail(minAmount.error);
+        const maxAmount = resolveAmount(state, ctx, effect.max);
+        if (!maxAmount.ok) return fail(maxAmount.error);
+
+        const options = state.players[whoseHand]?.hand.map((objId) => objectChoice(objId, getCardName(state, objId)));
+        if (!options || options.length === 0) return done(state, [], { bindAs: effect.bindAs, value: [] }); // Skip decision and bind empty Choice array if no options available
+
+        return ask(
+            openDecision(state, (id) =>
+                chooseMany({
+                    id,
+                    options,
+                    player: chooser,
+                    min: Math.min(options.length, minAmount.value), // Later, if min >= options.length, just add all options to binding without asking
+                    max: Math.min(options.length, maxAmount.value),
+                    prompt: effect.prompt,
+                    then: { kind: "resolveEffect", bindAs: effect.bindAs },
+                }),
+            ),
+        );
+    }
+    return assertNever(effect.from.kind);
 }
 
 //#endregion

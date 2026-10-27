@@ -26,6 +26,7 @@ export type Effect =
     | Readonly<{ kind: "loseLife"; who: PlayerRef; amount: Amount }>
     | Readonly<{ kind: "destroy"; target: EffectTarget }>
     | Readonly<{ kind: "addMana"; mana: ManaType; amount: Amount }>
-    | Readonly<{ kind: "applyContinuousEffect"; template: ContinuousEffectTemplate }>;
+    | Readonly<{ kind: "applyContinuousEffect"; template: ContinuousEffectTemplate }>
+    | Readonly<{ kind: "choose"; chooser: EffectTarget; from: { kind: "hand"; of: EffectTarget }; min: Amount; max: Amount; bindAs: string; prompt: string }>;
 
 export type Amount = number | { kind: "bound"; name: string };
