@@ -1,24 +1,25 @@
 import {
-  getCharacteristics,
-  type Ability,
-  type Action,
-  type Answer,
-  type ChoiceValue,
-  type ContinuousEffect,
-  type ContinuousEffectTemplate,
-  type Cost,
-  type Decision,
-  type Effect,
-  type EffectTarget,
-  type GameEvent,
-  type GameState,
-  type ManaCost,
-  type ManaPool,
-  type Modification,
-  type ObjectId,
-  type Target,
-  type TargetSpec,
-  type Zone,
+    getCharacteristics,
+    type Ability,
+    type Action,
+    type Amount,
+    type Answer,
+    type ChoiceValue,
+    type ContinuousEffect,
+    type ContinuousEffectTemplate,
+    type Cost,
+    type Decision,
+    type Effect,
+    type EffectTarget,
+    type GameEvent,
+    type GameState,
+    type ManaCost,
+    type ManaPool,
+    type Modification,
+    type ObjectId,
+    type Target,
+    type TargetSpec,
+    type Zone,
 } from "@mtg/engine";
 
 function unreachable(value: never): never {
@@ -83,36 +84,42 @@ export function describeContinuousEffect(state: GameState, e: ContinuousEffect):
 
 function describeEffectTarget(t: EffectTarget): string {
   switch (t.kind) {
-    case "target":
-      return `target ${t.index + 1}`;
-    case "self":
-      return "this object";
-    case "player":
-      return t.who;
-    default:
-      return unreachable(t);
+      case "target":
+          return t.index === "all" ? `all targets` : `target ${t.index + 1}`;
+      case "self":
+          return "this object";
+      case "player":
+          return t.who;
+      case "bound":
+          return `the targets chosen as ${t.name}`;
+      default:
+          return unreachable(t);
   }
 }
 
 export function describeEffect(e: Effect): string {
   switch (e.kind) {
     case "draw":
-      return `${e.who} draws ${e.count}`;
+      return `${e.who} draws ${describeAmount(e.count)}`;
     case "damage":
-      return `deal ${e.amount} damage to ${describeEffectTarget(e.to)}`;
+      return `deal ${describeAmount(e.amount)} damage to ${describeEffectTarget(e.to)}`;
     case "gainLife":
-      return `${e.who} gains ${e.amount} life`;
+      return `${e.who} gains ${describeAmount(e.amount)} life`;
     case "loseLife":
-      return `${e.who} loses ${e.amount} life`;
+      return `${e.who} loses ${describeAmount(e.amount)} life`;
     case "destroy":
       return `destroy ${describeEffectTarget(e.target)}`;
     case "addMana":
-      return `add ${e.amount}× {${e.mana}}`;
+      return `add ${describeAmount(e.amount)}× {${e.mana}}`;
     case "applyContinuousEffect":
       return `apply ${describeTemplate(e.template)}`;
     default:
       return unreachable(e);
   }
+}
+
+export function describeAmount(a: Amount): string {
+    return typeof a === "number" ? String(a) : `the number of “${a.name}”`;
 }
 
 export function describeCost(c: Cost): string {

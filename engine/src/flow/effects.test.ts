@@ -69,7 +69,7 @@ describe("resolveAmount", () => {
     const amount: Amount = { kind: "bound", name: "amount" };
     const ctx = { ...context(source), bindings: { amount: 4 } };
 
-    expect(resolveAmount(state, ctx, amount)).toEqual({ ok: true, amount: 4 });
+    expect(resolveAmount(state, ctx, amount)).toEqual({ ok: true, value: 4 });
   });
 
   test("resolves a bound list to its length", () => {
@@ -87,7 +87,7 @@ describe("resolveAmount", () => {
       },
     };
 
-    expect(resolveAmount(state, ctx, amount)).toEqual({ ok: true, amount: 3 });
+    expect(resolveAmount(state, ctx, amount)).toEqual({ ok: true, value: 3 });
   });
 
   test("returns an error for an unbound name", () => {
@@ -109,6 +109,23 @@ function complete(result: StepResult) {
 }
 
 describe("player effects", () => {
+  test("gainLife uses a bound amount", () => {
+    const state = newGame();
+    const source = state.players[alice]!.library.at(-1)!;
+    const ctx = { ...context(source), bindings: { x: 5 } };
+
+    const result = complete(
+      executeEffect(state, ctx, {
+        kind: "gainLife",
+        who: "opponent",
+        amount: { kind: "bound", name: "x" },
+      }),
+    );
+
+    expect(result.state.players[bob]?.life).toBe(25);
+    expect(result.events).toEqual([{ type: "lifeChanged", player: bob, delta: 5 }]);
+  });
+
   test("gainLife increases the chosen player's life and emits a lifeChanged event", () => {
     const state = newGame();
     const source = state.players[alice]!.library.at(-1)!;

@@ -1,11 +1,19 @@
 import type { GameEvent } from "../model/events";
 import type { GameState } from "../model/state";
 
-export type ApplyResult = Readonly<{ ok: true; state: GameState; events: readonly GameEvent[]; changesMade?: boolean }> | Readonly<{ ok: false; error: string }>;
+export type Failure = Readonly<{ ok: false; error: string }>;
 
+export type Result<T> = Readonly<{ ok: true; value: T }> | Failure;
+export const goodResult = <T>(value: T): Result<T> => ({ ok: true, value });
+export const badResult = (error: string): Result<never> => ({ ok: false, error });
+
+export type ApplyResult = Readonly<{ ok: true; state: GameState; events: readonly GameEvent[]; changesMade?: boolean }> | Failure;
+
+export const fail = (error: string): Failure => ({ ok: false, error });
 export const ok = (state: GameState, events: readonly GameEvent[], changesMade?: boolean): ApplyResult =>
     changesMade === undefined ? { ok: true, state, events } : { ok: true, state, events, changesMade };
-export const fail = (error: string): { ok: false; error: string } => ({ ok: false, error });
+
+
 
 export function applySequentially(state: GameState, steps: readonly ((state: GameState) => ApplyResult)[]): ApplyResult {
     let currentState = state;

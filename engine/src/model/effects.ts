@@ -16,7 +16,8 @@ export type TargetSpec = TargetKinds & { minCount: number; maxCount: number };
 export type EffectTarget =
     | Readonly<{ kind: "target"; index: number | "all" }> // index into the chosen targets
     | Readonly<{ kind: "self" }>
-    | Readonly<{ kind: "player"; who: PlayerRef }>;
+    | Readonly<{ kind: "player"; who: PlayerRef }>
+    | Readonly<{ kind: "bound"; name: string }>;
 
 export type Effect =
     | Readonly<{ kind: "draw"; who: PlayerRef; count: Amount }>

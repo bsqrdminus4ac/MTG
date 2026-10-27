@@ -1,3 +1,4 @@
+import { badResult, goodResult, type Result } from "../core/result";
 import type { Action } from "./actions";
 import type { DecisionId, ObjectId, PlayerId } from "./ids";
 
@@ -24,39 +25,39 @@ export type ChoiceValue =
     | Readonly<{ kind: "null" }>;
 
 export interface Choice {
-  /** Unique within its decision. This is what answers quote. */
-  readonly id: string;
-  /** Fallback display text. */
-  readonly label: string;
-  readonly value: ChoiceValue;
+    /** Unique within its decision. This is what answers quote. */
+    readonly id: string;
+    /** Fallback display text. */
+    readonly label: string;
+    readonly value: ChoiceValue;
 }
 
 /** One legal move while holding priority. Choosing it runs `action` through the rules engine. */
 export interface PriorityOption {
-  readonly id: string;
-  readonly label: string;
-  readonly action: Action;
+    readonly id: string;
+    readonly label: string;
+    readonly action: Action;
 }
 
 export const objectChoice = (id: ObjectId, label: string): Choice => ({
-  id: `object:${id}`,
-  label,
-  value: { kind: "object", id },
+    id: `object:${id}`,
+    label,
+    value: { kind: "object", id },
 });
 export const playerChoice = (id: PlayerId, label: string): Choice => ({
-  id: `player:${id}`,
-  label,
-  value: { kind: "player", id },
+    id: `player:${id}`,
+    label,
+    value: { kind: "player", id },
 });
 export const indexChoice = (index: number, label: string): Choice => ({
-  id: `index:${index}`,
-  label,
-  value: { kind: "index", index },
+    id: `index:${index}`,
+    label,
+    value: { kind: "index", index },
 });
 export const manaAbilityChoice = (id: ObjectId, abilityIndex: number, label: string): Choice => ({
-  id: `object:${id}#${abilityIndex}`,
-  label,
-  value: {kind: "ability", id, index: abilityIndex}
+    id: `object:${id}#${abilityIndex}`,
+    label,
+    value: { kind: "ability", id, index: abilityIndex },
 });
 export const nullChoice = (id: string, label: string): Choice => ({
     id,
@@ -97,21 +98,21 @@ interface DecisionBase {
 }
 
 export interface PriorityDecision extends DecisionBase {
-  readonly kind: "priority";
-  readonly options: readonly PriorityOption[];
+    readonly kind: "priority";
+    readonly options: readonly PriorityOption[];
 }
 
 export interface YesNoDecision extends DecisionBase {
-  readonly kind: "yesNo";
-  readonly then: Continuation;
+    readonly kind: "yesNo";
+    readonly then: Continuation;
 }
 
 export interface ChooseDecision extends DecisionBase {
-  readonly kind: "choose";
-  readonly options: readonly Choice[];
-  readonly min: number;
-  readonly max: number;
-  readonly then: Continuation;
+    readonly kind: "choose";
+    readonly options: readonly Choice[];
+    readonly min: number;
+    readonly max: number;
+    readonly then: Continuation;
 }
 
 export interface OrderingDecision extends DecisionBase {
@@ -123,21 +124,20 @@ export interface OrderingDecision extends DecisionBase {
 export type Decision = PriorityDecision | YesNoDecision | ChooseDecision | OrderingDecision;
 
 export const priorityDecision = (spec: Omit<PriorityDecision, "kind">): PriorityDecision => ({
-  kind: "priority",
-  ...spec,
+    kind: "priority",
+    ...spec,
 });
 
 export const yesNo = (spec: Omit<YesNoDecision, "kind">): YesNoDecision => ({ kind: "yesNo", ...spec });
 
 export function chooseMany(spec: Omit<ChooseDecision, "kind">): ChooseDecision {
-  if (spec.min < 0 || spec.min > spec.max || spec.max > spec.options.length) {
-    throw new Error(`Invalid selection bounds ${spec.min}..${spec.max} for ${spec.options.length} options`);
-  }
-  return { kind: "choose", ...spec };
+    if (spec.min < 0 || spec.min > spec.max || spec.max > spec.options.length) {
+        throw new Error(`Invalid selection bounds ${spec.min}..${spec.max} for ${spec.options.length} options`);
+    }
+    return { kind: "choose", ...spec };
 }
 
-export const chooseOne = (spec: Omit<ChooseDecision, "kind" | "min" | "max">): ChooseDecision =>
-  chooseMany({ ...spec, min: 1, max: 1 });
+export const chooseOne = (spec: Omit<ChooseDecision, "kind" | "min" | "max">): ChooseDecision => chooseMany({ ...spec, min: 1, max: 1 });
 
 export const orderingDecision = (spec: Omit<OrderingDecision, "kind">): OrderingDecision => ({ kind: "order", ...spec });
 
@@ -153,18 +153,10 @@ export type Answer =
 
 /** The only thing a UI or AI sends to the engine. */
 export interface Submission {
-  readonly player: PlayerId;
-  readonly decision: DecisionId;
-  readonly answer: Answer;
+    readonly player: PlayerId;
+    readonly decision: DecisionId;
+    readonly answer: Answer;
 }
-
-export type Result<T> =
-  | Readonly<{ ok: true; value: T }>
-  | Readonly<{ ok: false; error: string }>;
-
-const good = <T>(value: T): Result<T> => ({ ok: true, value });
-const bad = (error: string): Result<never> => ({ ok: false, error });
-
 
 export type ResolvedAnswer =
     | Readonly<{ kind: "yesNo"; value: boolean }>
@@ -175,56 +167,56 @@ export type ResolvedAnswer =
 // Validation turns a raw answer (ids and booleans) into the thing it refers to.
 
 export function resolvePriorityAnswer(d: PriorityDecision, answer: Answer): Result<PriorityOption> {
-  if (answer.kind !== "priority") return bad("Expected a priority answer");
-  const option = d.options.find((o) => o.id === answer.option);
-  return option ? good(option) : bad(`Not a legal option: ${answer.option}`);
+    if (answer.kind !== "priority") return badResult("Expected a priority answer");
+    const option = d.options.find((o) => o.id === answer.option);
+    return option ? goodResult(option) : badResult(`Not a legal option: ${answer.option}`);
 }
 
 export function resolveYesNoAnswer(_d: YesNoDecision, answer: Answer): Result<boolean> {
-  return answer.kind === "yesNo" ? good(answer.value) : bad("Expected a yes or no answer");
+    return answer.kind === "yesNo" ? goodResult(answer.value) : badResult("Expected a yes or no answer");
 }
 
 export function resolveChooseAnswer(d: ChooseDecision, answer: Answer): Result<readonly Choice[]> {
-  if (answer.kind !== "choose") return bad("Expected a selection");
-  if (new Set(answer.selected).size !== answer.selected.length) {
-    return bad("Each option can only be chosen once");
-  }
-  const chosen: Choice[] = [];
-  for (const id of answer.selected) {
-    const choice = d.options.find((o) => o.id === id);
-    if (!choice) return bad(`Not one of the options: ${id}`);
-    chosen.push(choice);
-  }
-  if (chosen.length < d.min || chosen.length > d.max) {
-    return bad(d.min === d.max ? `Choose exactly ${d.min}` : `Choose between ${d.min} and ${d.max}`);
-  }
-  return good(chosen);
+    if (answer.kind !== "choose") return badResult("Expected a selection");
+    if (new Set(answer.selected).size !== answer.selected.length) {
+        return badResult("Each option can only be chosen once");
+    }
+    const chosen: Choice[] = [];
+    for (const id of answer.selected) {
+        const choice = d.options.find((o) => o.id === id);
+        if (!choice) return badResult(`Not one of the options: ${id}`);
+        chosen.push(choice);
+    }
+    if (chosen.length < d.min || chosen.length > d.max) {
+        return badResult(d.min === d.max ? `Choose exactly ${d.min}` : `Choose between ${d.min} and ${d.max}`);
+    }
+    return goodResult(chosen);
 }
 
 export function resolveOrderingAnswer(d: OrderingDecision, answer: Answer): Result<readonly number[]> {
-    if (answer.kind !== "order") return bad("Expected an ordering answer");
-    if (answer.order.length !== d.options.length) return bad("Ordering length doesn't match number of options");
+    if (answer.kind !== "order") return badResult("Expected an ordering answer");
+    if (answer.order.length !== d.options.length) return badResult("Ordering length doesn't match number of options");
     const n = answer.order.length;
     const seen = new Array<boolean>(n).fill(false);
     for (const x of answer.order) {
-        if (!Number.isInteger(x) || x < 0 || x >= n || seen[x]) return bad(`Ordering doesn't have each index from 0 to ${n - 1} once each`);
+        if (!Number.isInteger(x) || x < 0 || x >= n || seen[x]) return badResult(`Ordering doesn't have each index from 0 to ${n - 1} once each`);
         seen[x] = true;
     }
-    return good(answer.order);
+    return goodResult(answer.order);
 }
 
 /** Is this answer acceptable for this decision? Handy for UIs that want to disable a Submit button. */
 export function validateAnswer(d: Decision, answer: Answer): Result<null> {
-  if (answer.kind === "cancel") return d.onCancel ? good(null) : bad("This decision cannot be canceled");
-  const r =
-      d.kind === "priority"
-          ? resolvePriorityAnswer(d, answer)
-          : d.kind === "yesNo"
-            ? resolveYesNoAnswer(d, answer)
-            : d.kind === "order"
-              ? resolveOrderingAnswer(d, answer)
-              : resolveChooseAnswer(d, answer);
-  return r.ok ? good(null) : r;
+    if (answer.kind === "cancel") return d.onCancel ? goodResult(null) : badResult("This decision cannot be canceled");
+    const r =
+        d.kind === "priority"
+            ? resolvePriorityAnswer(d, answer)
+            : d.kind === "yesNo"
+              ? resolveYesNoAnswer(d, answer)
+              : d.kind === "order"
+                ? resolveOrderingAnswer(d, answer)
+                : resolveChooseAnswer(d, answer);
+    return r.ok ? goodResult(null) : r;
 }
 
 //#endregion

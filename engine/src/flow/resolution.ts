@@ -6,7 +6,7 @@ import type { GameEvent } from "../model/events";
 import type { Binding, GameState, ResolutionInProgress } from "../model/state";
 import type { Zone } from "../model/vocabulary";
 import { moveObject } from "../model/zones";
-import { contextOf, executeEffect, resolveStackEntryEffects, type EffectContext } from "./effects";
+import { contextOf, executeEffect, resolveStackEntryEffects } from "./effects";
 import { givePriorityToActivePlayer } from "./priority";
 
 export function beginResolution(state: GameState): ApplyResult {
@@ -74,14 +74,4 @@ export function finishResolution(state: GameState, events: readonly GameEvent[])
         out.push({ type: "stackEntryResolved", id: resolving.entry.id, spellName: "TODO: Ability event names" });
     }
     return givePriorityToActivePlayer(currentState, out);
-}
-
-export function getBinding(ctx: EffectContext, name: string): { ok: true; binding: Binding } | { ok: false; error: string } {
-    if (name in ctx.bindings) {
-        const binding = ctx.bindings[name];
-        if (binding === undefined) return { ok: false, error: `Empty binding for name ${name}` };
-        return { ok: true, binding };
-    } else {
-        return { ok: false, error: `Unbound name ${name}` };
-    }
 }

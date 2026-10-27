@@ -1,4 +1,4 @@
-import { applySequentially, fail, type ApplyResult } from "../core/result";
+import { applySequentially, badResult, fail, goodResult, type ApplyResult, type Failure, type Result } from "../core/result";
 import { assertNever } from "../core/util";
 import type { Ability } from "../model/abilities";
 import { getCharacteristics } from "../model/characteristics";
@@ -8,7 +8,6 @@ import type { ObjectId, PlayerId } from "../model/ids";
 import { getRemainingPlayersInTurnOrder, type Binding, type GameState, type ResolutionInProgress, type StackEntry, type Target } from "../model/state";
 import { drawCardResult } from "../model/zones";
 import { addManaEffect, damageObject, damagePlayer, destroyPermanent, gainLife, loseLife } from "../rules/primitives";
-import { getBinding } from "./resolution";
 
 /** Enough to evaluate predicates, amounts and player references. Usable at targeting time too. */
 interface EvalContext {
@@ -26,7 +25,7 @@ export interface EffectContext extends EvalContext {
 export type StepResult =
     | Readonly<{ ok: true; waiting: false; state: GameState; events: readonly GameEvent[] }>
     | Readonly<{ ok: true; waiting: true; state: GameState; events: readonly GameEvent[] }>
-    | Extract<ApplyResult, { ok: false }>;
+    | Failure;
 
 export const done = (state: GameState, events: readonly GameEvent[] = []): StepResult => ({ ok: true, waiting: false, state, events });
 
@@ -40,6 +39,89 @@ export const stepFromApply = (result: ApplyResult): StepResult => {
     return done(result.state, result.events);
 };
 
+//#region Effect Execution
+
+export function executeEffect(state: GameState, ctx: EffectContext, effect: Effect): StepResult {
+    let currentState = state;
+    switch (effect.kind) {
+        case "damage": {
+            const a = resolveAmount(currentState, ctx, effect.amount);
+            if (!a.ok) return fail(a.error);
+            return withTargets(currentState, ctx, effect.to, (targets) => {
+                return applySequentially(
+                    currentState,
+                    targets.map((target): ((s: GameState) => ApplyResult) => {
+                        if (target.kind === "player") return (s) => damagePlayer(s, target.id, ctx.source, a.value, false);
+                        if (target.kind === "object") return (s) => damageObject(s, target.id, ctx.source, a.value, false);
+                        return () => fail("Damage cannot be dealt to spells/abilities on the stack");
+                    }),
+                );
+            });
+        }
+        case "draw": {
+            const a = resolveAmount(currentState, ctx, effect.count);
+            if (!a.ok) return fail(a.error);
+            return withTargets(currentState, ctx, { kind: "player", who: effect.who }, (targets) => {
+                return applySequentially(
+                    currentState,
+                    targets.flatMap((target) => {
+                        if (target.kind !== "player") return () => fail("Only players can draw cards");
+                        return Array.from({ length: a.value }, () => (s) => drawCardResult(s, target.id));
+                    }),
+                );
+            });
+        }
+        case "gainLife": {
+            const a = resolveAmount(currentState, ctx, effect.amount);
+            if (!a.ok) return fail(a.error);
+            return withTargets(currentState, ctx, { kind: "player", who: effect.who }, (targets) => {
+                return applySequentially(
+                    currentState,
+                    targets.map((target) => {
+                        if (target.kind !== "player") return () => fail("Only players can gain life");
+                        return (s) => gainLife(s, target.id, a.value);
+                    }),
+                );
+            });
+        }
+        case "loseLife": {
+            const a = resolveAmount(currentState, ctx, effect.amount);
+            if (!a.ok) return fail(a.error);
+            return withTargets(currentState, ctx, { kind: "player", who: effect.who }, (targets) => {
+                return applySequentially(
+                    currentState,
+                    targets.map((target) => {
+                        if (target.kind !== "player") return () => fail("Only players can lose life");
+                        return (s) => loseLife(s, target.id, a.value);
+                    }),
+                );
+            });
+        }
+        case "destroy": {
+            return withTargets(currentState, ctx, effect.target, (targets) => {
+                return applySequentially(
+                    currentState,
+                    targets.map((target) => {
+                        if (target.kind === "object") return (s) => destroyPermanent(s, target.id, ctx.source);
+                        return () => fail("Destroying non-permanents has not been implemented yet");
+                    }),
+                );
+            });
+        }
+        case "addMana": {
+            const a = resolveAmount(currentState, ctx, effect.amount);
+            if (!a.ok) return fail(a.error);
+            return stepFromApply(addManaEffect(currentState, ctx.controller, effect.mana, a.value));
+        }
+        default:
+            return fail(`Resolving effects of kind ${effect.kind} is not implemented yet`);
+    }
+}
+
+//#endregion
+
+//#region Helpers
+
 export const contextOf = (resolving: ResolutionInProgress): EffectContext => ({
     source: resolving.entry.source,
     controller: resolving.entry.controller,
@@ -48,21 +130,31 @@ export const contextOf = (resolving: ResolutionInProgress): EffectContext => ({
     bindings: resolving.bindings,
 });
 
-export const resolveAmount = (state: GameState, ctx: EffectContext, amount: Amount): { ok: true; amount: number } | { ok: false; error: string } => {
+export const resolveAmount = (state: GameState, ctx: EffectContext, amount: Amount): Result<number> => {
     if (typeof amount === "number") {
-        return { ok: true, amount };
+        return goodResult(amount);
     }
     const a = getBinding(ctx, amount.name);
     if (!a.ok) return a;
-    if (typeof a.binding === "number") return { ok: true, amount: a.binding };
-    else if (typeof a.binding === "boolean") return { ok: false, error: `Invalid numeric value stored for name ${amount.name}` };
-    else return { ok: true, amount: a.binding.length };
+    if (typeof a.value === "number") return goodResult(a.value);
+    else if (typeof a.value === "boolean") return badResult(`Invalid numeric value stored for name ${amount.name}`);
+    else return goodResult(a.value.length);
 };
 
 export function resolvePlayers(state: GameState, ctx: EffectContext, ref: PlayerRef): PlayerId[] {
     if (ref === "controller") return [ctx.controller];
     if (ref === "opponent") return getRemainingPlayersInTurnOrder(state).filter((p) => p !== ctx.controller) as PlayerId[];
     return getRemainingPlayersInTurnOrder(state) as PlayerId[];
+}
+
+export function getBinding(ctx: EffectContext, name: string): Result<Binding> {
+    if (name in ctx.bindings) {
+        const binding = ctx.bindings[name];
+        if (binding === undefined) return badResult(`Empty binding for name ${name}`);
+        return goodResult(binding);
+    } else {
+        return badResult(`Unbound name ${name}`);
+    }
 }
 
 export function resolveStackEntryEffects(state: GameState, entry: StackEntry): readonly Effect[] {
@@ -83,95 +175,43 @@ export function resolveStackEntryEffects(state: GameState, entry: StackEntry): r
     return ability?.effects ?? [];
 }
 
-function resolveEffectTargets(state: GameState, ctx: EffectContext, t: EffectTarget): readonly Target[] {
+function resolveEffectTargets(state: GameState, ctx: EffectContext, t: EffectTarget): Result<Target[]> {
     switch (t.kind) {
         case "target": {
-            if (t.index == "all") return ctx.targets.filter((_, i) => ctx.legalTargets[i]);
+            if (t.index == "all") return goodResult(ctx.targets.filter((_, i) => ctx.legalTargets[i]));
             const target = ctx.targets[t.index];
-            return target && ctx.legalTargets[t.index] ? [target] : []; // illegal target: the effect does nothing
+            return goodResult(target && ctx.legalTargets[t.index] ? [target] : []); // illegal target: the effect does nothing
         }
         case "self":
-            return [{ kind: "object", id: ctx.source }];
+            return goodResult([{ kind: "object", id: ctx.source }]);
         case "player":
-            return resolvePlayers(state, ctx, t.who).map((id) => ({ kind: "player", id }));
+            return goodResult(resolvePlayers(state, ctx, t.who).map((id) => ({ kind: "player", id })));
+        case "bound":
+            return targetsFromBinding(ctx, t.name);
+
         default:
             return assertNever(t);
     }
 }
 
-export function executeEffect(state: GameState, ctx: EffectContext, effect: Effect): StepResult {
-    let currentState = state;
-    switch (effect.kind) {
-        case "damage": {
-            const a = resolveAmount(currentState, ctx, effect.amount);
-            if (!a.ok) return fail(a.error);
-            return stepFromApply(
-                applySequentially(
-                    currentState,
-                    resolveEffectTargets(state, ctx, effect.to).map((target): ((s: GameState) => ApplyResult) => {
-                        if (target.kind === "player") return (s) => damagePlayer(s, target.id, ctx.source, a.amount, false);
-                        if (target.kind === "object") return (s) => damageObject(s, target.id, ctx.source, a.amount, false);
-                        return () => fail("Damage cannot be dealt to spells/abilities on the stack");
-                    }),
-                ),
-            );
-        }
-        case "draw": {
-            const a = resolveAmount(currentState, ctx, effect.count);
-            if (!a.ok) return fail(a.error);
-            return stepFromApply(
-                applySequentially(
-                    currentState,
-                    resolveEffectTargets(state, ctx, { kind: "player", who: effect.who }).flatMap((target) => {
-                        if (target.kind !== "player") return () => fail("Only players can draw cards");
-                        return Array.from({ length: a.amount }, () => (s) => drawCardResult(s, target.id));
-                    }),
-                ),
-            );
-        }
-        case "gainLife": {
-            const a = resolveAmount(currentState, ctx, effect.amount);
-            if (!a.ok) return fail(a.error);
-            return stepFromApply(
-                applySequentially(
-                    currentState,
-                    resolveEffectTargets(state, ctx, { kind: "player", who: effect.who }).map((target) => {
-                        if (target.kind !== "player") return () => fail("Only players can gain life");
-                        return (s) => gainLife(s, target.id, a.amount);
-                    }),
-                ),
-            );
-        }
-        case "loseLife": {
-            const a = resolveAmount(currentState, ctx, effect.amount);
-            if (!a.ok) return fail(a.error);
-            return stepFromApply(
-                applySequentially(
-                    currentState,
-                    resolveEffectTargets(state, ctx, { kind: "player", who: effect.who }).map((target) => {
-                        if (target.kind !== "player") return () => fail("Only players can lose life");
-                        return (s) => loseLife(s, target.id, a.amount);
-                    }),
-                ),
-            );
-        }
-        case "destroy": {
-            return stepFromApply(
-                applySequentially(
-                    currentState,
-                    resolveEffectTargets(state, ctx, effect.target).map((target) => {
-                        if (target.kind === "object") return (s) => destroyPermanent(s, target.id, ctx.source);
-                        return () => fail("Destroying non-permanents has not been implemented yet");
-                    }),
-                ),
-            );
-        }
-        case "addMana": {
-            const a = resolveAmount(currentState, ctx, effect.amount);
-            if (!a.ok) return fail(a.error);
-            return stepFromApply(addManaEffect(currentState, ctx.controller, effect.mana, a.amount));
-        }
-        default:
-            return fail(`Resolving effects of kind ${effect.kind} is not implemented yet`);
+function targetsFromBinding(ctx: EffectContext, name: string): Result<Target[]> {
+    const b = getBinding(ctx, name);
+    if (!b.ok) return b;
+    const binding = b.value;
+    if (typeof binding === "boolean" || typeof binding === "number") {
+        return badResult(`'${name}' holds a ${typeof binding}, expected a list of choices`);
     }
+    const targets: Target[] = [];
+    for (const choice of binding) {
+        if (choice.kind === "object") targets.push({ kind: "object", id: choice.id });
+        else if (choice.kind === "player") targets.push({ kind: "player", id: choice.id });
+    }
+    return goodResult(targets);
 }
+
+function withTargets(state: GameState, ctx: EffectContext, t: EffectTarget, run: (targets: readonly Target[]) => ApplyResult): StepResult {
+    const targets = resolveEffectTargets(state, ctx, t);
+    return targets.ok ? stepFromApply(run(targets.value)) : fail(targets.error);
+}
+
+//#endregion
