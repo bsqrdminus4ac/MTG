@@ -8,7 +8,7 @@ import type { GameEvent } from "../model/events";
 import type { ObjectId, PlayerId } from "../model/ids";
 import { getRemainingPlayersInTurnOrder, type Binding, type Bindings, type GameState, type ResolutionInProgress, type StackEntry, type Target } from "../model/state";
 import { drawCardResult } from "../model/zones";
-import { getChoiceBinding, getNumberBinding, getObjectIdsFromBinding } from "../rules/bindings";
+import { getChoiceBinding, getCountBinding, getObjectIdsFromBinding } from "../rules/bindings";
 import { openDecision } from "../rules/pending";
 import { addManaEffect, damageObject, damagePlayer, destroyPermanent, discardCard, gainLife, loseLife } from "../rules/primitives";
 
@@ -65,7 +65,7 @@ export function executeEffect(state: GameState, ctx: EffectContext, effect: Effe
         case "draw": {
             const a = resolveAmount(currentState, ctx, effect.count);
             if (!a.ok) return a;
-            return withTargets(currentState, ctx, { kind: "player", who: effect.who }, (targets) => {
+            return withTargets(currentState, ctx, effect.who, (targets) => {
                 return applySequentially(
                     currentState,
                     targets.flatMap((target) => {
@@ -78,7 +78,7 @@ export function executeEffect(state: GameState, ctx: EffectContext, effect: Effe
         case "gainLife": {
             const a = resolveAmount(currentState, ctx, effect.amount);
             if (!a.ok) return a;
-            return withTargets(currentState, ctx, { kind: "player", who: effect.who }, (targets) => {
+            return withTargets(currentState, ctx, effect.who, (targets) => {
                 return applySequentially(
                     currentState,
                     targets.map((target) => {
@@ -91,7 +91,7 @@ export function executeEffect(state: GameState, ctx: EffectContext, effect: Effe
         case "loseLife": {
             const a = resolveAmount(currentState, ctx, effect.amount);
             if (!a.ok) return a;
-            return withTargets(currentState, ctx, { kind: "player", who: effect.who }, (targets) => {
+            return withTargets(currentState, ctx, effect.who, (targets) => {
                 return applySequentially(
                     currentState,
                     targets.map((target) => {
@@ -120,15 +120,11 @@ export function executeEffect(state: GameState, ctx: EffectContext, effect: Effe
         case "discard": {
             const cards = getObjectIdsFromBinding(ctx.bindings, effect.cards.name);
             if (!cards.ok) return cards;
-            const discardPlayer = resolveEffectTargets(currentState, ctx, { kind: "player", who: effect.who });
-            if (!discardPlayer.ok) return discardPlayer;
-            if (discardPlayer.value.length !== 1 || discardPlayer.value[0]?.kind !== "player") return fail("Discarding cards must be done by exactly one player");
-            const who = discardPlayer.value[0].id;
             const cause = `${ctx.controller}'s ${getCardName(currentState, ctx.source)}`;
             return stepFromApply(
                 applySequentially(
                     currentState,
-                    cards.value.map((card) => (s) => discardCard(s, who, card, cause)),
+                    cards.value.map((card) => (s) => discardCard(s, card, cause)),
                 ),
             );
         }
@@ -190,7 +186,7 @@ export const contextOf = (resolving: ResolutionInProgress): EffectContext => ({
 });
 
 export const resolveAmount = (state: GameState, ctx: EffectContext, amount: Amount): Result<number> => {
-    return typeof amount === "number" ? goodResult(amount) : getNumberBinding(ctx.bindings, amount.name);
+    return typeof amount === "number" ? goodResult(amount) : getCountBinding(ctx.bindings, amount.name);
 };
 
 export function resolvePlayers(state: GameState, ctx: EffectContext, ref: PlayerRef): PlayerId[] {

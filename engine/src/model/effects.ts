@@ -22,14 +22,14 @@ export type EffectTarget =
     | Readonly<{ kind: "bound"; name: string }>;
 
 export type Effect =
-    | Readonly<{ kind: "draw"; who: PlayerRef; count: Amount }>
+    | Readonly<{ kind: "draw"; who: EffectTarget; count: Amount }>
     | Readonly<{ kind: "damage"; to: EffectTarget; amount: Amount }>
-    | Readonly<{ kind: "gainLife"; who: PlayerRef; amount: Amount }>
-    | Readonly<{ kind: "loseLife"; who: PlayerRef; amount: Amount }>
+    | Readonly<{ kind: "gainLife"; who: EffectTarget; amount: Amount }>
+    | Readonly<{ kind: "loseLife"; who: EffectTarget; amount: Amount }>
     | Readonly<{ kind: "destroy"; target: EffectTarget }>
     | Readonly<{ kind: "addMana"; mana: ManaType; amount: Amount }>
     | Readonly<{ kind: "applyContinuousEffect"; template: ContinuousEffectTemplate }>
-    | Readonly<{ kind: "discard"; who: PlayerRef; cards: BindingRef }>
+    | Readonly<{ kind: "discard"; cards: BindingRef }>
     | Readonly<{ kind: "choose"; chooser: EffectTarget; from: { kind: "hand"; of: EffectTarget }; min: Amount; max: Amount; bindAs: string; prompt: string }>;
 
 export type Amount = number | BindingRef;

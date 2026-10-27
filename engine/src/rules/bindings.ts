@@ -17,6 +17,13 @@ export function getNumberBinding(bindings: Bindings, name: string): Result<numbe
     return typeof b.value === "number" ? goodResult(b.value) : badResult(`'${name}' is ${describeKind(b.value)}, expected a number`);
 }
 
+// Coerces a list of choices to its length, useful for returning how many things were selected
+export function getCountBinding(bindings: Bindings, name: string): Result<number> {
+    const b = getBinding(bindings, name);
+    if (!b.ok) return b;
+    return typeof b.value === "boolean" ? badResult(`'${name}' is ${describeKind(b.value)}, expected a number`) : typeof b.value === "number" ? goodResult(b.value) : goodResult(b.value.length);
+}
+
 export function getFlagBinding(bindings: Bindings, name: string): Result<boolean> { 
     const b = getBinding(bindings, name);
     if (!b.ok) return b;

@@ -1,9 +1,4 @@
-import {
-  cardDefId,
-  type Ability,
-  type CardDefinition,
-  type ManaType,
-} from "@mtg/engine";
+import { cardDefId, type Ability, type CardDefinition, type ManaType } from "@mtg/engine";
 
 const tapForMana = (mana: ManaType): Ability => ({
     kind: "activated",
@@ -14,6 +9,24 @@ const tapForMana = (mana: ManaType): Ability => ({
     activateableZones: ["battlefield"],
     timingRestriction: "instantSpeed",
     description: `Tap: Add ${mana}`,
+});
+
+const discardThenGainLife = (): Ability => ({
+    kind: "spell",
+    targets: [{ kind: "Player", minCount: 1, maxCount: 1, allowedTypes: "any", zone: "battlefield" }],
+    effects: [
+        {
+            kind: "choose",
+            chooser: { kind: "target", index: 0 },
+            from: { kind: "hand", of: { kind: "target", index: 0 } },
+            min: 0,
+            max: 10,
+            bindAs: "cardsToDiscard",
+            prompt: "Discard any number of cards (the caster gains 1 life for each)",
+        },
+        { kind: "discard", cards: { kind: "bound", name: "cardsToDiscard" } },
+        { kind: "gainLife", who: { kind: "player", who: "controller" }, amount: { kind: "bound", name: "cardsToDiscard" } },
+    ],
 });
 
 export const forest: CardDefinition = {
@@ -84,11 +97,22 @@ export const bolt: CardDefinition = {
                     maxCount: 1,
                 },
             ],
-            effects: [
-                { kind: "damage", to: { kind: "target", index: 0 }, amount: 3 },
-            ],
+            effects: [{ kind: "damage", to: { kind: "target", index: 0 }, amount: 3 }],
         },
     ],
 };
 
-export const DEFINITIONS: readonly CardDefinition[] = [forest, mountain, bear, drake, bolt];
+export const discardLife: CardDefinition = {
+    id: cardDefId("twist"),
+    name: "Mind Twist",
+    manaCost: { generic: 0, pips: ["R"] },
+    colors: ["R"],
+    supertypes: [],
+    types: ["Sorcery"],
+    subtypes: [],
+    power: null,
+    toughness: null,
+    abilities: [discardThenGainLife()],
+};
+
+export const DEFINITIONS: readonly CardDefinition[] = [forest, mountain, bear, drake, bolt, discardLife];

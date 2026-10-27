@@ -100,13 +100,13 @@ function describeEffectTarget(t: EffectTarget): string {
 export function describeEffect(e: Effect): string {
   switch (e.kind) {
       case "draw":
-          return `${e.who} draws ${describeAmount(e.count)}`;
+          return `${describeEffectTarget(e.who)} draws ${describeAmount(e.count)}`;
       case "damage":
           return `deal ${describeAmount(e.amount)} damage to ${describeEffectTarget(e.to)}`;
       case "gainLife":
-          return `${e.who} gains ${describeAmount(e.amount)} life`;
+          return `${describeEffectTarget(e.who)} gains ${describeAmount(e.amount)} life`;
       case "loseLife":
-          return `${e.who} loses ${describeAmount(e.amount)} life`;
+          return `${describeEffectTarget(e.who)} loses ${describeAmount(e.amount)} life`;
       case "destroy":
           return `destroy ${describeEffectTarget(e.target)}`;
       case "addMana":
@@ -116,7 +116,7 @@ export function describeEffect(e: Effect): string {
       case "choose":
           return describeEffectChoice(e);
       case "discard":
-          return `${e.who} discards the cards chosen as ${e.cards.name}`;
+          return `The cards chosen as ${e.cards.name} are discarded from their owner's hand`;
       default:
           return unreachable(e);
   }
@@ -349,6 +349,8 @@ export function findProblems(state: GameState): string[] {
   }
 
   const spellSources = new Set(state.stack.filter((e) => e.kind === "spell").map((e) => e.source));
+  const r = state.resolving;
+  if (r?.entry.kind === "spell") spellSources.add(r.entry.source);
   for (const obj of Object.values(state.objects)) {
     if (obj.zone === "stack") {
       if (!spellSources.has(obj.id)) {
@@ -362,6 +364,10 @@ export function findProblems(state: GameState): string[] {
     if (entry.kind === "spell" && state.objects[entry.source]?.zone !== "stack") {
       problems.push(`Stack entry #${entry.id} is a spell whose card (#${entry.source}) is not in the stack zone`);
     }
+  }
+  
+  if (r?.entry.kind === "spell" && state.objects[r.entry.source]?.zone !== "stack") {
+      problems.push(`Resolving spell's card (#${r.entry.source}) is not in the stack zone`);
   }
   return problems;
 }

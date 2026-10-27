@@ -7,7 +7,7 @@ import {
   type GameState,
 } from "@mtg/engine";
 
-import { bear, bolt, DEFINITIONS, drake, forest, mountain } from "@mtg/definitions";
+import { bear, bolt, DEFINITIONS, discardLife, drake, forest, mountain } from "@mtg/definitions";
 
 export const ALICE = playerId("Alice");
 export const BOB = playerId("Bob");
@@ -15,7 +15,7 @@ export const BOB = playerId("Bob");
 
 
 /** Three repeats of a 7-card cycle. The last element is the top of the library, so the opening hand is one full cycle. */
-const CYCLE = [forest, bear, mountain, bolt, forest, drake, mountain];
+const CYCLE = [forest, bear, mountain, bolt, discardLife, drake, mountain];
 const deck = (): CardDefId[] => Array.from({ length: 3 }, () => CYCLE.map((c) => c.id)).flat();
 
 /** Two players, unshuffled 21-card decks, and a 7-card hand each. */
