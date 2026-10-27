@@ -14,15 +14,17 @@ export type TargetKinds =
 export type TargetSpec = TargetKinds & { minCount: number; maxCount: number };
 
 export type EffectTarget =
-    | Readonly<{ kind: "target"; index: number }> // index into the chosen targets
+    | Readonly<{ kind: "target"; index: number | "all" }> // index into the chosen targets
     | Readonly<{ kind: "self" }>
     | Readonly<{ kind: "player"; who: PlayerRef }>;
 
 export type Effect =
-    | Readonly<{ kind: "draw"; who: PlayerRef; count: number }>
-    | Readonly<{ kind: "damage"; to: EffectTarget; amount: number }>
-    | Readonly<{ kind: "gainLife"; who: PlayerRef; amount: number }>
-    | Readonly<{ kind: "loseLife"; who: PlayerRef; amount: number }>
+    | Readonly<{ kind: "draw"; who: PlayerRef; count: Amount }>
+    | Readonly<{ kind: "damage"; to: EffectTarget; amount: Amount }>
+    | Readonly<{ kind: "gainLife"; who: PlayerRef; amount: Amount }>
+    | Readonly<{ kind: "loseLife"; who: PlayerRef; amount: Amount }>
     | Readonly<{ kind: "destroy"; target: EffectTarget }>
-    | Readonly<{ kind: "addMana"; mana: ManaType; amount: number }>
+    | Readonly<{ kind: "addMana"; mana: ManaType; amount: Amount }>
     | Readonly<{ kind: "applyContinuousEffect"; template: ContinuousEffectTemplate }>;
+
+export type Amount = number | { kind: "bound"; name: string };

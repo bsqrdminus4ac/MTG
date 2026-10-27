@@ -1,12 +1,12 @@
 import { describe, expect, test } from "vitest";
 import type { CardDefinition } from "../model/cardDefinition";
-import type { Effect } from "../model/effects";
+import type { Amount, Effect } from "../model/effects";
 import { cardDefId, playerId, type CardDefId, type ObjectId } from "../model/ids";
 import type { GameState, Target } from "../model/state";
 import { moveObject } from "../model/zones";
 import { damageObject, damagePlayer } from "../rules/primitives";
 import { createGame } from "../setup";
-import { executeEffect, type EffectContext, type StepResult } from "./effects";
+import { executeEffect, resolveAmount, type EffectContext, type StepResult } from "./effects";
 
 const alice = playerId("alice");
 const bob = playerId("bob");
@@ -61,6 +61,46 @@ function context(source: ObjectId, targets: readonly Target[] = []): EffectConte
     bindings: {},
   };
 }
+
+describe("resolveAmount", () => {
+  test("resolves a bound number", () => {
+    const state = newGame();
+    const source = state.players[alice]!.library.at(-1)!;
+    const amount: Amount = { kind: "bound", name: "amount" };
+    const ctx = { ...context(source), bindings: { amount: 4 } };
+
+    expect(resolveAmount(state, ctx, amount)).toEqual({ ok: true, amount: 4 });
+  });
+
+  test("resolves a bound list to its length", () => {
+    const state = newGame();
+    const source = state.players[alice]!.library.at(-1)!;
+    const amount: Amount = { kind: "bound", name: "chosen" };
+    const ctx = {
+      ...context(source),
+      bindings: {
+        chosen: [
+          { kind: "index" as const, index: 0 },
+          { kind: "index" as const, index: 1 },
+          { kind: "index" as const, index: 2 },
+        ],
+      },
+    };
+
+    expect(resolveAmount(state, ctx, amount)).toEqual({ ok: true, amount: 3 });
+  });
+
+  test("returns an error for an unbound name", () => {
+    const state = newGame();
+    const source = state.players[alice]!.library.at(-1)!;
+    const amount: Amount = { kind: "bound", name: "missing" };
+
+    expect(resolveAmount(state, context(source), amount)).toEqual({
+      ok: false,
+      error: "Unbound name missing",
+    });
+  });
+});
 
 function complete(result: StepResult) {
   if (!result.ok) throw new Error(result.error);

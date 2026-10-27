@@ -5,7 +5,7 @@ export type ApplyResult = Readonly<{ ok: true; state: GameState; events: readonl
 
 export const ok = (state: GameState, events: readonly GameEvent[], changesMade?: boolean): ApplyResult =>
     changesMade === undefined ? { ok: true, state, events } : { ok: true, state, events, changesMade };
-export const fail = (error: string): ApplyResult => ({ ok: false, error });
+export const fail = (error: string): { ok: false; error: string } => ({ ok: false, error });
 
 export function applySequentially(state: GameState, steps: readonly ((state: GameState) => ApplyResult)[]): ApplyResult {
     let currentState = state;
