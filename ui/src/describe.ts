@@ -99,27 +99,33 @@ function describeEffectTarget(t: EffectTarget): string {
 
 export function describeEffect(e: Effect): string {
   switch (e.kind) {
-    case "draw":
-      return `${e.who} draws ${describeAmount(e.count)}`;
-    case "damage":
-      return `deal ${describeAmount(e.amount)} damage to ${describeEffectTarget(e.to)}`;
-    case "gainLife":
-      return `${e.who} gains ${describeAmount(e.amount)} life`;
-    case "loseLife":
-      return `${e.who} loses ${describeAmount(e.amount)} life`;
-    case "destroy":
-      return `destroy ${describeEffectTarget(e.target)}`;
-    case "addMana":
-      return `add ${describeAmount(e.amount)}× {${e.mana}}`;
-    case "applyContinuousEffect":
-      return `apply ${describeTemplate(e.template)}`;
-    default:
-      return unreachable(e);
+      case "draw":
+          return `${e.who} draws ${describeAmount(e.count)}`;
+      case "damage":
+          return `deal ${describeAmount(e.amount)} damage to ${describeEffectTarget(e.to)}`;
+      case "gainLife":
+          return `${e.who} gains ${describeAmount(e.amount)} life`;
+      case "loseLife":
+          return `${e.who} loses ${describeAmount(e.amount)} life`;
+      case "destroy":
+          return `destroy ${describeEffectTarget(e.target)}`;
+      case "addMana":
+          return `add ${describeAmount(e.amount)}× {${e.mana}}`;
+      case "applyContinuousEffect":
+          return `apply ${describeTemplate(e.template)}`;
+      case "choose":
+          return describeEffectChoice(e);
+      default:
+          return unreachable(e);
   }
 }
 
 export function describeAmount(a: Amount): string {
     return typeof a === "number" ? String(a) : `the number of “${a.name}”`;
+}
+
+export function describeEffectChoice(e: Extract<Effect, { kind: "choose" }>): string {
+    return `Choice: ${e.prompt}`; // Too complicated to piece apart full choice settings on client
 }
 
 export function describeCost(c: Cost): string {
