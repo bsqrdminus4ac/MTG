@@ -77,10 +77,10 @@ export function nextPlayer(state: GameState, from: PlayerId): PlayerId {
 
 export const getRemainingPlayersInTurnOrder = (state: GameState): PlayerId[] => {
     let p: PlayerId = state.turn.activePlayer;
-    const order = [p]; // Assumes active player hasn't lost the game
+    const order = []; // Assumes active player hasn't lost the game
     do {
-        p = nextPlayer(state, p);
         if (state.players[p] && !state.players[p]?.hasLostTheGame) order.push(p);
+        p = nextPlayer(state, p);
     } while (p !== state.turn.activePlayer);
     return order;
 };

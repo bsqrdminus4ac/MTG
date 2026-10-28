@@ -8,7 +8,7 @@ import { moveObject } from "../model/zones";
 import { resolveAmount } from "../rules/conditions";
 import { damageObject, damagePlayer } from "../rules/primitives";
 import { createGame } from "../setup";
-import { executeEffect, type EffectContext, type StepResult } from "./effects";
+import { executeEffect, resolvePlayers, type EffectContext, type StepResult } from "./effects";
 import { handleResolutionDecision, runResolution } from "./resolution";
 
 const alice = playerId("alice");
@@ -267,6 +267,84 @@ describe("control-flow effects", () => {
 });
 
 describe("player effects", () => {
+    test("eachOpponent resolves to the single opponent of a non-active controller", () => {
+        const state = newGame();
+        const source = state.players[alice]!.library.at(-1)!;
+
+        expect(resolvePlayers(state, { ...context(source), controller: bob }, "eachOpponent")).toEqual([alice]);
+    });
+
+    test("eachPlayer gainLife emits one lifeChanged event for each player", () => {
+        const state = newGame();
+        const source = state.players[alice]!.library.at(-1)!;
+        const result = complete(executeEffect(state, context(source), {
+            kind: "gainLife",
+            who: { kind: "player", who: "eachPlayer" },
+            amount: 2,
+        }));
+
+        expect(result.state.players[alice]?.life).toBe(22);
+        expect(result.state.players[bob]?.life).toBe(22);
+        expect(result.events.filter((event) => event.type === "lifeChanged")).toEqual([
+            { type: "lifeChanged", player: alice, delta: 2 },
+            { type: "lifeChanged", player: bob, delta: 2 },
+        ]);
+    });
+
+    test("each player chooses and discards a card in turn order", () => {
+        const state = putCardsInHand(putCardsInHand(newGame(), alice, 2), bob, 2);
+        const effects: Effect[] = [{
+            kind: "forEach",
+            over: { kind: "player", who: "eachPlayer" },
+            as: "player",
+            body: [
+                {
+                    kind: "choose",
+                    chooser: { kind: "bound", name: "player" },
+                    from: { kind: "hand", of: { kind: "bound", name: "player" } },
+                    min: 1,
+                    max: 1,
+                    bindAs: "discarded",
+                    prompt: "Choose a card to discard",
+                },
+                { kind: "discard", cards: { kind: "bound", name: "discarded" } },
+            ],
+        }];
+        const initialAliceHandSize = state.players[alice]!.hand.length;
+        const initialBobHandSize = state.players[bob]!.hand.length;
+        const firstDecision = runResolution(resolvingState(state, effects));
+
+        expect(firstDecision.ok).toBe(true);
+        if (!firstDecision.ok || firstDecision.state.pending?.kind !== "choose") return;
+        expect(firstDecision.state.pending.player).toBe(alice);
+        const aliceChoice = firstDecision.state.pending.options[0];
+        if (!aliceChoice) throw new Error("Expected an Alice hand choice");
+        const secondDecision = submitAnswer(firstDecision.state, {
+            player: alice,
+            decision: firstDecision.state.pending.id,
+            answer: { kind: "choose", selected: [aliceChoice.id] },
+        });
+
+        expect(secondDecision.ok).toBe(true);
+        if (!secondDecision.ok || secondDecision.state.pending?.kind !== "choose") return;
+        expect(secondDecision.state.pending.player).toBe(bob);
+        expect(secondDecision.state.players[alice]?.hand).toHaveLength(initialAliceHandSize - 1);
+        const bobChoice = secondDecision.state.pending.options[0];
+        if (!bobChoice) throw new Error("Expected a Bob hand choice");
+        const finalResult = submitAnswer(secondDecision.state, {
+            player: bob,
+            decision: secondDecision.state.pending.id,
+            answer: { kind: "choose", selected: [bobChoice.id] },
+        });
+
+        expect(finalResult.ok).toBe(true);
+        if (!finalResult.ok) return;
+        expect(finalResult.state.resolving).toBeNull();
+        expect(finalResult.state.pending).toMatchObject({ kind: "priority", player: alice });
+        expect(finalResult.state.players[alice]?.hand).toHaveLength(initialAliceHandSize - 1);
+        expect(finalResult.state.players[bob]?.hand).toHaveLength(initialBobHandSize - 1);
+    });
+
     test("choice waits for the chooser with priority cleared", () => {
         const state = putCardsInHand(newGame(), alice, 3);
         const resolving = resolvingState(state, [chooseFromControllerHand]);

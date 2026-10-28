@@ -29,6 +29,30 @@ const discardThenGainLife = (): Ability => ({
     ],
 });
 
+const eachPlayerDiscards = (amount: number): Ability => ({
+    kind: "spell",
+    targets: [],
+    effects: [
+        {
+            kind: "forEach",
+            over: { kind: "player", who: "eachPlayer" },
+            as: "p",
+            body: [
+                {
+                    kind: "choose",
+                    bindAs: "picked",
+                    prompt: "Discard a card",
+                    chooser: { kind: "bound", name: "p" },
+                    from: { kind: "hand", of: { kind: "bound", name: "p" } },
+                    max: amount,
+                    min: amount,
+                },
+                { kind: "discard", cards: { kind: "bound", name: "picked" } },
+            ],
+        },
+    ],
+});
+
 export const forest: CardDefinition = {
     id: cardDefId("forest"),
     name: "Forest",
@@ -115,4 +139,17 @@ export const discardLife: CardDefinition = {
     abilities: [discardThenGainLife()],
 };
 
-export const DEFINITIONS: readonly CardDefinition[] = [forest, mountain, bear, drake, bolt, discardLife];
+export const skeins: CardDefinition = {
+    id: cardDefId("skeins"),
+    name: "Delirium Skeins",
+    manaCost: { generic: 0, pips: ["G"] },
+    abilities: [eachPlayerDiscards(3)],
+    colors: ["B"],
+    supertypes: [],
+    types: ["Sorcery"],
+    subtypes: [],
+    power: null,
+    toughness: null,
+};
+
+export const DEFINITIONS: readonly CardDefinition[] = [forest, mountain, bear, drake, bolt, discardLife, skeins];
