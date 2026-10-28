@@ -1,5 +1,6 @@
 import {
     getCharacteristics,
+    getCardText,
     type Ability,
     type Action,
     type Amount,
@@ -7,6 +8,7 @@ import {
     type ChoiceValue,
     type ContinuousEffect,
     type ContinuousEffectTemplate,
+    type Condition,
     type Cost,
     type Decision,
     type Effect,
@@ -92,7 +94,7 @@ export function describeContinuousEffect(state: GameState, e: ContinuousEffect):
   return `${describeModification(e.modification)} on ${who} — from ${nameOf(state, e.source)} (timestamp ${e.timestamp}, ${e.duration})`;
 }
 
-function describeEffectTarget(t: EffectTarget): string {
+function describeEffectTarget(t: EffectTarget, bindings: Readonly<Record<string, string>> = {}): string {
   switch (t.kind) {
       case "target":
           return `target ${t.index + 1}`;
@@ -101,45 +103,120 @@ function describeEffectTarget(t: EffectTarget): string {
       case "self":
           return "this object";
       case "player":
-          return t.who;
+          switch (t.who) {
+            case "controller": return "you";
+            case "owner": return "this object's owner";
+            case "eachOpponent": return "each opponent";
+            case "eachPlayer": return "each player";
+            default: return unreachable(t.who);
+          }
       case "bound":
-          return `the targets chosen as ${t.name}`;
+          return bindings[t.name] ?? `the targets chosen as ${t.name}`;
       default:
           return unreachable(t);
   }
 }
 
 export function describeEffect(e: Effect): string {
+    return expandEffect(e, {});
+}
+
+function expandEffect(e: Effect, bindings: Readonly<Record<string, string>>): string {
   switch (e.kind) {
       case "draw":
-          return `${describeEffectTarget(e.who)} draws ${describeAmount(e.count)}`;
+          return `${describeEffectTarget(e.who, bindings)} ${effectVerb(e.who, bindings, "draws", "draw")} ${describeAmountWithBindings(e.count, bindings)}`;
       case "damage":
-          return `deal ${describeAmount(e.amount)} damage to ${describeEffectTarget(e.to)}`;
+          return `deal ${describeAmountWithBindings(e.amount, bindings)} damage to ${describeEffectTarget(e.to, bindings)}`;
       case "gainLife":
-          return `${describeEffectTarget(e.who)} gains ${describeAmount(e.amount)} life`;
+          return `${describeEffectTarget(e.who, bindings)} ${effectVerb(e.who, bindings, "gains", "gain")} ${describeAmountWithBindings(e.amount, bindings)} life`;
       case "loseLife":
-          return `${describeEffectTarget(e.who)} loses ${describeAmount(e.amount)} life`;
+          return `${describeEffectTarget(e.who, bindings)} ${effectVerb(e.who, bindings, "loses", "lose")} ${describeAmountWithBindings(e.amount, bindings)} life`;
       case "destroy":
-          return `destroy ${describeEffectTarget(e.target)}`;
+          return `destroy ${describeEffectTarget(e.target, bindings)}`;
       case "addMana":
-          return `add ${describeAmount(e.amount)}× {${e.mana}}`;
+          return `add ${describeAmountWithBindings(e.amount, bindings)}× {${e.mana}}`;
       case "applyContinuousEffect":
           return `apply ${describeTemplate(e.template)}`;
       case "choose":
           return describeEffectChoice(e);
       case "discard":
-          return `The cards chosen as ${e.cards.name} are discarded from their owner's hand`;
+          return bindings[e.cards.name]
+              ? `${bindings[e.cards.name]} are discarded from their owner's hand`
+              : `The cards chosen as ${e.cards.name} are discarded from their owner's hand`;
       case "askYesNo":
           return `${e.prompt}`;
-      case "if":
-          return `TODO: Nested effect descriptions`;
-      case "forEach":
-          return `TODO: Nested effect descriptions`;
+      case "if": {
+          const condition = describeCondition(e.condition, bindings);
+          const thenEffects = describeEffectsWithBindings(e.then, bindings);
+          const otherwise = e.else ? `; otherwise, ${describeEffectsWithBindings(e.else, bindings)}` : "";
+          return `If ${condition}, ${thenEffects}${otherwise}`;
+      }
+      case "forEach": {
+          const [subject, reference] = describeLoopSubject(e.over, bindings);
+          return `For ${subject}, ${describeEffectsWithBindings(e.body, { ...bindings, [e.as]: reference })}`;
+      }
       case "setBinding":
           return "";
       default:
           return unreachable(e);
   }
+}
+
+function effectVerb(target: EffectTarget, bindings: Readonly<Record<string, string>>, singular: string, plural: string): string {
+    if (target.kind === "allTargets" || (target.kind === "player" && target.who === "controller")) return plural;
+    if (target.kind === "bound" && bindings[target.name] === "you") return plural;
+    return singular;
+}
+
+function describeEffectsWithBindings(effects: readonly Effect[], bindings: Readonly<Record<string, string>>): string {
+    let currentBindings = bindings;
+    const descriptions = effects.map((effect) => {
+        const description = expandEffect(effect, currentBindings);
+        if (effect.kind === "askYesNo") currentBindings = { ...currentBindings, [effect.bindAs]: effect.prompt };
+        if (effect.kind === "choose") currentBindings = { ...currentBindings, [effect.bindAs]: "the cards selected by the choice" };
+        return description;
+    }).filter(Boolean);
+    return descriptions.length > 0 ? descriptions.join("; ") : "do nothing";
+}
+
+function describeLoopSubject(target: EffectTarget, bindings: Readonly<Record<string, string>>): [string, string] {
+    if (target.kind === "player") {
+        switch (target.who) {
+            case "eachPlayer": return ["each player", "that player"];
+            case "eachOpponent": return ["each opponent", "that opponent"];
+            case "controller": return ["you", "you"];
+            case "owner": return ["the owner", "that owner"];
+            default: return unreachable(target.who);
+        }
+    }
+    if (target.kind === "allTargets") return ["each target", "that target"];
+    if (target.kind === "target") return [`target ${target.index + 1}`, `target ${target.index + 1}`];
+    if (target.kind === "self") return ["this object", "this object"];
+    const label = bindings[target.name] ?? `the targets chosen as ${target.name}`;
+    return [label, label];
+}
+
+function describeAmountWithBindings(amount: Amount, bindings: Readonly<Record<string, string>>): string {
+    return typeof amount === "number" ? String(amount) : `the number of “${bindings[amount.name] ?? amount.name}”`;
+}
+
+function describeCondition(condition: Condition, bindings: Readonly<Record<string, string>>): string {
+    switch (condition.kind) {
+        case "flag":
+            return bindings[condition.name]
+                ? `the answer to “${bindings[condition.name]}” is yes`
+                : `“${condition.name}” is true`;
+        case "compare":
+            return `${describeAmountWithBindings(condition.left, bindings)} ${condition.op} ${describeAmountWithBindings(condition.right, bindings)}`;
+        case "not":
+            return `not (${describeCondition(condition.of, bindings)})`;
+        case "all":
+            return condition.of.map((part) => describeCondition(part, bindings)).join(" and ");
+        case "any":
+            return condition.of.map((part) => describeCondition(part, bindings)).join(" or ");
+        default:
+            return unreachable(condition);
+    }
 }
 
 export function describeAmount(a: Amount): string {
@@ -167,7 +244,7 @@ const describeTargetSpecs = (specs?: TargetSpec[]): string => {
     return `${count} ${kindString}` + (isPlural ? "s" : "")
   }).join(", ")}`;
 }
-const describeEffects = (effects: readonly Effect[]): string => effects.map(describeEffect).join("; ");
+export const describeEffects = (effects: readonly Effect[]): string => describeEffectsWithBindings(effects, {});
 
 export function describeAbility(a: Ability | undefined): string {
     if (!a) return "";
@@ -185,6 +262,16 @@ export function describeAbility(a: Ability | undefined): string {
         default:
             return unreachable(a);
     }
+}
+
+export function describeCardText(a: Ability | undefined, objectName = "this object"): string[] {
+    if (!a) return [];
+    if (a.kind === "keyword") {
+        const keyword = a.keyword.replace(/[A-Z]/g, (letter) => ` ${letter.toLowerCase()}`);
+        return [`${keyword[0]?.toUpperCase() ?? ""}${keyword.slice(1)}`];
+    }
+    if (!("effects" in a)) return [];
+    return getCardText(a.effects).map((text) => text.replace(/<this>/gi, objectName));
 }
 
 // ---------------------------------------------------------------------------

@@ -44,6 +44,12 @@ type InternalEffect = Readonly<{ kind: "setBinding"; bindAs: string; value: Bind
 
 export type Effect = ControlFlowEffect | PrimitiveEffect | InternalEffect;
 
+export type CardEffect = Effect & { readonly description?: string };
+
+export function getCardText(effects: readonly CardEffect[]): string[] {
+    return effects.flatMap((effect) => effect.description?.trim() ? [effect.description] : []);
+}
+
 export const mayDo = (who: EffectTarget, prompt: string, bindAs: string, then: readonly Effect[]): Effect[] => {
     return [
         { kind: "askYesNo", prompt, who, bindAs },

@@ -1,6 +1,6 @@
 import { getCharacteristics, type GameState, type StackEntry } from "@mtg/engine";
-import { describeAbility, describeEffect, describeTarget, nameOf } from "../describe";
-import { Bullets, NestedList } from "./Bullets";
+import { describeAbility, describeCardText, describeTarget, nameOf } from "../describe";
+import { Bullets, NestedList, type BulletItem } from "./Bullets";
 
 interface EntryProps {
   readonly state: GameState;
@@ -13,30 +13,40 @@ function StackEntryCard({ state, entry, top }: EntryProps) {
   const source = state.objects[entry.source];
 
   // A spell's effects live on its card; an ability on the stack carries its own copy.
-  const effects =
+  const abilities =
       entry.kind === "ability"
-          ? [describeAbility(state.definitions[entry.definitionId]?.abilities[entry.abilityIndex])]
-          : (getCharacteristics(state, entry.source)?.abilities ?? []).filter((a) => a.kind === "spell").map(describeAbility);
+          ? [state.definitions[entry.definitionId]?.abilities[entry.abilityIndex]]
+          : (getCharacteristics(state, entry.source)?.abilities ?? []).filter((a) => a.kind === "spell");
+  const effects = abilities.map(describeAbility);
+  const cardText = abilities.flatMap((ability) => describeCardText(ability, name));
+  const abilityText = cardText.join("; ");
+  const items: BulletItem[] = [
+    ["Stack ID", `#${entry.id}`],
+    ["Kind", entry.kind],
+    ["Controller", entry.controller],
+    ["Source", `${name} (#${entry.source})`],
+    ["Source zone", source?.zone ?? "missing"],
+    ["Targets", <NestedList key="targets" items={entry.targets.map((t) => describeTarget(state, t))} />],
+    ["Effects", <NestedList key="effects" items={effects} />],
+  ];
+  if (cardText.length > 0) {
+    items.push(["Card Text", <NestedList key="card-text" items={cardText} />]);
+  }
 
   return (
     <details className="obj">
       <summary>
         {top && <span className="badge accent">top</span>}
         <span className="badge">{entry.kind}</span>
-        <span className="name">{name}</span>
-        <span className="note">by {entry.controller}</span>
+        <span className="stack-summary-main">
+          <span className="stack-title">
+            <span className="name">{name}</span>
+            <span className="note">by {entry.controller}</span>
+          </span>
+          {abilityText && <span className="stack-ability-text">{abilityText}</span>}
+        </span>
       </summary>
-      <Bullets
-        items={[
-          ["Stack ID", `#${entry.id}`],
-          ["Kind", entry.kind],
-          ["Controller", entry.controller],
-          ["Source", `${name} (#${entry.source})`],
-          ["Source zone", source?.zone ?? "missing"],
-          ["Targets", <NestedList key="targets" items={entry.targets.map((t) => describeTarget(state, t))} />],
-          ["Effects", <NestedList key="effects" items={effects} />],
-        ]}
-      />
+      <Bullets items={items} />
     </details>
   );
 }

@@ -12,6 +12,7 @@ import {
   type StackId,
 } from "@mtg/engine";
 import { App, ProgressState } from "./App";
+import { ObjectCard } from "./components/ObjectCard";
 import { DecisionPanel } from "./components/DecisionPanel";
 import { StackPanel } from "./components/StackPanel";
 import { ALICE, BOB, newDemoGame } from "./demo";
@@ -30,6 +31,26 @@ function zoneOf(region: HTMLElement, title: string): HTMLDetailsElement {
 }
 
 const cardsIn = (zone: HTMLElement) => [...zone.querySelectorAll<HTMLDetailsElement>("details.obj")];
+
+function withCardText(state: GameState, cardId: string, description: string): GameState {
+  const id = cardDefId(cardId);
+  const definition = state.definitions[id];
+  if (!definition) throw new Error(`expected ${cardId} definition`);
+  const ability = definition.abilities[0];
+  if (!ability || !("effects" in ability)) throw new Error(`expected effects on ${cardId}`);
+
+  const describedAbility = {
+    ...ability,
+    effects: ability.effects.map((effect, index) => index === 0 ? { ...effect, description } : effect),
+  };
+  return {
+    ...state,
+    definitions: {
+      ...state.definitions,
+      [id]: { ...definition, abilities: [describedAbility, ...definition.abilities.slice(1)] },
+    },
+  };
+}
 
 describe("in-progress state panels", () => {
   test("hides states when they are null", () => {
@@ -74,6 +95,28 @@ describe("zones", () => {
     expect(bullets).toContain("Zonehand");
     expect(bullets).toContain("Tappedno");
     expect(bullets.some((b) => b?.startsWith("Abilities"))).toBe(true);
+  });
+
+  test("shows authored effect text under Card Text and replaces the this placeholder", () => {
+    const state = withCardText(newDemoGame(), "forest", "<this> taps to add one green mana.");
+    const id = must(state.players[ALICE]!.hand.find((card) => state.objects[card]?.definitionId === cardDefId("forest")));
+    render(<ObjectCard state={state} id={id} />);
+
+    expect(screen.getByText("Card Text")).toBeTruthy();
+    const cardText = screen.getByText("Forest taps to add one green mana.", { selector: ".obj-card-text" });
+    expect(cardText).toBeTruthy();
+    const summary = must(cardText.closest("summary"));
+    expect(summary.querySelector(".name")?.textContent).toBe("Forest");
+    expect(summary.querySelector(".obj-card-text")?.textContent).toBe("Forest taps to add one green mana.");
+    expect(screen.getByText("Mana ability: {T} → add 1× {G}")).toBeTruthy();
+  });
+
+  test("includes keyword abilities in the collapsed card text", () => {
+    const state = newDemoGame();
+    const id = must(state.players[ALICE]!.hand.find((card) => state.objects[card]?.definitionId === cardDefId("drake")));
+    render(<ObjectCard state={state} id={id} />);
+
+    expect(screen.getByText("Flying", { selector: ".obj-card-text" })).toBeTruthy();
   });
 
   test("expand all and collapse all affect every card in that zone only", () => {
@@ -271,7 +314,11 @@ describe("stack panel", () => {
   });
 
   test("lists entries with the top of the stack first", () => {
-      const base = newDemoGame();
+      const base = withCardText(
+          withCardText(newDemoGame(), "bolt", "<this> deals three damage."),
+          "forest",
+          "<this> taps for green mana.",
+      );
       const hand = must(base.players[ALICE]).hand;
       const find = (def: string) => must(hand.find((id) => base.objects[id]?.definitionId === cardDefId(def)));
 
@@ -299,9 +346,12 @@ describe("stack panel", () => {
       const names = [...region.querySelectorAll("ol.stack-list > li > details > summary .name")].map((n) => n.textContent);
       expect(names).toEqual(["Forest", "Lightning Bolt"]); // last element of the array is the top
       expect(must(region.querySelector("summary")).textContent).toContain("top");
+      expect(region.querySelector("summary .stack-ability-text")?.textContent).toContain("Forest taps for green mana.");
+      expect(region.querySelectorAll("summary .stack-ability-text")[1]?.textContent).toContain("Lightning Bolt deals three damage.");
 
       const text = region.textContent ?? "";
       expect(text).toContain("deal 3 damage to target 1"); // the spell's effect, read from its card
+      expect(text).toContain("Card TextLightning Bolt deals three damage.");
       expect(text).toContain("player Bob"); // its target
       expect(text).toContain("Mana ability: {T} → add 1× {G}"); // the ability is read from its source card
   });

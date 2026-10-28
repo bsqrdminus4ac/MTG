@@ -9,6 +9,7 @@ import { moveObject } from "../model/zones";
 import { openDecision } from "../rules/pending";
 import { checkStateBasedActions } from "../rules/stateBasedActions";
 import { canPlayLand } from "../rules/timing";
+import { getCardText } from "../model/effects";
 import { getAllActivatableAbilities } from "./abilities";
 import { couldHaveManaToPayCost } from "./manaAbilities";
 import { beginResolution } from "./resolution";
@@ -70,20 +71,21 @@ export function priorityOptions(
     }
 
     options.push(
-        ...getAllActivatableAbilities(state, player).map(
-            ({ source, ability, abilityIndex }): PriorityOption => ({
+        ...getAllActivatableAbilities(state, player).map(({ source, ability, abilityIndex }): PriorityOption => {
+            const cardText = getCardText(ability.effects)[0];
+            return {
                 id: `activate:${source}:${abilityIndex}`,
                 label:
                     `Activate ${getCharacteristics(state, source)?.name}'s ability` +
-                    (ability.description ? ` (${ability.description})` : ""),
+                    (cardText ? ` (${cardText})` : ""),
                 action: {
                     type: "activateAbility",
                     player,
                     source,
                     abilityIndex,
                 }, // TODO: handle targets
-            }),
-        ),
+            };
+        }),
     );
 
     options.push(

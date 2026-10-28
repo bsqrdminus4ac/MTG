@@ -289,14 +289,69 @@ details.obj {
   border-radius: 6px;
 }
 details.obj > summary {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 4px 8px;
-  padding: 4px 8px;
+  padding: 4px 8px 4px 28px;
+}
+details.obj > summary::before {
+  position: absolute;
+  top: 4px;
+  left: 8px;
 }
 details.obj[open] > summary {
   border-bottom: 1px solid var(--border);
+}
+.obj-summary-main {
+  display: flex;
+  flex: 1 1 100%;
+  flex-direction: column;
+  min-width: 0;
+}
+.obj-summary-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 8px;
+  flex-wrap: wrap;
+}
+.obj-summary-statuses {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px 8px;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+.obj-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+.obj-card-text {
+  color: var(--muted);
+  font-size: 12px;
+}
+.stack-summary-main {
+  display: flex;
+  flex: 1 1 100%;
+  flex-direction: column;
+  min-width: 0;
+}
+.stack-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+.stack-ability-text {
+  color: var(--muted);
+  font-size: 12px;
 }
 .obj.missing {
   padding: 4px 8px;

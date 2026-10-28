@@ -5,10 +5,9 @@ const tapForMana = (mana: ManaType): Ability => ({
     cost: { mana: null, tap: true, sacrificeSelf: false },
     isManaAbility: true,
     targets: [],
-    effects: [{ kind: "addMana", mana, amount: 1 }],
+    effects: [{ kind: "addMana", mana, amount: 1, description: `Tap: Add ${mana}` }],
     activateableZones: ["battlefield"],
     timingRestriction: "instantSpeed",
-    description: `Tap: Add ${mana}`,
 });
 
 const discardThenGainLife = (): Ability => ({
@@ -23,9 +22,10 @@ const discardThenGainLife = (): Ability => ({
             max: 10,
             bindAs: "cardsToDiscard",
             prompt: "Discard any number of cards (the caster gains 1 life for each)",
+            description: "Target player discards any number of cards.",
         },
         { kind: "discard", cards: { kind: "bound", name: "cardsToDiscard" } },
-        { kind: "gainLife", who: { kind: "player", who: "controller" }, amount: { kind: "bound", name: "cardsToDiscard" } },
+        { kind: "gainLife", who: { kind: "player", who: "controller" }, amount: { kind: "bound", name: "cardsToDiscard" }, description: "You gain 1 life for each card discarded this way" },
     ],
 });
 
@@ -49,6 +49,7 @@ const eachPlayerDiscards = (amount: number): Ability => ({
                 },
                 { kind: "discard", cards: { kind: "bound", name: "picked" } },
             ],
+            description: "Each player discards a card",
         },
     ],
 });
@@ -121,7 +122,7 @@ export const bolt: CardDefinition = {
                     maxCount: 1,
                 },
             ],
-            effects: [{ kind: "damage", to: { kind: "target", index: 0 }, amount: 3 }],
+            effects: [{ kind: "damage", to: { kind: "target", index: 0 }, amount: 3, description: "<this> deals 3 damage to any target" }],
         },
     ],
 };

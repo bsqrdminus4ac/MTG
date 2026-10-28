@@ -1,5 +1,5 @@
 import { getCharacteristics, manaValue, type GameState, type ObjectId } from "@mtg/engine";
-import { describeAbility, describeContinuousEffect, describeManaCost } from "../describe";
+import { describeAbility, describeCardText, describeContinuousEffect, describeManaCost } from "../describe";
 import { Bullets, NestedList, type BulletItem } from "./Bullets";
 
 interface ObjectCardProps {
@@ -23,8 +23,10 @@ export function ObjectCard({ state, id, tag }: ObjectCardProps) {
   }
 
   const chars = getCharacteristics(state, id);
+  const objectName = chars?.name ?? "Unknown card";
   const counters = Object.entries(obj.counters);
   const isCreature = chars?.types.includes("Creature") ?? false;
+  const cardText = chars?.abilities.flatMap((ability) => describeCardText(ability, objectName)) ?? [];
   const effects = state.continuousEffects.filter((e) =>
     e.affects.kind === "object" ? e.affects.id === id : obj.zone === "battlefield" && isCreature,
   );
@@ -44,14 +46,17 @@ export function ObjectCard({ state, id, tag }: ObjectCardProps) {
   if (chars) {
     const subtypes = chars.subtypes.length > 0 ? ` — ${chars.subtypes.join(" ")}` : "";
     items.push(
-      ["Type line", orDash([...chars.supertypes, ...chars.types]) + subtypes],
-      ["Colors", chars.colors.length > 0 ? chars.colors.join("") : "colorless"],
-      ["Mana cost", describeManaCost(chars.manaCost)],
-      ["Mana value", String(manaValue(chars.manaCost))],
-      ["Power / toughness", chars.power !== null && chars.toughness !== null ? `${chars.power}/${chars.toughness}` : "—"],
-      ["Abilities", <NestedList key="abilities" items={chars.abilities.map(describeAbility)} />],
-      ["Active effects", <NestedList key="effects" items={effects.map((e) => describeContinuousEffect(state, e))} />],
+        ["Type line", orDash([...chars.supertypes, ...chars.types]) + subtypes],
+        ["Colors", chars.colors.length > 0 ? chars.colors.join("") : "colorless"],
+        ["Mana cost", describeManaCost(chars.manaCost)],
+        ["Mana value", String(manaValue(chars.manaCost))],
+        ["Power / toughness", chars.power !== null && chars.toughness !== null ? `${chars.power}/${chars.toughness}` : "—"],
     );
+    if (cardText.length > 0) {
+        items.push(["Card Text", <NestedList key="card-text" items={cardText} />]);
+    }
+    items.push(["Abilities", <NestedList key="abilities" items={chars.abilities.map(describeAbility)} />]);
+    items.push(["Active effects", <NestedList key="effects" items={effects.map((e) => describeContinuousEffect(state, e))} />]);
   } else {
     items.push(["Characteristics", "definition not found in state.definitions"]);
   }
@@ -59,18 +64,27 @@ export function ObjectCard({ state, id, tag }: ObjectCardProps) {
   return (
     <details className="obj">
       <summary>
-        <span className="name">{chars?.name ?? "Unknown card"}</span>
-        <span className="id">#{id}</span>
-        {tag !== undefined && <span className="badge accent">{tag}</span>}
-        {chars?.power != null && chars.toughness != null && (
-          <span className="badge">
-            {chars.power}/{chars.toughness}
+        <span className="obj-summary-main">
+          <span className="obj-summary-topline">
+            <span className="obj-title">
+              <span className="name">{objectName}</span>
+              <span className="id">#{id}</span>
+            </span>
+            <span className="obj-summary-statuses">
+              {tag !== undefined && <span className="badge accent">{tag}</span>}
+              {chars?.power != null && chars.toughness != null && (
+                <span className="badge">
+                  {chars.power}/{chars.toughness}
+                </span>
+              )}
+              {obj.tapped && <span className="badge warn">tapped</span>}
+              {obj.damage > 0 && <span className="badge warn">{obj.damage} damage</span>}
+              {counters.length > 0 && <span className="badge">counters</span>}
+              {obj.controller !== obj.owner && <span className="badge warn">controlled by {obj.controller}</span>}
+            </span>
           </span>
-        )}
-        {obj.tapped && <span className="badge warn">tapped</span>}
-        {obj.damage > 0 && <span className="badge warn">{obj.damage} damage</span>}
-        {counters.length > 0 && <span className="badge">counters</span>}
-        {obj.controller !== obj.owner && <span className="badge warn">controlled by {obj.controller}</span>}
+          {cardText.length > 0 && <span className="obj-card-text">{cardText.join(" ")}</span>}
+        </span>
       </summary>
       <Bullets items={items} />
     </details>

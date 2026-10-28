@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 import { cardDefId, type GameState, type ObjectId } from "@mtg/engine";
 import { DEFINITIONS } from "@mtg/definitions";
 import { ALICE, newDemoGame } from "./demo";
-import { describeAbility, describeManaCost, describePool, findProblems } from "./describe";
+import { describeAbility, describeCardText, describeEffect, describeEffects, describeManaCost, describePool, findProblems } from "./describe";
 
 const definition = (id: string) => {
   const def = DEFINITIONS.find((d) => d.id === cardDefId(id));
@@ -25,9 +25,41 @@ describe("text describers", () => {
 
   test("abilities", () => {
     expect(describeAbility({ kind: "keyword", keyword: "flying" })).toBe("Keyword: flying");
+    expect(describeCardText({ kind: "keyword", keyword: "firstStrike" })).toEqual(["First strike"]);
+    expect(describeCardText({
+      kind: "spell",
+      targets: [],
+      effects: [{ kind: "gainLife", who: { kind: "player", who: "controller" }, amount: 1, description: "<this> gains life." }],
+    }, "Healing Light")).toEqual(["Healing Light gains life."]);
     expect(describeAbility(definition("forest").abilities[0]!)).toBe("Mana ability: {T} → add 1× {G}");
     expect(describeAbility(definition("bolt").abilities[0]!)).toBe(
       "Spell targeting 1 of any target: deal 3 damage to target 1",
+    );
+  });
+
+  test("expands loop effects and describes their bound values", () => {
+    const ability = definition("skeins").abilities[0];
+    const effect = ability?.kind === "spell"
+      ? ability.effects[0]
+      : undefined;
+
+    expect(effect).toBeDefined();
+    expect(describeEffect(effect!)).toBe(
+      "For each player, Choice: Discard a card; the cards selected by the choice are discarded from their owner's hand",
+    );
+  });
+
+  test("describes conditional branches and the yes/no answer they depend on", () => {
+    expect(describeEffects([
+      { kind: "askYesNo", who: { kind: "player", who: "controller" }, prompt: "Gain life?", bindAs: "accepted" },
+      {
+        kind: "if",
+        condition: { kind: "flag", name: "accepted" },
+        then: [{ kind: "gainLife", who: { kind: "player", who: "controller" }, amount: 2 }],
+        else: [{ kind: "loseLife", who: { kind: "player", who: "controller" }, amount: 1 }],
+      },
+    ])).toBe(
+      "Gain life?; If the answer to “Gain life?” is yes, you gain 2 life; otherwise, you lose 1 life",
     );
   });
 });
