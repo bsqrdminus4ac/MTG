@@ -85,7 +85,9 @@ export function describeContinuousEffect(state: GameState, e: ContinuousEffect):
 function describeEffectTarget(t: EffectTarget): string {
   switch (t.kind) {
       case "target":
-          return t.index === "all" ? `all targets` : `target ${t.index + 1}`;
+          return `target ${t.index + 1}`;
+      case "allTargets":
+          return "all targets";
       case "self":
           return "this object";
       case "player":
@@ -117,6 +119,12 @@ export function describeEffect(e: Effect): string {
           return describeEffectChoice(e);
       case "discard":
           return `The cards chosen as ${e.cards.name} are discarded from their owner's hand`;
+      case "askYesNo":
+          return `${e.prompt}`;
+      case "if":
+          return `TODO: Nested effect descriptions`;
+      case "forEach":
+          return `TODO: Nested effect descriptions`;
       default:
           return unreachable(e);
   }

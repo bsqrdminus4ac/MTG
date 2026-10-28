@@ -3,7 +3,7 @@ import { withEntry } from "../core/util";
 import { getCharacteristics, isPermanentType } from "../model/characteristics";
 import type { ResolvedAnswer } from "../model/decisions";
 import type { GameEvent } from "../model/events";
-import type { Binding, GameState, ResolutionInProgress } from "../model/state";
+import type { Binding, Frame, GameState, ResolutionInProgress } from "../model/state";
 import type { Zone } from "../model/vocabulary";
 import { moveObject } from "../model/zones";
 import { contextOf, executeEffect, resolveStackEntryEffects } from "./effects";
@@ -14,8 +14,7 @@ export function beginResolution(state: GameState): ApplyResult {
     if (!entry) return fail("The stack is empty");
     const resolving: ResolutionInProgress = {
         entry,
-        effects: resolveStackEntryEffects(state, entry),
-        pc: 0,
+        frames: [{ effects: resolveStackEntryEffects(state, entry), pc: 0 }],
         bindings: {},
     };
     //TODO: Check target legality and trim from entry.targets. If targets were required and no legal targets left, clear effects and let it resolve without any effects
@@ -30,17 +29,25 @@ export function runResolution(state: GameState): ApplyResult {
     for (;;) {
         const resolving = currentState.resolving;
         if (!resolving) return fail("Nothing is resolving");
-        const effect = resolving.effects[resolving.pc];
-        if (!effect) return finishResolution(currentState, out);
+        const topFrame = getTopFrame(currentState);
+        if (!topFrame) return finishResolution(currentState, out);
+        const effect = topFrame.effects[topFrame.pc];
+        if (!effect) {
+            currentState = { ...currentState, resolving: { ...resolving, frames: resolving.frames.slice(0, -1) } };
+            continue;
+        }
+
         const ctx = contextOf(resolving);
         if (!ctx) return finishResolution(currentState, out);
-
         const step = executeEffect(currentState, ctx, effect);
         if (!step.ok) return step;
         out.push(...step.events);
         if (step.waiting) return ok(step.state, out); // paused for a decision
+
         const bindings = step.bind ? withEntry(resolving.bindings, step.bind.bindAs, step.bind.value) : resolving.bindings;
-        currentState = { ...step.state, resolving: { ...resolving, pc: resolving.pc + 1, bindings } };
+        const advanced = [...resolving.frames.slice(0, -1), { ...topFrame, pc: topFrame.pc + 1 }];
+        const frames = step.enter ? [...advanced, ...[...step.enter].reverse()] : advanced; // If effect resulted in new nested effects to resolve, add those at the end and reverse them since ones at the end should resolve first
+        currentState = { ...step.state, resolving: { ...resolving, frames, bindings } };
     }
 }
 
@@ -51,7 +58,10 @@ export function handleResolutionDecision(state: GameState, bindAs: string, answe
     if (answer.kind === "choose") binding = answer.chosen.map((c) => c.value);
     else if (answer.kind === "yesNo") binding = answer.value;
     else return fail("Unsupported answer for a resolution decision");
-    return runResolution({ ...state, resolving: { ...resolving, pc: resolving.pc + 1, bindings: withEntry(resolving.bindings, bindAs, binding) } });
+    const topFrame = getTopFrame(state);
+    if (!topFrame) return fail("No effect frame to bind decision to");
+    const advanced = [...resolving.frames.slice(0, -1), { ...topFrame, pc: topFrame.pc + 1 }];
+    return runResolution({ ...state, resolving: { ...resolving, frames: advanced, bindings: withEntry(resolving.bindings, bindAs, binding) } });
 }
 
 export function finishResolution(state: GameState, events: readonly GameEvent[]): ApplyResult {
@@ -76,3 +86,5 @@ export function finishResolution(state: GameState, events: readonly GameEvent[])
     }
     return givePriorityToActivePlayer(currentState, out);
 }
+
+export const getTopFrame = (state: GameState): Frame | undefined => state.resolving?.frames[state.resolving.frames.length - 1];

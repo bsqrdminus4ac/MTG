@@ -6,7 +6,7 @@ import { chooseMany, objectChoice } from "../model/decisions";
 import type { Amount, Effect, EffectTarget, PlayerRef } from "../model/effects";
 import type { GameEvent } from "../model/events";
 import type { ObjectId, PlayerId } from "../model/ids";
-import { getRemainingPlayersInTurnOrder, type Binding, type Bindings, type GameState, type ResolutionInProgress, type StackEntry, type Target } from "../model/state";
+import { getRemainingPlayersInTurnOrder, type Binding, type Bindings, type Frame, type GameState, type ResolutionInProgress, type StackEntry, type Target } from "../model/state";
 import { drawCardResult } from "../model/zones";
 import { getChoiceBinding, getCountBinding, getObjectIdsFromBinding } from "../rules/bindings";
 import { openDecision } from "../rules/pending";
@@ -26,7 +26,7 @@ export interface EffectContext extends EvalContext {
 }
 
 export type StepResult =
-    | Readonly<{ ok: true; waiting: false; state: GameState; events: readonly GameEvent[]; bind?: Readonly<{ bindAs: string; value: Binding }> }>
+    | Readonly<{ ok: true; waiting: false; state: GameState; events: readonly GameEvent[]; bind?: Readonly<{ bindAs: string; value: Binding }>; enter?: readonly Frame[] }>
     | Readonly<{ ok: true; waiting: true; state: GameState; events: readonly GameEvent[] }>
     | Failure;
 
@@ -191,7 +191,11 @@ export const resolveAmount = (state: GameState, ctx: EffectContext, amount: Amou
 
 export function resolvePlayers(state: GameState, ctx: EffectContext, ref: PlayerRef): PlayerId[] {
     if (ref === "controller") return [ctx.controller];
-    if (ref === "opponent") return getRemainingPlayersInTurnOrder(state).filter((p) => p !== ctx.controller) as PlayerId[];
+    if (ref === "owner") {
+        const owner = state.objects[ctx.source]?.owner;
+        return owner ? [owner] : [];
+    }
+    if (ref === "eachOpponent") return getRemainingPlayersInTurnOrder(state).filter((p) => p !== ctx.controller) as PlayerId[];
     return getRemainingPlayersInTurnOrder(state) as PlayerId[];
 }
 
@@ -216,10 +220,11 @@ export function resolveStackEntryEffects(state: GameState, entry: StackEntry): r
 function resolveEffectTargets(state: GameState, ctx: EffectContext, t: EffectTarget): Result<Target[]> {
     switch (t.kind) {
         case "target": {
-            if (t.index == "all") return goodResult(ctx.targets.filter((_, i) => ctx.legalTargets[i]));
             const target = ctx.targets[t.index];
             return goodResult(target && ctx.legalTargets[t.index] ? [target] : []); // illegal target: the effect does nothing
         }
+        case "allTargets":
+            return goodResult(ctx.targets.filter((_, i) => ctx.legalTargets[i]));
         case "self":
             return goodResult([{ kind: "object", id: ctx.source }]);
         case "player":

@@ -110,10 +110,14 @@ export interface CastingInProgress {
     events: readonly GameEvent[]; // buffered until commit
 }
 
+export interface Frame {
+    readonly effects: readonly Effect[];
+    readonly pc: number;
+}
+
 export interface ResolutionInProgress {
     entry: StackEntry;
-    effects: readonly Effect[];
-    pc: number;
+    frames: readonly Frame[];
     bindings: Bindings;
 }
 
