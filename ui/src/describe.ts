@@ -17,6 +17,7 @@ import {
     type ManaPool,
     type Modification,
     type ObjectId,
+    type StackId,
     type Target,
     type TargetSpec,
     type Zone,
@@ -37,6 +38,15 @@ export const nameOf = (state: GameState, id: ObjectId, includeId?: boolean): str
     return `#${id}`;
   }
 }
+
+export const nameOfStackEntry = (state: GameState, id: StackId, includeId?: boolean): string => {
+    const stackEntry = state.stack.find((entry) => entry.id === id);
+    if (stackEntry) {
+        const name = getCharacteristics(state, stackEntry.source)?.name;
+        if (name) return includeId ? `${name} (stack entry #${id})` : name; // TODO: Handle abilities, not just spells
+    }
+    return `Stack entry #${id}`;
+};
 
 // ---------------------------------------------------------------------------
 // Card data
@@ -125,6 +135,8 @@ export function describeEffect(e: Effect): string {
           return `TODO: Nested effect descriptions`;
       case "forEach":
           return `TODO: Nested effect descriptions`;
+      case "setBinding":
+          return "";
       default:
           return unreachable(e);
   }
@@ -193,6 +205,8 @@ export function describeChoiceValue(state: GameState, v: ChoiceValue): string {
           return `option ${v.index}`;
       case "ability":
           return `activate ability ${v.index + 1} of ${nameOf(state, v.id)} (#${v.id})`;
+      case "stackEntry":
+          return nameOfStackEntry(state, v.id, true);
       case "null":
           return "";
       default:

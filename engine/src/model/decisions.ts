@@ -1,6 +1,6 @@
 import { badResult, goodResult, type Result } from "../core/result";
 import type { Action } from "./actions";
-import type { DecisionId, ObjectId, PlayerId } from "./ids";
+import type { DecisionId, ObjectId, PlayerId, StackId } from "./ids";
 
 /**
  * A Decision is a question the engine asks one player. The engine stops, stores the question in
@@ -22,6 +22,7 @@ export type ChoiceValue =
     | Readonly<{ kind: "player"; id: PlayerId }>
     | Readonly<{ kind: "index"; index: number }> // e.g. which mode of a modal spell
     | Readonly<{ kind: "ability"; id: ObjectId; index: number }>
+    | Readonly<{ kind: "stackEntry"; id: StackId }>
     | Readonly<{ kind: "null" }>;
 
 export interface Choice {

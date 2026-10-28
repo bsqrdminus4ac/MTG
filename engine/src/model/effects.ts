@@ -1,5 +1,6 @@
 import type { ContinuousEffectTemplate } from "./continuous";
 import type { ManaType } from "./mana";
+import type { Binding } from "./state";
 import type { PermanentType } from "./vocabulary";
 
 export type BindingRef = { kind: "bound"; name: string };
@@ -22,23 +23,43 @@ export type EffectTarget =
     | Readonly<{ kind: "player"; who: PlayerRef }>
     | Readonly<{ kind: "bound"; name: string }>;
 
-export type Effect =
+type ControlFlowEffect =
+    | Readonly<{ kind: "choose"; chooser: EffectTarget; from: { kind: "hand"; of: EffectTarget }; min: Amount; max: Amount; bindAs: string; prompt: string }>
+    | Readonly<{ kind: "if"; condition: Condition; then: readonly Effect[]; else?: readonly Effect[] }>
+    | Readonly<{ kind: "forEach"; over: EffectTarget; as: string; body: readonly Effect[] }>
+    | Readonly<{ kind: "askYesNo"; who: EffectTarget; prompt: string; bindAs: string }>;
+
+type PrimitiveEffect =
     | Readonly<{ kind: "draw"; who: EffectTarget; count: Amount }>
     | Readonly<{ kind: "damage"; to: EffectTarget; amount: Amount }>
     | Readonly<{ kind: "gainLife"; who: EffectTarget; amount: Amount }>
     | Readonly<{ kind: "loseLife"; who: EffectTarget; amount: Amount }>
     | Readonly<{ kind: "destroy"; target: EffectTarget }>
     | Readonly<{ kind: "addMana"; mana: ManaType; amount: Amount }>
-    | Readonly<{ kind: "applyContinuousEffect"; template: ContinuousEffectTemplate }>
     | Readonly<{ kind: "discard"; cards: BindingRef }>
-    | Readonly<{ kind: "choose"; chooser: EffectTarget; from: { kind: "hand"; of: EffectTarget }; min: Amount; max: Amount; bindAs: string; prompt: string }>
-    | Readonly<{ kind: "if"; condition: Condition; then: readonly Effect[]; else?: readonly Effect[] }>
-    | Readonly<{ kind: "forEach"; over: EffectTarget; as: string; body: readonly Effect[] }>
-    | Readonly<{ kind: "askYesNo"; who: EffectTarget; prompt: string; bindAs: string }>;
+    | Readonly<{ kind: "applyContinuousEffect"; template: ContinuousEffectTemplate }>;
 
-type Condition =
+// Internal, not for card authors
+type InternalEffect = Readonly<{ kind: "setBinding"; bindAs: string; value: Binding }>;
+
+export type Effect = ControlFlowEffect | PrimitiveEffect | InternalEffect;
+
+export const mayDo = (who: EffectTarget, prompt: string, bindAs: string, then: readonly Effect[]): Effect[] => {
+    return [
+        { kind: "askYesNo", prompt, who, bindAs },
+        { kind: "if", condition: { kind: "flag", name: bindAs }, then },
+    ];
+};
+
+export const YOU: EffectTarget = { kind: "player", who: "controller" };
+
+export type Comparison = ">" | ">=" | "==" | "<" | "<=" | "!=";
+
+export type Condition =
     | { kind: "flag"; name: string } // via getFlag
-    | { kind: "compare"; left: Amount; op: ">" | ">=" | "==" | "<="; right: Amount }
-    | { kind: "not"; of: Condition };
+    | { kind: "compare"; left: Amount; op: Comparison; right: Amount }
+    | { kind: "not"; of: Condition }
+    | { kind: "all"; of: Condition[] }
+    | { kind: "any"; of: Condition[] };
 
 export type Amount = number | BindingRef;

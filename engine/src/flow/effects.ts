@@ -2,36 +2,33 @@ import { applySequentially, fail, goodResult, type ApplyResult, type Failure, ty
 import { assertNever } from "../core/util";
 import type { Ability } from "../model/abilities";
 import { getCardName, getCharacteristics } from "../model/characteristics";
-import { chooseMany, objectChoice } from "../model/decisions";
-import type { Amount, Effect, EffectTarget, PlayerRef } from "../model/effects";
+import { chooseMany, objectChoice, yesNo } from "../model/decisions";
+import type { Effect, EffectTarget, PlayerRef } from "../model/effects";
 import type { GameEvent } from "../model/events";
-import type { ObjectId, PlayerId } from "../model/ids";
+import type { PlayerId } from "../model/ids";
 import { getRemainingPlayersInTurnOrder, type Binding, type Bindings, type Frame, type GameState, type ResolutionInProgress, type StackEntry, type Target } from "../model/state";
 import { drawCardResult } from "../model/zones";
-import { getChoiceBinding, getCountBinding, getObjectIdsFromBinding } from "../rules/bindings";
+import { getChoiceBinding, getObjectIdsFromBinding } from "../rules/bindings";
+import { evalCondition, resolveAmount, type EvalScope } from "../rules/conditions";
 import { openDecision } from "../rules/pending";
 import { addManaEffect, damageObject, damagePlayer, destroyPermanent, discardCard, gainLife, loseLife } from "../rules/primitives";
 
-/** Enough to evaluate predicates, amounts and player references. Usable at targeting time too. */
-interface EvalContext {
-    readonly source: ObjectId;
-    readonly controller: PlayerId;
-}
-
 /** Everything an effect can see while its ability resolves. */
-export interface EffectContext extends EvalContext {
+export interface EffectContext extends EvalScope {
     readonly targets: readonly Target[];
     readonly legalTargets: readonly boolean[]; // per target index, computed once when resolution starts
     readonly bindings: Bindings;
 }
 
+export type StepBind = Readonly<{ bindAs: string; value: Binding }>;
+export type StepExtras = Readonly<{ bind?: StepBind; enter?: readonly Frame[] }>;
+
 export type StepResult =
-    | Readonly<{ ok: true; waiting: false; state: GameState; events: readonly GameEvent[]; bind?: Readonly<{ bindAs: string; value: Binding }>; enter?: readonly Frame[] }>
+    | (Readonly<{ ok: true; waiting: false; state: GameState; events: readonly GameEvent[] }> & StepExtras)
     | Readonly<{ ok: true; waiting: true; state: GameState; events: readonly GameEvent[] }>
     | Failure;
 
-export const done = (state: GameState, events: readonly GameEvent[] = [], bind?: { bindAs: string; value: Binding }): StepResult =>
-    bind === undefined ? { ok: true, waiting: false, state, events } : { ok: true, waiting: false, state, events, bind };
+export const done = (state: GameState, events: readonly GameEvent[] = [], extras: StepExtras = {}): StepResult => ({ ok: true, waiting: false, state, events, ...extras });
 
 export const ask = (state: GameState, events: readonly GameEvent[] = []): StepResult => {
     if (!state.pending) return { ok: false, error: "ask() requires a pending decision" };
@@ -48,6 +45,20 @@ export const stepFromApply = (result: ApplyResult): StepResult => {
 export function executeEffect(state: GameState, ctx: EffectContext, effect: Effect): StepResult {
     let currentState = state;
     switch (effect.kind) {
+        //#region Control flow effects
+        case "choose": {
+            return executeChoiceEffect(state, ctx, effect);
+        }
+        case "askYesNo":
+            return executeYesNoEffect(state, ctx, effect);
+        case "if":
+            return executeIfEffect(state, ctx, effect);
+        case "forEach":
+            return executeForEachEffect(state, ctx, effect);
+        case "setBinding":
+            return done(state, [], { bind: effect });
+        //#endregion
+        //#region Primitive effects
         case "damage": {
             const a = resolveAmount(currentState, ctx, effect.amount);
             if (!a.ok) return a;
@@ -128,9 +139,7 @@ export function executeEffect(state: GameState, ctx: EffectContext, effect: Effe
                 ),
             );
         }
-        case "choose": {
-            return executeChoiceEffect(state, ctx, effect);
-        }
+        //#endregion
         default:
             return fail(`Resolving effects of kind ${effect.kind} is not implemented yet`);
     }
@@ -154,7 +163,7 @@ function executeChoiceEffect(state: GameState, ctx: EffectContext, effect: Extra
         if (!maxAmount.ok) return fail(maxAmount.error);
 
         const options = state.players[whoseHand]?.hand.map((objId) => objectChoice(objId, getCardName(state, objId)));
-        if (!options || options.length === 0) return done(state, [], { bindAs: effect.bindAs, value: [] }); // Skip decision and bind empty Choice array if no options available
+        if (!options || options.length === 0) return done(state, [], { bind: { bindAs: effect.bindAs, value: [] } }); // Skip decision and bind empty Choice array if no options available
 
         return ask(
             openDecision(state, (id) =>
@@ -173,6 +182,43 @@ function executeChoiceEffect(state: GameState, ctx: EffectContext, effect: Extra
     return assertNever(effect.from.kind);
 }
 
+function executeYesNoEffect(state: GameState, ctx: EffectContext, effect: Extract<Effect, { kind: "askYesNo" }>): StepResult {
+    const chooserResult = resolveEffectTargets(state, ctx, effect.who);
+    if (!chooserResult.ok) return fail(chooserResult.error);
+    if (chooserResult.value.length > 1) return fail("Chooser of effects must be a single player");
+    if (chooserResult.value.length === 0 || chooserResult.value[0]?.kind !== "player") return done(state, [], { bind: { bindAs: effect.bindAs, value: false } }); // If chooser has become illegal, just bind false rather than failing loudly
+    const chooser = chooserResult.value[0].id;
+
+    return ask(
+        openDecision(state, (id) =>
+            yesNo({
+                id,
+                player: chooser,
+                prompt: effect.prompt,
+                then: { kind: "resolveEffect", bindAs: effect.bindAs },
+            }),
+        ),
+    );
+}
+
+function executeIfEffect(state: GameState, ctx: EffectContext, effect: Extract<Effect, { kind: "if" }>): StepResult {
+    const result = evalCondition(state, ctx, effect.condition);
+    if (!result.ok) return result;
+    if (result.value) return done(state, [], { enter: [{ effects: effect.then, pc: 0 }] });
+    else return effect.else ? done(state, [], { enter: [{ effects: effect.else, pc: 0 }] }) : done(state, []);
+}
+
+function executeForEachEffect(state: GameState, ctx: EffectContext, effect: Extract<Effect, { kind: "forEach" }>): StepResult {
+    const over = resolveEffectTargets(state, ctx, effect.over);
+    if (!over.ok) return over;
+
+    const frames: Frame[] = over.value.map((item) => ({
+        effects: [{ kind: "setBinding", bindAs: effect.as, value: [item] }, ...effect.body],
+        pc: 0,
+    }));
+    return done(state, [], { enter: frames });
+}
+
 //#endregion
 
 //#region Helpers
@@ -184,10 +230,6 @@ export const contextOf = (resolving: ResolutionInProgress): EffectContext => ({
     legalTargets: resolving.entry.targets.map(() => true), // real check arrives with isTargetLegal
     bindings: resolving.bindings,
 });
-
-export const resolveAmount = (state: GameState, ctx: EffectContext, amount: Amount): Result<number> => {
-    return typeof amount === "number" ? goodResult(amount) : getCountBinding(ctx.bindings, amount.name);
-};
 
 export function resolvePlayers(state: GameState, ctx: EffectContext, ref: PlayerRef): PlayerId[] {
     if (ref === "controller") return [ctx.controller];

@@ -1,13 +1,14 @@
 import { describe, expect, test } from "vitest";
 import { submitAnswer } from "../engine";
 import type { CardDefinition } from "../model/cardDefinition";
-import type { Amount, Effect } from "../model/effects";
+import { mayDo, type Amount, type Effect } from "../model/effects";
 import { cardDefId, playerId, type CardDefId, type ObjectId, type StackId } from "../model/ids";
 import type { GameState, Target } from "../model/state";
 import { moveObject } from "../model/zones";
+import { resolveAmount } from "../rules/conditions";
 import { damageObject, damagePlayer } from "../rules/primitives";
 import { createGame } from "../setup";
-import { executeEffect, resolveAmount, type EffectContext, type StepResult } from "./effects";
+import { executeEffect, type EffectContext, type StepResult } from "./effects";
 import { handleResolutionDecision, runResolution } from "./resolution";
 
 const alice = playerId("alice");
@@ -64,7 +65,7 @@ function putCardsInHand(state: GameState, player: typeof alice, count: number): 
     return current;
 }
 
-function resolvingState(state: GameState, effects: Effect[]): GameState {
+function resolvingState(state: GameState, effects: Effect[], targets: readonly Target[] = []): GameState {
     const source = state.players[alice]!.library.at(-1)!;
     return {
         ...state,
@@ -75,7 +76,7 @@ function resolvingState(state: GameState, effects: Effect[]): GameState {
                 id: state.nextId as StackId,
                 controller: alice,
                 source,
-                targets: [],
+                targets,
                 definitionId: bear.id,
                 abilityIndex: 0,
             },
@@ -150,6 +151,120 @@ function complete(result: StepResult) {
     if (result.waiting) throw new Error("Expected the effect to complete");
     return result;
 }
+
+describe("control-flow effects", () => {
+    test("resolves nested if and forEach effects before continuing", () => {
+        const state = newGame();
+        const effects: Effect[] = [
+            {
+                kind: "if",
+                condition: { kind: "compare", left: 2, op: ">", right: 1 },
+                then: [
+                    {
+                        kind: "forEach",
+                        over: { kind: "allTargets" },
+                        as: "player",
+                        body: [{ kind: "gainLife", who: { kind: "bound", name: "player" }, amount: 1 }],
+                    },
+                ],
+            },
+            { kind: "gainLife", who: { kind: "player", who: "controller" }, amount: 2 },
+        ];
+
+        const result = runResolution(
+            resolvingState(state, effects, [
+                { kind: "player", id: alice },
+                { kind: "player", id: bob },
+            ]),
+        );
+
+        expect(result.ok).toBe(true);
+        if (!result.ok) return;
+        expect(result.state.players[alice]?.life).toBe(23);
+        expect(result.state.players[bob]?.life).toBe(21);
+        expect(result.events.filter((event) => event.type === "lifeChanged")).toEqual([
+            { type: "lifeChanged", player: alice, delta: 1 },
+            { type: "lifeChanged", player: bob, delta: 1 },
+            { type: "lifeChanged", player: alice, delta: 2 },
+        ]);
+        expect(result.state.resolving).toBeNull();
+    });
+
+    test("runs the else branch when an if condition is false", () => {
+        const result = runResolution(
+            resolvingState(newGame(), [
+                {
+                    kind: "if",
+                    condition: { kind: "compare", left: 1, op: ">", right: 2 },
+                    then: [{ kind: "gainLife", who: { kind: "player", who: "controller" }, amount: 5 }],
+                    else: [{ kind: "gainLife", who: { kind: "player", who: "controller" }, amount: 2 }],
+                },
+            ]),
+        );
+
+        expect(result.ok).toBe(true);
+        if (!result.ok) return;
+        expect(result.state.players[alice]?.life).toBe(22);
+        expect(result.events).toContainEqual({ type: "lifeChanged", player: alice, delta: 2 });
+    });
+
+    test("mayDo resolves its nested effects when accepted", () => {
+        const effects: Effect[] = [
+            ...mayDo(
+                { kind: "player", who: "controller" },
+                "Gain life?",
+                "gainLife",
+                [{ kind: "gainLife", who: { kind: "player", who: "controller" }, amount: 2 }],
+            ),
+            { kind: "gainLife", who: { kind: "player", who: "controller" }, amount: 1 },
+        ];
+        const waiting = runResolution(resolvingState(newGame(), effects));
+        if (!waiting.ok || waiting.state.pending?.kind !== "yesNo") throw new Error("Expected a yes/no decision");
+
+        const result = submitAnswer(waiting.state, {
+            player: alice,
+            decision: waiting.state.pending.id,
+            answer: { kind: "yesNo", value: true },
+        });
+
+        expect(result.ok).toBe(true);
+        if (!result.ok) return;
+        expect(result.state.players[alice]?.life).toBe(23);
+        expect(result.events.filter((event) => event.type === "lifeChanged")).toEqual([
+            { type: "lifeChanged", player: alice, delta: 2 },
+            { type: "lifeChanged", player: alice, delta: 1 },
+        ]);
+        expect(result.state.resolving).toBeNull();
+    });
+
+    test("mayDo skips its nested effects when declined", () => {
+        const effects: Effect[] = [
+            ...mayDo(
+                { kind: "player", who: "controller" },
+                "Gain life?",
+                "gainLife",
+                [{ kind: "gainLife", who: { kind: "player", who: "controller" }, amount: 2 }],
+            ),
+            { kind: "gainLife", who: { kind: "player", who: "controller" }, amount: 1 },
+        ];
+        const waiting = runResolution(resolvingState(newGame(), effects));
+        if (!waiting.ok || waiting.state.pending?.kind !== "yesNo") throw new Error("Expected a yes/no decision");
+
+        const result = submitAnswer(waiting.state, {
+            player: alice,
+            decision: waiting.state.pending.id,
+            answer: { kind: "yesNo", value: false },
+        });
+
+        expect(result.ok).toBe(true);
+        if (!result.ok) return;
+        expect(result.state.players[alice]?.life).toBe(21);
+        expect(result.events.filter((event) => event.type === "lifeChanged")).toEqual([
+            { type: "lifeChanged", player: alice, delta: 1 },
+        ]);
+        expect(result.state.resolving).toBeNull();
+    });
+});
 
 describe("player effects", () => {
     test("choice waits for the chooser with priority cleared", () => {
