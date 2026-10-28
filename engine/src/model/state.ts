@@ -123,6 +123,11 @@ export interface ResolutionInProgress {
 
 export type Binding = readonly ChoiceValue[] | boolean | number;
 export type Bindings = Readonly<Record<string, Binding>>;
+export interface EvalScope {
+    bindings: Bindings;
+    controller: PlayerId;
+    source: ObjectId;
+}
 
 export interface GameState {
     readonly definitions: Readonly<Record<CardDefId, CardDefinition>>;

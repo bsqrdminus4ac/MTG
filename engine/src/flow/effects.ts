@@ -6,10 +6,10 @@ import { chooseMany, objectChoice, yesNo } from "../model/decisions";
 import type { Effect, EffectTarget, PlayerRef } from "../model/effects";
 import type { GameEvent } from "../model/events";
 import type { PlayerId } from "../model/ids";
-import { getRemainingPlayersInTurnOrder, type Binding, type Bindings, type Frame, type GameState, type ResolutionInProgress, type StackEntry, type Target } from "../model/state";
+import { getRemainingPlayersInTurnOrder, type Binding, type Bindings, type EvalScope, type Frame, type GameState, type ResolutionInProgress, type StackEntry, type Target } from "../model/state";
 import { drawCardResult } from "../model/zones";
 import { getChoiceBinding, getObjectIdsFromBinding } from "../rules/bindings";
-import { evalCondition, resolveAmount, type EvalScope } from "../rules/conditions";
+import { evalCondition, resolveAmount } from "../rules/conditions";
 import { openDecision } from "../rules/pending";
 import { addManaEffect, damageObject, damagePlayer, destroyPermanent, discardCard, gainLife, loseLife } from "../rules/primitives";
 

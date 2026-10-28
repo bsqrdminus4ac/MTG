@@ -1,11 +1,9 @@
 import { type Result, goodResult } from "../core/result";
 import { assertNever } from "../core/util";
 import type { Amount, Comparison, Condition } from "../model/effects";
-import type { ObjectId, PlayerId } from "../model/ids";
-import type { Bindings, GameState } from "../model/state";
+import type { EvalScope, GameState } from "../model/state";
 import { getCountBinding, getFlagBinding } from "./bindings";
 
-export interface EvalScope { bindings: Bindings; controller: PlayerId; source: ObjectId }
 
 export const resolveAmount = (state: GameState, ctx: EvalScope, amount: Amount): Result<number> => {
     return typeof amount === "number" ? goodResult(amount) : getCountBinding(ctx.bindings, amount.name);
