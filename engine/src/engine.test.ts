@@ -2,12 +2,14 @@ import { describe, expect, test, vi } from "vitest";
 import { applySequentially, fail, ok } from "./core/result";
 import { applyAction, submitAnswer } from "./engine";
 import type { CardDefinition } from "./model/cardDefinition";
-import type { ContinuousEffect } from "./model/continuous";
 import { getCharacteristics } from "./model/characteristics";
-import { cardDefId, playerId, type Timestamp } from "./model/ids";
+import type { ContinuousEffect } from "./model/continuous";
+import { anyTarget, permanentOfType, type TargetFilter } from "./model/effects";
+import { cardDefId, playerId, type ObjectId, type StackId, type Timestamp } from "./model/ids";
 import type { GameState } from "./model/state";
 import { drawCard, moveObject } from "./model/zones";
 import { createGame } from "./setup";
+import { getLegalTargets } from "./flow/casting";
 
 const alice = playerId("alice");
 const bob = playerId("bob");
@@ -39,11 +41,13 @@ const targetSpell: CardDefinition = {
             kind: "spell",
             targets: [
                 {
-                    kind: "Player",
-                    allowedTypes: "any",
-                    zone: "battlefield",
+                    filter: {
+                        kind: "player",
+                        filter: { kind: "anyPlayer" },
+                    },
                     minCount: 1,
                     maxCount: 1,
+                    description: "player",
                 },
             ],
             effects: [],
@@ -170,6 +174,115 @@ describe("priority and turn structure", () => {
 });
 
 describe("spell targeting", () => {
+    function targetingGame() {
+        const game = createGame(
+            [bear, targetSpell],
+            [
+                { id: alice, deck: [bear.id, targetSpell.id] },
+                { id: bob, deck: [bear.id] },
+            ],
+        );
+        const aliceBear = moveObject(game, game.players[alice]!.library[0]!, "battlefield")!;
+        const bobBear = moveObject(aliceBear.state, game.players[bob]!.library[0]!, "battlefield")!;
+        const spellCard = bobBear.state.players[alice]!.library[0]!;
+        const spell = moveObject(bobBear.state, spellCard, "stack")!;
+        const spellEntry = {
+            kind: "spell" as const,
+            id: 1000 as StackId,
+            controller: alice,
+            source: spell.newId,
+            targets: [],
+        };
+        const abilityEntry = {
+            kind: "ability" as const,
+            id: 1001 as StackId,
+            controller: bob,
+            source: spell.newId,
+            targets: [],
+            definitionId: targetSpell.id,
+            abilityIndex: 0,
+        };
+        return {
+            state: { ...spell.state, stack: [spellEntry, abilityEntry] },
+            aliceBear: aliceBear.newId,
+            bobBear: bobBear.newId,
+            spellEntryId: spellEntry.id,
+            abilityEntryId: abilityEntry.id,
+            scope: { controller: alice, source: spell.newId, bindings: {} },
+        };
+    }
+
+    const legalTargets = (state: GameState, scope: ReturnType<typeof targetingGame>["scope"], filter: TargetFilter) => {
+        const result = getLegalTargets(state, scope, { filter, minCount: 1, maxCount: 1 });
+        if (!result.ok) throw new Error(result.error);
+        return result.value;
+    };
+
+    test("player filters select you, opponents, or any player", () => {
+        const game = targetingGame();
+
+        expect(legalTargets(game.state, game.scope, { kind: "player", filter: { kind: "you" } })).toEqual([
+            { kind: "player", id: alice },
+        ]);
+        expect(legalTargets(game.state, game.scope, { kind: "player", filter: { kind: "opponent" } })).toEqual([
+            { kind: "player", id: bob },
+        ]);
+        expect(legalTargets(game.state, game.scope, { kind: "player", filter: { kind: "anyPlayer" } })).toEqual([
+            { kind: "player", id: alice },
+            { kind: "player", id: bob },
+        ]);
+    });
+
+    test("object filters use predicates and permanentOfType restricts to matching battlefield objects", () => {
+        const game = targetingGame();
+
+        expect(legalTargets(game.state, game.scope, {
+            kind: "object",
+            filter: { kind: "controlledBy", who: "opponent" },
+        })).toEqual([{ kind: "object", id: game.bobBear }]);
+        expect(legalTargets(game.state, game.scope, permanentOfType(["Creature"]))).toEqual([
+            { kind: "object", id: game.aliceBear },
+            { kind: "object", id: game.bobBear },
+        ]);
+    });
+
+    test("stack-entry filters distinguish spells and abilities and can match the spell card", () => {
+        const game = targetingGame();
+
+        expect(legalTargets(game.state, game.scope, {
+            kind: "stackEntry",
+            filter: { kind: "isSpell" },
+        })).toEqual([{ kind: "stackEntry", id: game.spellEntryId }]);
+        expect(legalTargets(game.state, game.scope, {
+            kind: "stackEntry",
+            filter: { kind: "isAbility" },
+        })).toEqual([{ kind: "stackEntry", id: game.abilityEntryId }]);
+        expect(legalTargets(game.state, game.scope, {
+            kind: "stackEntry",
+            filter: { kind: "controlledBy", who: "opponent" },
+        })).toEqual([{ kind: "stackEntry", id: game.abilityEntryId }]);
+        expect(legalTargets(game.state, game.scope, {
+            kind: "stackEntry",
+            filter: {
+                kind: "spellMatches",
+                of: { kind: "hasType", type: "Instant" },
+            },
+        })).toEqual([{ kind: "stackEntry", id: game.spellEntryId }]);
+    });
+
+    test("anyTarget combines players and damageable permanents without duplicates", () => {
+        const game = targetingGame();
+        const targets = legalTargets(game.state, game.scope, anyTarget());
+
+        expect(targets).toEqual([
+            { kind: "player", id: alice },
+            { kind: "player", id: bob },
+            { kind: "object", id: game.aliceBear },
+            { kind: "object", id: game.bobBear },
+        ]);
+        expect(new Set(targets.map((target) => `${target.kind}:${target.id}`)).size).toBe(targets.length);
+    });
+
     test("canceling a targeting decision rolls back the spell cast", () => {
         const g = createGame(
             [bear, targetSpell],

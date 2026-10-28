@@ -1,15 +1,15 @@
-import { fail, ok, type ApplyResult } from "../core/result";
-import { withEntry } from "../core/util";
-import { getCardText, type TargetSpec } from "../model/effects";
-import type { CardType } from "../model/vocabulary";
+import { fail, goodResult, ok, type ApplyResult, type Result } from "../core/result";
+import { assertNever, withEntry } from "../core/util";
 import { getCardName, getCharacteristics, isPermanentType } from "../model/characteristics";
 import { chooseMany, chooseOne, manaAbilityChoice, objectChoice, playerChoice, yesNo, type Choice } from "../model/decisions";
+import { getCardText, type TargetFilter, type TargetSpec } from "../model/effects";
 import type { GameEvent } from "../model/events";
 import { nextID, type ObjectId, type PlayerId, type StackId } from "../model/ids";
 import { canPayMana, payMana, type ManaCost } from "../model/mana";
-import type { GameState, SpellOnStack, Target } from "../model/state";
+import type { EvalScope, GameState, SpellOnStack, Target } from "../model/state";
 import { moveObject } from "../model/zones";
 import { openDecision } from "../rules/pending";
+import { evalObjectPredicate, evalPlayerPredicate, evalStackPredicate } from "../rules/predicates";
 import { activateAbility } from "./abilities";
 import { getAllManaSources } from "./manaAbilities";
 import { withPriorityDecision } from "./priority";
@@ -115,7 +115,14 @@ export function selectTargetOptions(state: GameState): ApplyResult {
     if (!spell) return fail("This card has no spell abilities to cast");
     const nextSpec = spell.targets[nextSpecIndex];
     if (!nextSpec) return fail("Invalid TargetSpec to select targets for");
-    const legalTargets = getLegalTargets(state, player, nextSpec);
+    const scope: EvalScope = {
+        controller: player,
+        source: card,
+        bindings: {},
+    };
+    const legalTargetsResult = getLegalTargets(state, scope, nextSpec);
+    if (!legalTargetsResult.ok) return fail(legalTargetsResult.error);
+    const legalTargets = legalTargetsResult.value;
 
     const options: Choice[] = [];
     for (const target of legalTargets) {
@@ -131,7 +138,7 @@ export function selectTargetOptions(state: GameState): ApplyResult {
         chooseMany({
             id,
             options: options,
-            prompt: buildTargetPrompt(card, chars?.name!, spell.targets, nextSpec),
+            prompt: buildTargetPrompt(card, chars?.name!, nextSpec),
             min: nextSpec.minCount,
             max: nextSpec.maxCount,
             player: player,
@@ -160,62 +167,79 @@ export function applyTargetSelections(state: GameState, targets: Target[]): Appl
     return selectTargetOptions(nextState);
 }
 
-function buildTargetPrompt(card: ObjectId, cardName: string, specs: TargetSpec[], spec: TargetSpec): string {
+function buildTargetPrompt(card: ObjectId, cardName: string, spec: TargetSpec): string {
     let prompt = "Select ";
+    const targetDesc = spec.description ?? "";
     if (spec.minCount === 1 && spec.maxCount === 1) {
-        prompt += "the target ";
+        prompt += `the ${targetDesc} target `;
     } else if (spec.minCount === spec.maxCount) {
-        prompt += `${spec.minCount} targets `;
+        prompt += `${spec.minCount} ${targetDesc} targets `;
     } else {
-        prompt += `between ${spec.minCount} and ${spec.maxCount} targets `;
-    }
-    if (specs.length !== 1) {
-        prompt += `of type ${spec.kind} `;
+        prompt += `between ${spec.minCount} and ${spec.maxCount} ${targetDesc} targets `;
     }
     prompt += `for spell ${cardName} (#${card})`;
     return prompt;
 }
 
-export function getLegalTargets(state: GameState, player: PlayerId, targetSpec: TargetSpec): readonly Target[] {
-    let targets: Target[] = [];
-    const isAnyTarget = targetSpec.kind === "AnyTarget";
+const targetKey = (t: Target): string => `${t.kind}:${t.id}`;
 
-    if (targetSpec.kind === "StackAbility") {
-        for (const stackEntry of state.stack) {
-            if (stackEntry.kind === "spell") {
-                continue; // These already get caught by the object loop above
-            }
-            targets.push({ kind: "stackEntry", id: stackEntry.id });
-        }
-        return targets;
+export function getLegalTargets(state: GameState, scope: EvalScope, spec: TargetSpec): Result<readonly Target[]> {
+    const seen = new Set<string>();
+    const out: Target[] = [];
+    const candidates = collectTargets(state, scope, spec.filter);
+    if (!candidates.ok) return candidates;
+    for (const t of candidates.value) {
+        const key = targetKey(t);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push(t);
     }
-
-    if (targetSpec.kind === "Player" || isAnyTarget) {
-        for (const p of Object.values(state.players)) {
-            // Worry about hexproof players later
-            targets.push({ kind: "player", id: p.id });
-        }
-    }
-
-    if (targetSpec.kind == "Player") return targets;
-
-    for (const obj of Object.values(state.objects)) {
-        const characteristics = getCharacteristics(state, obj.id);
-        if (!characteristics) continue;
-        if (targetSpec.zone !== obj.zone) continue;
-        if (
-            (targetSpec.kind === "AnyTarget" && isValidForAnyTarget(characteristics.types)) ||
-            (targetSpec.kind == "Permanent" && (targetSpec.allowedTypes === "any" || targetSpec.allowedTypes.some((type) => characteristics.types.includes(type))))
-        ) {
-            targets.push({ kind: "object", id: obj.id });
-        }
-    }
-
-    return targets;
+    return goodResult(out);
 }
 
-function isValidForAnyTarget(types: readonly CardType[]): boolean {
-    return types.some((type) => type === "Creature" || type === "Planeswalker" || type === "Battle");
+function collectTargets(state: GameState, scope: EvalScope, filter: TargetFilter): Result<readonly Target[]> {
+    switch (filter.kind) {
+        case "anyOf": {
+            const targets: Target[] = [];
+            for (const subfilter of filter.of) {
+                const result = collectTargets(state, scope, subfilter);
+                if (!result.ok) return result;
+                targets.push(...result.value);
+            }
+            return goodResult(targets);
+        }
+        case "player": {
+            const targets: Target[] = [];
+            for (const player of Object.values(state.players)) {
+                const matches = evalPlayerPredicate(state, scope, player.id, filter.filter);
+                if (!matches.ok) return matches;
+                if (matches.value) targets.push({ kind: "player", id: player.id });
+            }
+            return goodResult(targets);
+        }
+        case "object": {
+            const targets: Target[] = [];
+            for (const obj of Object.values(state.objects)) {
+                const chars = getCharacteristics(state, obj.id);
+                if (!chars) continue;
+                const matches = evalObjectPredicate(state, scope, obj.id, chars, filter.filter);
+                if (!matches.ok) return matches;
+                if (matches.value) targets.push({ kind: "object", id: obj.id });
+            }
+            return goodResult(targets);
+        }
+        case "stackEntry": {
+            const targets: Target[] = [];
+            for (const entry of state.stack) {
+                const matches = evalStackPredicate(state, scope, entry, filter.filter);
+                if (!matches.ok) return matches;
+                if (matches.value) targets.push({ kind: "stackEntry", id: entry.id });
+            }
+            return goodResult(targets);
+        }
+        default:
+            return assertNever(filter);
+    }
 }
 
 // No real logic for now, could add logic around target decisions changing costs later

@@ -6,6 +6,17 @@ export type PermanentType = Exclude<CardType, "Instant" | "Sorcery">;
 export type Supertype = "Basic" | "Legendary" | "Snow";
 export type Keyword = "flying" | "firstStrike" | "doubleStrike" | "deathtouch" | "haste" | "lifelink" | "reach" | "trample" | "vigilance" | "menace" | "defender" | "hexproof" | "indestructible";
 
+const DAMAGEABLE: Record<PermanentType, boolean> = {
+    Creature: true,
+    Planeswalker: true,
+    Battle: true,
+    Artifact: false,
+    Enchantment: false,
+    Land: false,
+};
+
+export const DAMAGEABLE_TYPES = (Object.keys(DAMAGEABLE) as PermanentType[]).filter((t) => DAMAGEABLE[t]);
+
 export const STEPS = [
     "untap",
     "upkeep",

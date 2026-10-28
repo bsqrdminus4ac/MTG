@@ -1,14 +1,14 @@
 import {
-    getCharacteristics,
     getCardText,
+    getCharacteristics,
     type Ability,
     type Action,
     type Amount,
     type Answer,
     type ChoiceValue,
+    type Condition,
     type ContinuousEffect,
     type ContinuousEffectTemplate,
-    type Condition,
     type Cost,
     type Decision,
     type Effect,
@@ -21,6 +21,7 @@ import {
     type ObjectId,
     type StackId,
     type Target,
+    type TargetFilter,
     type TargetSpec,
     type Zone,
 } from "@mtg/engine";
@@ -240,9 +241,24 @@ const describeTargetSpecs = (specs?: TargetSpec[]): string => {
   return ` targeting ${specs.map((s) => { 
     const count = s.minCount === s.maxCount ? s.maxCount : `${s.minCount} - ${s.maxCount}`
     const isPlural = s.minCount !== 1 || s.maxCount !== 1;
-    const kindString = s.kind === "AnyTarget" ? "of any target" : s.kind;
-    return `${count} ${kindString}` + (isPlural ? "s" : "")
+    const filterDescription = s.description ? `${s.description}${isPlural ? "s" : ""}` : describeTargetFilter(s.filter, isPlural);
+    return `${count} ${filterDescription}`;
   }).join(", ")}`;
+}
+
+function describeTargetFilter(filter: TargetFilter, plural: boolean): string {
+    switch (filter.kind) {
+        case "player":
+            return plural ? "players" : "player";
+        case "object":
+            return plural ? "objects" : "object";
+        case "stackEntry":
+            return plural ? "stack entries" : "stack entry";
+        case "anyOf":
+            return filter.of.map((part) => describeTargetFilter(part, plural)).join(" or ");
+        default:
+            return unreachable(filter);
+    }
 }
 export const describeEffects = (effects: readonly Effect[]): string => describeEffectsWithBindings(effects, {});
 

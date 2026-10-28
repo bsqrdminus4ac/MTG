@@ -33,8 +33,34 @@ describe("text describers", () => {
     }, "Healing Light")).toEqual(["Healing Light gains life."]);
     expect(describeAbility(definition("forest").abilities[0]!)).toBe("Mana ability: {T} → add 1× {G}");
     expect(describeAbility(definition("bolt").abilities[0]!)).toBe(
-      "Spell targeting 1 of any target: deal 3 damage to target 1",
+      "Spell targeting 1 player or object: deal 3 damage to target 1",
     );
+  });
+
+  test("target descriptions use custom text or fall back to the filter kind", () => {
+    expect(describeAbility({
+      kind: "spell",
+      targets: [
+        {
+          filter: {
+            kind: "anyOf",
+            of: [
+              { kind: "player", filter: { kind: "opponent" } },
+              { kind: "object", filter: { kind: "hasType", type: "Creature" } },
+            ],
+          },
+          minCount: 1,
+          maxCount: 1,
+        },
+        {
+          filter: { kind: "object", filter: { kind: "hasType", type: "Creature" } },
+          minCount: 2,
+          maxCount: 2,
+          description: "creature",
+        },
+      ],
+      effects: [],
+    })).toBe("Spell targeting 1 player or object, 2 creatures: do nothing");
   });
 
   test("expands loop effects and describes their bound values", () => {

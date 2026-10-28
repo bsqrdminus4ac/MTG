@@ -1,4 +1,4 @@
-import { cardDefId, type Ability, type CardDefinition, type ManaType } from "@mtg/engine";
+import { anyTarget, cardDefId, type Ability, type CardDefinition, type ManaType } from "@mtg/engine";
 
 const tapForMana = (mana: ManaType): Ability => ({
     kind: "activated",
@@ -12,7 +12,7 @@ const tapForMana = (mana: ManaType): Ability => ({
 
 const discardThenGainLife = (): Ability => ({
     kind: "spell",
-    targets: [{ kind: "Player", minCount: 1, maxCount: 1, allowedTypes: "any", zone: "battlefield" }],
+    targets: [{ filter: { kind: "player", filter: { kind: "anyPlayer" } }, minCount: 1, maxCount: 1 }],
     effects: [
         {
             kind: "choose",
@@ -116,8 +116,7 @@ export const bolt: CardDefinition = {
             kind: "spell",
             targets: [
                 {
-                    kind: "AnyTarget",
-                    zone: "battlefield",
+                    filter: anyTarget(),
                     minCount: 1,
                     maxCount: 1,
                 },

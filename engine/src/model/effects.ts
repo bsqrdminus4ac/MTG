@@ -1,20 +1,40 @@
 import type { ContinuousEffectTemplate } from "./continuous";
 import type { ManaType } from "./mana";
+import type { ObjectPredicate, PlayerPredicate, Predicate, StackPredicate } from "./predicates";
 import type { Binding } from "./state";
-import type { PermanentType } from "./vocabulary";
+import { DAMAGEABLE_TYPES, type PermanentType } from "./vocabulary";
 
 export type BindingRef = { kind: "bound"; name: string };
 
 export type PlayerRef = "controller" | "owner" | "eachOpponent" | "eachPlayer";
 
-export type TargetKinds =
-    | Readonly<{ kind: "Permanent"; allowedTypes: PermanentType[] | "any"; zone: "battlefield" }>
-    | Readonly<{ kind: "Player"; allowedTypes: "opponent" | "any"; zone: "battlefield" }>
-    | Readonly<{ kind: "GraveyardCard"; zone: "graveyard" }>
-    | Readonly<{ kind: "StackAbility"; zone: "stack" }>
-    | Readonly<{ kind: "AnyTarget"; zone: "battlefield" }>; // Shorthand for player / creature / planeswalker / battle
+export type TargetFilter =
+    | { kind: "player"; filter: PlayerPredicate }
+    | { kind: "object"; filter: ObjectPredicate }
+    | { kind: "stackEntry"; filter: StackPredicate }
+    | { kind: "anyOf"; of: TargetFilter[] };
 
-export type TargetSpec = TargetKinds & { minCount: number; maxCount: number };
+export type TargetSpec = { filter: TargetFilter; minCount: number; maxCount: number; description?: string };
+
+export const permanentOfType = (allowedTypes: PermanentType[] | "any"): TargetFilter => {
+    const inBattlefield: ObjectPredicate = { kind: "inZone", zone: "battlefield" };
+    if (allowedTypes === "any") return { kind: "object", filter: inBattlefield };
+
+    return {
+        kind: "object",
+        filter: {
+            kind: "all",
+            of: [inBattlefield, { kind: "any", of: allowedTypes.map((type): ObjectPredicate => ({ kind: "hasType", type })) }],
+        },
+    };
+};
+
+export const anyTarget = (): TargetFilter => {
+    return {
+        kind: "anyOf",
+        of: [{ kind: "player", filter: { kind: "anyPlayer" } }, permanentOfType(DAMAGEABLE_TYPES)],
+    };
+};
 
 export type EffectTarget =
     | Readonly<{ kind: "target"; index: number }> // index into the chosen targets
@@ -47,7 +67,7 @@ export type Effect = ControlFlowEffect | PrimitiveEffect | InternalEffect;
 export type CardEffect = Effect & { readonly description?: string };
 
 export function getCardText(effects: readonly CardEffect[]): string[] {
-    return effects.flatMap((effect) => effect.description?.trim() ? [effect.description] : []);
+    return effects.flatMap((effect) => (effect.description?.trim() ? [effect.description] : []));
 }
 
 export const mayDo = (who: EffectTarget, prompt: string, bindAs: string, then: readonly Effect[]): Effect[] => {
@@ -61,11 +81,8 @@ export const YOU: EffectTarget = { kind: "player", who: "controller" };
 
 export type Comparison = ">" | ">=" | "==" | "<" | "<=" | "!=";
 
-export type Condition =
-    | { kind: "flag"; name: string } // via getFlag
-    | { kind: "compare"; left: Amount; op: Comparison; right: Amount }
-    | { kind: "not"; of: Condition }
-    | { kind: "all"; of: Condition[] }
-    | { kind: "any"; of: Condition[] };
+type ConditionLeaf = { kind: "flag"; name: string } | { kind: "compare"; left: Amount; op: Comparison; right: Amount };
+
+export type Condition = Predicate<ConditionLeaf>;
 
 export type Amount = number | BindingRef;
