@@ -45,7 +45,8 @@ interface StackEntryBase {
     readonly controller: PlayerId;
     /** For a spell, this is the card object itself (whose zone is "stack"). */
     readonly source: ObjectId;
-    readonly targets: readonly Target[];
+    readonly targets: readonly (readonly Target[])[];
+    readonly bindings: Bindings;
 }
 export interface SpellOnStack extends StackEntryBase {
     readonly kind: "spell";
@@ -103,9 +104,10 @@ export interface CombatInfo {
 export interface CastingInProgress {
     player: PlayerId;
     card: ObjectId; // still in hand until commit
-    targets: readonly Target[];
+    targets: readonly (readonly Target[])[];
     targetSpecsSelected: readonly boolean[];
     cost: ManaCost | null; // total cost, determined after targets
+    bindings: Bindings;
     rollback: GameState; // state before casting began
     events: readonly GameEvent[]; // buffered until commit
 }
@@ -119,6 +121,7 @@ export interface ResolutionInProgress {
     entry: StackEntry;
     frames: readonly Frame[];
     bindings: Bindings;
+    legalTargets: readonly (readonly boolean[])[];
 }
 
 export type Binding = readonly ChoiceValue[] | boolean | number;

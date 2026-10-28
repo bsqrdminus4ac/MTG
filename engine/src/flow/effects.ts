@@ -6,7 +6,7 @@ import { chooseMany, objectChoice, yesNo } from "../model/decisions";
 import type { Effect, EffectTarget, PlayerRef } from "../model/effects";
 import type { GameEvent } from "../model/events";
 import type { PlayerId } from "../model/ids";
-import { getRemainingPlayersInTurnOrder, type Binding, type Bindings, type EvalScope, type Frame, type GameState, type ResolutionInProgress, type StackEntry, type Target } from "../model/state";
+import { getRemainingPlayersInTurnOrder, type Binding, type EvalScope, type Frame, type GameState, type ResolutionInProgress, type StackEntry, type Target } from "../model/state";
 import { drawCardResult } from "../model/zones";
 import { getChoiceBinding, getObjectIdsFromBinding } from "../rules/bindings";
 import { evalCondition, resolveAmount } from "../rules/conditions";
@@ -15,9 +15,8 @@ import { addManaEffect, damageObject, damagePlayer, destroyPermanent, discardCar
 
 /** Everything an effect can see while its ability resolves. */
 export interface EffectContext extends EvalScope {
-    readonly targets: readonly Target[];
-    readonly legalTargets: readonly boolean[]; // per target index, computed once when resolution starts
-    readonly bindings: Bindings;
+    readonly targets: readonly (readonly Target[])[];
+    readonly legalTargets: readonly (readonly boolean[])[]; // per target index, computed once when resolution starts
 }
 
 export type StepBind = Readonly<{ bindAs: string; value: Binding }>;
@@ -227,7 +226,7 @@ export const contextOf = (resolving: ResolutionInProgress): EffectContext => ({
     source: resolving.entry.source,
     controller: resolving.entry.controller,
     targets: resolving.entry.targets,
-    legalTargets: resolving.entry.targets.map(() => true), // real check arrives with isTargetLegal
+    legalTargets: resolving.legalTargets, // real check arrives with isTargetLegal
     bindings: resolving.bindings,
 });
 
@@ -262,11 +261,19 @@ export function resolveStackEntryEffects(state: GameState, entry: StackEntry): r
 function resolveEffectTargets(state: GameState, ctx: EffectContext, t: EffectTarget): Result<Target[]> {
     switch (t.kind) {
         case "target": {
-            const target = ctx.targets[t.index];
-            return goodResult(target && ctx.legalTargets[t.index] ? [target] : []); // illegal target: the effect does nothing
+            const targets = ctx.targets[t.spec];
+            const legality = ctx.legalTargets[t.spec];
+            if (!targets || !legality) return goodResult([]);
+            return goodResult(targets.filter((_, i) => legality[i])); // illegal target: the effect does nothing
         }
         case "allTargets":
-            return goodResult(ctx.targets.filter((_, i) => ctx.legalTargets[i]));
+            return goodResult(
+                ctx.targets.flatMap((spec, i) => {
+                    const legality = ctx.legalTargets[i];
+                    if (!legality) return [];
+                    return spec.filter((_, j) => legality[j]);
+                }),
+            );
         case "self":
             return goodResult([{ kind: "object", id: ctx.source }]);
         case "player":

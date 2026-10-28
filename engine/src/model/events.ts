@@ -38,7 +38,8 @@ type StackEvent =
     | Readonly<{ type: "spellManaPaid"; player: PlayerId; card: ObjectId; cardName: string }>
     | Readonly<{ type: "spellCastCancelled"; player: PlayerId; card: ObjectId; cardName: string }>
     | Readonly<{ type: "abilityActivated"; player: PlayerId; abilitySource: ObjectId; cardName: string; stackEntryId?: StackId; targets?: Target[] }>
-    | Readonly<{ type: "stackEntryResolved"; id: StackId; spellName: string }>;
+    | Readonly<{ type: "stackEntryResolved"; id: StackId; entryName: string }>
+    | Readonly<{ type: "stackEntryFizzles"; id: StackId; entryName: string }>;
 
 type CombatEvent =
     | Readonly<{ type: "attackDeclared"; player: PlayerId; object: ObjectId; cardName: string; target: AttackableTarget; targetName: string }>

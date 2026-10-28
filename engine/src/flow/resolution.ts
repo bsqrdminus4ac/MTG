@@ -1,26 +1,48 @@
 import { fail, ok, type ApplyResult } from "../core/result";
 import { withEntry } from "../core/util";
-import { getCharacteristics, isPermanentType } from "../model/characteristics";
+import { getCardName, getCharacteristics, isPermanentType } from "../model/characteristics";
 import type { ResolvedAnswer } from "../model/decisions";
 import type { GameEvent } from "../model/events";
 import type { Binding, Frame, GameState, ResolutionInProgress } from "../model/state";
 import type { Zone } from "../model/vocabulary";
 import { moveObject } from "../model/zones";
+import { getTargetSpecs, isTargetLegal } from "../rules/targeting";
 import { contextOf, executeEffect, resolveStackEntryEffects } from "./effects";
 import { givePriorityToActivePlayer } from "./priority";
 
 export function beginResolution(state: GameState): ApplyResult {
     const entry = state.stack[state.stack.length - 1];
     if (!entry) return fail("The stack is empty");
+
+    const next: GameState = { ...state, stack: state.stack.slice(0, -1) };
+
+    const targetSpecs = getTargetSpecs(state, entry);
+    const legalTargets = entry.targets.map((spec, i) =>
+        spec.map((t) => {
+            const targetSpec = targetSpecs[i];
+            if (!targetSpec) return false;
+            const result = isTargetLegal(next, entry, t, targetSpec.filter);
+            return result.ok && result.value;
+        }),
+    );
+
+    if (legalTargets.some((spec) => spec.length > 0) && !legalTargets.some((spec) => spec.includes(true))) {
+        // There was at least one target specified, but no targets were legal - entry fizzles
+        const moved = moveObject(next, entry.source, "graveyard");
+        if (!moved) return fail("Unable to move fizzled spell to its owner's graveyard");
+        return givePriorityToActivePlayer(moved.state, [
+            { type: "stackEntryFizzles", id: entry.id, entryName: getCardName(state, entry.source) },
+            ...moved.events,
+        ]);
+    }
+
     const resolving: ResolutionInProgress = {
         entry,
         frames: [{ effects: resolveStackEntryEffects(state, entry), pc: 0 }],
+        legalTargets: legalTargets,
         bindings: {},
     };
-    //TODO: Check target legality and trim from entry.targets. If targets were required and no legal targets left, clear effects and let it resolve without any effects
-
-    const next: GameState = { ...state, stack: state.stack.slice(0, -1), resolving };
-    return runResolution(next);
+    return runResolution({ ...next, resolving });
 }
 
 export function runResolution(state: GameState): ApplyResult {
@@ -73,7 +95,7 @@ export function finishResolution(state: GameState, events: readonly GameEvent[])
     if (resolving.entry.kind === "spell" && currentState.objects[resolving.entry.source]?.zone === "stack") {
         const chars = getCharacteristics(currentState, resolving.entry.source);
         if (!chars) return fail("Unable to identify characteristics of resolving spell");
-        out.push({ type: "stackEntryResolved", id: resolving.entry.id, spellName: chars.name });
+        out.push({ type: "stackEntryResolved", id: resolving.entry.id, entryName: chars.name });
         const dest: Zone = chars.types.some((t) => isPermanentType(t)) ? "battlefield" : "graveyard";
         const moved = moveObject(currentState, resolving.entry.source, dest);
         if (moved) {
@@ -82,7 +104,7 @@ export function finishResolution(state: GameState, events: readonly GameEvent[])
         }
     } else if (resolving.entry.kind === "ability") {
         // TODO: Ability resolution
-        out.push({ type: "stackEntryResolved", id: resolving.entry.id, spellName: "TODO: Ability event names" });
+        out.push({ type: "stackEntryResolved", id: resolving.entry.id, entryName: "TODO: Ability event names" });
     }
     return givePriorityToActivePlayer(currentState, out);
 }

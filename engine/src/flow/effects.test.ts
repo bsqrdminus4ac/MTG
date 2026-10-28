@@ -65,7 +65,7 @@ function putCardsInHand(state: GameState, player: typeof alice, count: number): 
     return current;
 }
 
-function resolvingState(state: GameState, effects: Effect[], targets: readonly Target[] = []): GameState {
+function resolvingState(state: GameState, effects: Effect[], targets: readonly (readonly Target[])[] = []): GameState {
     const source = state.players[alice]!.library.at(-1)!;
     return {
         ...state,
@@ -77,11 +77,13 @@ function resolvingState(state: GameState, effects: Effect[], targets: readonly T
                 controller: alice,
                 source,
                 targets,
+                bindings: {},
                 definitionId: bear.id,
                 abilityIndex: 0,
             },
             frames: [{ effects, pc: 0 }],
             bindings: {},
+            legalTargets: targets.map((spec) => spec.map(() => true)),
         },
     };
 }
@@ -96,12 +98,12 @@ const chooseFromControllerHand: Effect = {
     prompt: "Choose cards",
 };
 
-function context(source: ObjectId, targets: readonly Target[] = []): EffectContext {
+function context(source: ObjectId, targets: readonly (readonly Target[])[] = []): EffectContext {
     return {
         source,
         controller: alice,
         targets,
-        legalTargets: targets.map(() => true),
+        legalTargets: targets.map((spec) => spec.map(() => true)),
         bindings: {},
     };
 }
@@ -173,8 +175,8 @@ describe("control-flow effects", () => {
 
         const result = runResolution(
             resolvingState(state, effects, [
-                { kind: "player", id: alice },
-                { kind: "player", id: bob },
+                [{ kind: "player", id: alice }],
+                [{ kind: "player", id: bob }],
             ]),
         );
 
@@ -447,6 +449,7 @@ describe("player effects", () => {
                     controller: alice,
                     source,
                     targets: [],
+                    bindings: {},
                     definitionId: bear.id,
                     abilityIndex: 0,
                 },
@@ -460,6 +463,7 @@ describe("player effects", () => {
                     },
                 ],
                 bindings: {},
+                legalTargets: [],
             },
         };
 
@@ -532,10 +536,10 @@ describe("destroy effect", () => {
   test("moves a targeted permanent to its owner's graveyard and emits destruction events", () => {
     const source = putOnBattlefield(newGame(), alice);
     const target = putOnBattlefield(source.state, bob);
-    const effect: Effect = { kind: "destroy", target: { kind: "target", index: 0 } };
+    const effect: Effect = { kind: "destroy", target: { kind: "target", spec: 0 } };
 
     const result = complete(
-      executeEffect(target.state, context(source.newId, [{ kind: "object", id: target.newId }]), effect),
+      executeEffect(target.state, context(source.newId, [[{ kind: "object", id: target.newId }]]), effect),
     );
     const graveyardId = result.state.players[bob]?.graveyard.at(-1);
 

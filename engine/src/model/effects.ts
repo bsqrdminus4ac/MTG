@@ -37,7 +37,7 @@ export const anyTarget = (): TargetFilter => {
 };
 
 export type EffectTarget =
-    | Readonly<{ kind: "target"; index: number }> // index into the chosen targets
+    | Readonly<{ kind: "target"; spec: number }> // index into the chosen targets
     | Readonly<{ kind: "allTargets" }>
     | Readonly<{ kind: "self" }>
     | Readonly<{ kind: "player"; who: PlayerRef }>

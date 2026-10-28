@@ -21,13 +21,13 @@ function StackEntryCard({ state, entry, top }: EntryProps) {
   const cardText = abilities.flatMap((ability) => describeCardText(ability, name));
   const abilityText = cardText.join("; ");
   const items: BulletItem[] = [
-    ["Stack ID", `#${entry.id}`],
-    ["Kind", entry.kind],
-    ["Controller", entry.controller],
-    ["Source", `${name} (#${entry.source})`],
-    ["Source zone", source?.zone ?? "missing"],
-    ["Targets", <NestedList key="targets" items={entry.targets.map((t) => describeTarget(state, t))} />],
-    ["Effects", <NestedList key="effects" items={effects} />],
+      ["Stack ID", `#${entry.id}`],
+      ["Kind", entry.kind],
+      ["Controller", entry.controller],
+      ["Source", `${name} (#${entry.source})`],
+      ["Source zone", source?.zone ?? "missing"],
+      ["Targets", <NestedList key="targets" items={entry.targets.flatMap((spec) => spec.map((t) => describeTarget(state, t)))} />],
+      ["Effects", <NestedList key="effects" items={effects} />],
   ];
   if (cardText.length > 0) {
     items.push(["Card Text", <NestedList key="card-text" items={cardText} />]);

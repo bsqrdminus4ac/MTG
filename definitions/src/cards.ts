@@ -16,8 +16,8 @@ const discardThenGainLife = (): Ability => ({
     effects: [
         {
             kind: "choose",
-            chooser: { kind: "target", index: 0 },
-            from: { kind: "hand", of: { kind: "target", index: 0 } },
+            chooser: { kind: "target", spec: 0 },
+            from: { kind: "hand", of: { kind: "target", spec: 0 } },
             min: 0,
             max: 10,
             bindAs: "cardsToDiscard",
@@ -121,7 +121,7 @@ export const bolt: CardDefinition = {
                     maxCount: 1,
                 },
             ],
-            effects: [{ kind: "damage", to: { kind: "target", index: 0 }, amount: 3, description: "<this> deals 3 damage to any target" }],
+            effects: [{ kind: "damage", to: { kind: "target", spec: 0 }, amount: 3, description: "<this> deals 3 damage to any target" }],
         },
     ],
 };

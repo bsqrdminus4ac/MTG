@@ -1,15 +1,15 @@
-import { fail, goodResult, ok, type ApplyResult, type Result } from "../core/result";
-import { assertNever, withEntry } from "../core/util";
+import { fail, ok, type ApplyResult } from "../core/result";
+import { withEntry } from "../core/util";
 import { getCardName, getCharacteristics, isPermanentType } from "../model/characteristics";
 import { chooseMany, chooseOne, manaAbilityChoice, objectChoice, playerChoice, yesNo, type Choice } from "../model/decisions";
-import { getCardText, type TargetFilter, type TargetSpec } from "../model/effects";
+import { getCardText, type TargetSpec } from "../model/effects";
 import type { GameEvent } from "../model/events";
 import { nextID, type ObjectId, type PlayerId, type StackId } from "../model/ids";
 import { canPayMana, payMana, type ManaCost } from "../model/mana";
 import type { EvalScope, GameState, SpellOnStack, Target } from "../model/state";
 import { moveObject } from "../model/zones";
 import { openDecision } from "../rules/pending";
-import { evalObjectPredicate, evalPlayerPredicate, evalStackPredicate } from "../rules/predicates";
+import { getLegalTargets } from "../rules/targeting";
 import { activateAbility } from "./abilities";
 import { getAllManaSources } from "./manaAbilities";
 import { withPriorityDecision } from "./priority";
@@ -33,6 +33,7 @@ export function beginCast(state: GameState, player: PlayerId, card: ObjectId): A
             targets: [],
             targetSpecsSelected: targetSpecs,
             cost: null,
+            bindings: {},
             rollback,
             events: [{ type: "spellCastStart", player, card, cardName: spellInfo.name }],
         },
@@ -85,12 +86,13 @@ export function commitCast(state: GameState): ApplyResult {
         kind: "spell",
         source: moved.newId,
         targets: castingInfo.targets,
+        bindings: {},
     };
     const spellEvent: GameEvent = {
         type: "spellCastSuccess",
         card: moved.newId,
         player: castingInfo.player,
-        targets: castingInfo.targets,
+        targets: castingInfo.targets.flat(), //TODO: Consider making event layered too
         cardName: getCardName(currentState, moved.newId),
     };
     const addedToStack = [...currentState.stack, spell];
@@ -161,7 +163,7 @@ export function applyTargetSelections(state: GameState, targets: Target[]): Appl
         casting: {
             ...casting,
             targetSpecsSelected: newSpecs,
-            targets: [...casting.targets, ...targets],
+            targets: [...casting.targets, targets],
         },
     };
     return selectTargetOptions(nextState);
@@ -179,67 +181,6 @@ function buildTargetPrompt(card: ObjectId, cardName: string, spec: TargetSpec): 
     }
     prompt += `for spell ${cardName} (#${card})`;
     return prompt;
-}
-
-const targetKey = (t: Target): string => `${t.kind}:${t.id}`;
-
-export function getLegalTargets(state: GameState, scope: EvalScope, spec: TargetSpec): Result<readonly Target[]> {
-    const seen = new Set<string>();
-    const out: Target[] = [];
-    const candidates = collectTargets(state, scope, spec.filter);
-    if (!candidates.ok) return candidates;
-    for (const t of candidates.value) {
-        const key = targetKey(t);
-        if (seen.has(key)) continue;
-        seen.add(key);
-        out.push(t);
-    }
-    return goodResult(out);
-}
-
-function collectTargets(state: GameState, scope: EvalScope, filter: TargetFilter): Result<readonly Target[]> {
-    switch (filter.kind) {
-        case "anyOf": {
-            const targets: Target[] = [];
-            for (const subfilter of filter.of) {
-                const result = collectTargets(state, scope, subfilter);
-                if (!result.ok) return result;
-                targets.push(...result.value);
-            }
-            return goodResult(targets);
-        }
-        case "player": {
-            const targets: Target[] = [];
-            for (const player of Object.values(state.players)) {
-                const matches = evalPlayerPredicate(state, scope, player.id, filter.filter);
-                if (!matches.ok) return matches;
-                if (matches.value) targets.push({ kind: "player", id: player.id });
-            }
-            return goodResult(targets);
-        }
-        case "object": {
-            const targets: Target[] = [];
-            for (const obj of Object.values(state.objects)) {
-                const chars = getCharacteristics(state, obj.id);
-                if (!chars) continue;
-                const matches = evalObjectPredicate(state, scope, obj.id, chars, filter.filter);
-                if (!matches.ok) return matches;
-                if (matches.value) targets.push({ kind: "object", id: obj.id });
-            }
-            return goodResult(targets);
-        }
-        case "stackEntry": {
-            const targets: Target[] = [];
-            for (const entry of state.stack) {
-                const matches = evalStackPredicate(state, scope, entry, filter.filter);
-                if (!matches.ok) return matches;
-                if (matches.value) targets.push({ kind: "stackEntry", id: entry.id });
-            }
-            return goodResult(targets);
-        }
-        default:
-            return assertNever(filter);
-    }
 }
 
 // No real logic for now, could add logic around target decisions changing costs later
@@ -277,7 +218,11 @@ export function payManaOptions(state: GameState): ApplyResult {
     const manaAbilities = getAllManaSources(nextState, player);
     if (manaAbilities.length === 0) return fail("Not enough mana abilities left to pay for this spell");
     const options = manaAbilities.map((ability) =>
-        manaAbilityChoice(ability.source, ability.abilityIndex, getCardText(ability.ability.effects)[0] ?? `Ability #${ability.abilityIndex + 1} of ${getCharacteristics(nextState, ability.source)?.name}`),
+        manaAbilityChoice(
+            ability.source,
+            ability.abilityIndex,
+            getCardText(ability.ability.effects)[0] ?? `Ability #${ability.abilityIndex + 1} of ${getCharacteristics(nextState, ability.source)?.name}`,
+        ),
     );
     const decisionState = openDecision(nextState, (id) =>
         chooseOne({
@@ -294,15 +239,10 @@ export function payManaOptions(state: GameState): ApplyResult {
 
 export function applyTargetingDecision(state: GameState, answer: readonly Choice[]): ApplyResult {
     if (!state.casting) return fail("No spell is currently being cast");
-    // Maybe validate against legal targets again? Skipping for now.
     const targetsToAdd: Target[] = [];
     for (const choice of answer) {
-        if (choice.value.kind !== "player" && choice.value.kind !== "object") return fail("Invalid choice type for spell targeting");
-        else if (choice.value.kind === "player") {
-            targetsToAdd.push({ kind: "player", id: choice.value.id });
-        } else {
-            targetsToAdd.push({ kind: "object", id: choice.value.id });
-        }
+        if (choice.value.kind !== "player" && choice.value.kind !== "object" && choice.value.kind !== "stackEntry") return fail("Invalid choice type for spell targeting");
+        targetsToAdd.push(choice.value); // Don't need to revalidate target legality since state can't change between selectTargetOptions and now.
     }
     return applyTargetSelections(state, targetsToAdd);
 }

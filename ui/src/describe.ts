@@ -98,7 +98,7 @@ export function describeContinuousEffect(state: GameState, e: ContinuousEffect):
 function describeEffectTarget(t: EffectTarget, bindings: Readonly<Record<string, string>> = {}): string {
   switch (t.kind) {
       case "target":
-          return `target ${t.index + 1}`;
+          return `target ${t.spec + 1}`;
       case "allTargets":
           return "all targets";
       case "self":
@@ -191,7 +191,7 @@ function describeLoopSubject(target: EffectTarget, bindings: Readonly<Record<str
         }
     }
     if (target.kind === "allTargets") return ["each target", "that target"];
-    if (target.kind === "target") return [`target ${target.index + 1}`, `target ${target.index + 1}`];
+    if (target.kind === "target") return [`target ${target.spec + 1}`, `target ${target.spec + 1}`];
     if (target.kind === "self") return ["this object", "this object"];
     const label = bindings[target.name] ?? `the targets chosen as ${target.name}`;
     return [label, label];
@@ -411,7 +411,9 @@ export function describeEvent(state: GameState, e: GameEvent): string {
               (e.targets ? ` targeting ${e.targets.map((t) => describeTarget(state, t)).join(", ")}` : "")
           );
       case "stackEntryResolved":
-          return `${e.spellName} (stack entry #${e.id}) resolves`;
+          return `${e.entryName} (stack entry #${e.id}) resolves`;
+      case "stackEntryFizzles":
+          return `${e.entryName} (stack entry #${e.id}) fizzles due to lack of targets`
 
       // Attacks
       case "attackDeclared":

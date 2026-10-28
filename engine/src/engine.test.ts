@@ -5,11 +5,11 @@ import type { CardDefinition } from "./model/cardDefinition";
 import { getCharacteristics } from "./model/characteristics";
 import type { ContinuousEffect } from "./model/continuous";
 import { anyTarget, permanentOfType, type TargetFilter } from "./model/effects";
-import { cardDefId, playerId, type ObjectId, type StackId, type Timestamp } from "./model/ids";
-import type { GameState } from "./model/state";
+import { cardDefId, playerId, type StackId, type Timestamp } from "./model/ids";
+import type { GameState, StackEntry, Target } from "./model/state";
 import { drawCard, moveObject } from "./model/zones";
+import { getLegalTargets } from "./rules/targeting";
 import { createGame } from "./setup";
-import { getLegalTargets } from "./flow/casting";
 
 const alice = playerId("alice");
 const bob = playerId("bob");
@@ -186,14 +186,15 @@ describe("spell targeting", () => {
         const bobBear = moveObject(aliceBear.state, game.players[bob]!.library[0]!, "battlefield")!;
         const spellCard = bobBear.state.players[alice]!.library[0]!;
         const spell = moveObject(bobBear.state, spellCard, "stack")!;
-        const spellEntry = {
+        const spellEntry: StackEntry = {
             kind: "spell" as const,
             id: 1000 as StackId,
             controller: alice,
             source: spell.newId,
             targets: [],
+            bindings: {},
         };
-        const abilityEntry = {
+        const abilityEntry: StackEntry = {
             kind: "ability" as const,
             id: 1001 as StackId,
             controller: bob,
@@ -201,6 +202,7 @@ describe("spell targeting", () => {
             targets: [],
             definitionId: targetSpell.id,
             abilityIndex: 0,
+            bindings: {},
         };
         return {
             state: { ...spell.state, stack: [spellEntry, abilityEntry] },
@@ -272,7 +274,7 @@ describe("spell targeting", () => {
 
     test("anyTarget combines players and damageable permanents without duplicates", () => {
         const game = targetingGame();
-        const targets = legalTargets(game.state, game.scope, anyTarget());
+        const targets: readonly Target[] = legalTargets(game.state, game.scope, anyTarget());
 
         expect(targets).toEqual([
             { kind: "player", id: alice },
@@ -354,11 +356,7 @@ describe("spell targeting", () => {
         if (!first.ok) throw new Error(first.error);
         if (!second.ok) throw new Error(second.error);
         expect(cast.state.casting?.targets).toEqual([]);
-        expect(first.state.casting?.targets).toEqual([
-            { kind: "player", id: bob },
-        ]);
-        expect(second.state.casting?.targets).toEqual([
-            { kind: "player", id: bob },
-        ]);
+        expect(first.state.casting?.targets[0]).toEqual([{ kind: "player", id: bob }]);
+        expect(second.state.casting?.targets[0]).toEqual([{ kind: "player", id: bob }]);
     });
 });
