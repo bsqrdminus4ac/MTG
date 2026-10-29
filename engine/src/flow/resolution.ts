@@ -102,8 +102,7 @@ export function finishResolution(state: GameState, events: readonly GameEvent[])
             out.push(...moved.events);
         }
     } else if (resolving.entry.kind === "ability") {
-        // TODO: Ability resolution
-        out.push({ type: "stackEntryResolved", id: resolving.entry.id, entryName: "TODO: Ability event names" });
+        out.push({ type: "stackEntryResolved", id: resolving.entry.id, entryName: resolving.entry.sourceSnapshot.chars.name });
     }
     return givePriorityToActivePlayer(currentState, out);
 }

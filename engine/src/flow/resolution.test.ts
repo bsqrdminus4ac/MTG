@@ -1,9 +1,11 @@
 import { describe, expect, test } from "vitest";
 import { applyAction, submitAnswer } from "../engine";
+import type { AbilityOfKind } from "../model/abilities";
+import { getCharacteristics } from "../model/characteristics";
 import type { CardDefinition } from "../model/cardDefinition";
 import { cardDefId, playerId, type ObjectId, type StackId } from "../model/ids";
 import { type TargetSpec } from "../model/effects";
-import type { GameState, Target } from "../model/state";
+import type { GameState, SourceSnapshot, Target } from "../model/state";
 import { moveObject } from "../model/zones";
 import { createGame } from "../setup";
 import { beginResolution } from "./resolution";
@@ -98,6 +100,63 @@ function mustResolve(state: GameState) {
     if (!result.ok) throw new Error(result.error);
     return result;
 }
+
+describe("ability resolution", () => {
+    test("resolves after its source leaves the battlefield using the source snapshot name", () => {
+        const initial = createGame([bear], [
+            { id: alice, deck: [bear.id] },
+            { id: bob, deck: [bear.id] },
+        ]);
+        const source = moveObject(initial, initial.players[alice]!.library[0]!, "battlefield")!;
+        const sourceObject = source.state.objects[source.newId]!;
+        const sourceCharacteristics = getCharacteristics(source.state, source.newId);
+        if (!sourceCharacteristics) throw new Error("Expected source characteristics");
+
+        const ability: AbilityOfKind<"activated"> = {
+            kind: "activated",
+            cost: { mana: null, tap: false, sacrificeSelf: false },
+            isManaAbility: false,
+            targets: [],
+            effects: [{ kind: "gainLife", who: { kind: "player", who: "controller" }, amount: 1 }],
+            activateableZones: ["battlefield"],
+            timingRestriction: "instantSpeed",
+        };
+        const sourceSnapshot: SourceSnapshot = {
+            id: source.newId,
+            chars: sourceCharacteristics,
+            controller: sourceObject.controller,
+            owner: sourceObject.owner,
+        };
+        const entryId = source.state.nextId as StackId;
+        const sourceLeft = moveObject(source.state, source.newId, "graveyard")!;
+        const state: GameState = {
+            ...sourceLeft.state,
+            stack: [{
+                kind: "ability",
+                id: entryId,
+                controller: alice,
+                source: source.newId,
+                targets: [],
+                bindings: {},
+                ability,
+                sourceSnapshot,
+            }],
+            priority: null,
+        };
+
+        const result = mustResolve(state);
+
+        expect(state.objects[source.newId]).toBeUndefined();
+        expect(state.players[alice]?.graveyard).toContain(sourceLeft.newId);
+        expect(result.state.players[alice]?.life).toBe(21);
+        expect(result.events).toContainEqual({ type: "lifeChanged", player: alice, delta: 1 });
+        expect(result.events).toContainEqual({
+            type: "stackEntryResolved",
+            id: entryId,
+            entryName: "Grizzly Bears",
+        });
+    });
+});
 
 describe("spell resolution with multiple target specs", () => {
     test("casting stores choices separately for each target spec", () => {
