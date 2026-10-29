@@ -4,7 +4,7 @@ import { getCardName, getCharacteristics, hasCardType, hasKeyword } from "../mod
 import { chooseMany, chooseOne, nullChoice, objectChoice, orderingDecision, playerChoice, type Choice } from "../model/decisions";
 import type { GameEvent } from "../model/events";
 import type { ObjectId, PlayerId } from "../model/ids";
-import type { AttackableTarget, CombatInfo, CombatInProgress, GameState } from "../model/state";
+import type { AttackableTarget, CombatInfo, CombatInProgress, GameState, SourceSnapshot } from "../model/state";
 import { openDecision } from "../rules/pending";
 import { damageObject, damagePlayer, tapPermanent } from "../rules/primitives";
 import { givePriorityToActivePlayer } from "./priority";
@@ -399,30 +399,55 @@ export function processCombatDamage(state: GameState, isFirstStrikeStep?: boolea
     if (state.turn.step !== "combatDamage") return fail("Combat damage can only be dealt during the combat damage step");
     if (!state.combat) return fail("No combat in progress to process damage for");
     if (!state.combat.attackers || Object.keys(state.combat.attackers).length === 0) return fail("No attackers have been declared");
+
+    const snapshots = new Map<ObjectId, SourceSnapshot>();
+
     return applySequentially(
         state,
-        Object.values(state.combat.attackers).map((a) => (currentState: GameState) => dealCombatDamage(currentState, a, isFirstStrikeStep)),
+        Object.values(state.combat.attackers).map((a) => (currentState: GameState) => dealCombatDamage(currentState, a, snapshots, isFirstStrikeStep)),
     );
 }
 
-function dealCombatDamage(state: GameState, combatInfo: CombatInfo, isFirstStrikeStep?: boolean): ApplyResult {
+const snap = (state: GameState, snapshots: Map<ObjectId, SourceSnapshot>, id: ObjectId) => {
+    let s = snapshots.get(id);
+    if (!s) {
+        s = snapshotSource(state, id) ?? undefined;
+        if (s) snapshots.set(id, s);
+    }
+    return s;
+};
+
+export function snapshotSource(state: GameState, id: ObjectId): SourceSnapshot | undefined {
+    const obj = state.objects[id];
+    const chars = getCharacteristics(state, id);
+    if (!obj || !chars) return undefined;
+    return {
+        id,
+        chars,
+        controller: obj.controller,
+        owner: obj.owner,
+    };
+}
+
+function dealCombatDamage(state: GameState, combatInfo: CombatInfo, snapshots: Map<ObjectId, SourceSnapshot>, isFirstStrikeStep?: boolean): ApplyResult {
     if (!combatInfo.attackTarget || !isStillLegalTarget(state, combatInfo.id, combatInfo.attackTarget)) return ok(state, []);
     const obj = state.objects[combatInfo.id];
     if (!obj) return ok(state, []);
     if (obj.zone !== "battlefield") return ok(state, []);
     if (obj.controller !== state.turn.activePlayer) return ok(state, []);
-    const chars = getCharacteristics(state, combatInfo.id);
-    if (!chars) return ok(state, []);
-    if (!chars.power || chars.power <= 0) return ok(state, []);
+    const attackerSnapshot = snap(state, snapshots, combatInfo.id);
+    if (!attackerSnapshot) return ok(state, []);
+    if (!attackerSnapshot.chars.power || attackerSnapshot.chars.power <= 0) return ok(state, []);
 
-    let damageLeft = chars.power;
+    let damageLeft = attackerSnapshot.chars.power;
     let currentState = { ...state };
     let events: GameEvent[] = [];
     const hasTrample = hasKeyword(currentState, combatInfo.id, "trample");
     if (combatInfo.blockedBy) {
         if (combatInfo.blockedBy.length === 1) {
             const blocker = combatInfo.blockedBy[0];
-            let [result, newDamageLeft] = dealSingleCombatDamage(currentState, combatInfo.id, blocker, combatInfo.attackTarget, damageLeft, hasTrample, true);
+            const blockerSnapshot = blocker ? snap(currentState, snapshots, blocker) : undefined;
+            let [result, newDamageLeft] = dealSingleCombatDamage(currentState, attackerSnapshot, blockerSnapshot, combatInfo.attackTarget, damageLeft, hasTrample, true);
             if (!result.ok) return result;
             currentState = result.state;
             events.push(...result.events);
@@ -432,10 +457,11 @@ function dealCombatDamage(state: GameState, combatInfo: CombatInfo, isFirstStrik
             for (let orderIndex = 0; orderIndex < combatInfo.blockOrder.length; orderIndex++) {
                 const i = combatInfo.blockOrder[orderIndex]!;
                 const blocker = combatInfo.blockedBy[i];
+                const blockerSnapshot = blocker ? snap(currentState, snapshots, blocker) : undefined;
                 let [result, newDamageLeft] = dealSingleCombatDamage(
                     currentState,
-                    combatInfo.id,
-                    blocker,
+                    attackerSnapshot,
+                    blockerSnapshot,
                     combatInfo.attackTarget,
                     damageLeft,
                     hasTrample,
@@ -454,29 +480,26 @@ function dealCombatDamage(state: GameState, combatInfo: CombatInfo, isFirstStrik
 
     const result =
         combatInfo.attackTarget.kind === "object"
-            ? damageObject(currentState, combatInfo.attackTarget.id, combatInfo.id, damageLeft, true)
-            : damagePlayer(currentState, combatInfo.attackTarget.id, combatInfo.id, damageLeft, true);
+            ? damageObject(currentState, combatInfo.attackTarget.id, attackerSnapshot, damageLeft, true)
+            : damagePlayer(currentState, combatInfo.attackTarget.id, attackerSnapshot, damageLeft, true);
     return result.ok ? ok(result.state, [...events, ...result.events]) : result;
 }
 
 function dealSingleCombatDamage(
     state: GameState,
-    attacker: ObjectId,
-    blocker: ObjectId | undefined,
+    attacker: SourceSnapshot,
+    blocker: SourceSnapshot | undefined,
     attackTarget: AttackableTarget,
     attackerDamageLeft: number,
     hasTrample: boolean,
     isLastBlocker: boolean,
 ): [result: ApplyResult, damageLeft: number] {
-    if (blocker && isStillValidBlocker(state, attacker, blocker, attackTarget)) {
-        const blockerChars = getCharacteristics(state, blocker);
-        if (blockerChars) {
-            const blockerToughness = blockerChars?.toughness ?? 0;
-            const damageToDeal = !hasTrample && isLastBlocker ? attackerDamageLeft : blockerToughness;
-            const damageBlockerDeals = blockerChars.power ?? 0;
-            const result = applySequentially(state, [(s) => damageObject(s, blocker, attacker, damageToDeal, true), (s) => damageObject(s, attacker, blocker, damageBlockerDeals, true)]);
-            return [result, attackerDamageLeft - damageToDeal];
-        }
+    if (blocker && isStillValidBlocker(state, attacker.id, blocker.id, attackTarget)) {
+        const blockerToughness = blocker.chars.toughness ?? 0;
+        const damageToDeal = !hasTrample && isLastBlocker ? attackerDamageLeft : blockerToughness;
+        const damageBlockerDeals = blocker.chars.power ?? 0;
+        const result = applySequentially(state, [(s) => damageObject(s, blocker.id, attacker, damageToDeal, true), (s) => damageObject(s, attacker.id, blocker, damageBlockerDeals, true)]);
+        return [result, attackerDamageLeft - damageToDeal];
     }
     return [ok(state, []), attackerDamageLeft];
 }

@@ -16,7 +16,7 @@ import { addManaEffect, damageObject, damagePlayer, destroyPermanent, discardCar
 export interface EffectContext extends EvalScope {
     readonly targets: readonly (readonly Target[])[];
     readonly legalTargets: readonly (readonly boolean[])[]; // per target index, computed once when resolution starts
-    readonly sourceSnapshot: SourceSnapshot | undefined;
+    readonly sourceSnapshot: SourceSnapshot;
 }
 
 const getSourceName = (state: GameState, ctx: EffectContext): string => {
@@ -70,8 +70,8 @@ export function executeEffect(state: GameState, ctx: EffectContext, effect: Effe
                 return applySequentially(
                     currentState,
                     targets.map((target): ((s: GameState) => ApplyResult) => {
-                        if (target.kind === "player") return (s) => damagePlayer(s, target.id, ctx.source, a.value, false);
-                        if (target.kind === "object") return (s) => damageObject(s, target.id, ctx.source, a.value, false);
+                        if (target.kind === "player") return (s) => damagePlayer(s, target.id, ctx.sourceSnapshot, a.value, false);
+                        if (target.kind === "object") return (s) => damageObject(s, target.id, ctx.sourceSnapshot, a.value, false);
                         return () => fail("Damage cannot be dealt to spells/abilities on the stack");
                     }),
                 );
@@ -121,7 +121,7 @@ export function executeEffect(state: GameState, ctx: EffectContext, effect: Effe
                 return applySequentially(
                     currentState,
                     targets.map((target) => {
-                        if (target.kind === "object") return (s) => destroyPermanent(s, target.id, ctx.source);
+                        if (target.kind === "object") return (s) => destroyPermanent(s, target.id, ctx.sourceSnapshot);
                         return () => fail("Destroying non-permanents has not been implemented yet");
                     }),
                 );
@@ -233,7 +233,7 @@ export const contextOf = (resolving: ResolutionInProgress): EffectContext => ({
     targets: resolving.entry.targets,
     legalTargets: resolving.legalTargets, // real check arrives with isTargetLegal
     bindings: resolving.bindings,
-    sourceSnapshot: resolving.entry.kind === "ability" ? resolving.entry.sourceSnapshot : undefined,
+    sourceSnapshot: resolving.sourceSnapshot,
 });
 
 export function resolvePlayers(state: GameState, ctx: EffectContext, ref: PlayerRef): PlayerId[] {

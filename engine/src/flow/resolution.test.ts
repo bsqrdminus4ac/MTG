@@ -1,10 +1,10 @@
 import { describe, expect, test } from "vitest";
 import { applyAction, submitAnswer } from "../engine";
 import type { AbilityOfKind } from "../model/abilities";
-import { getCharacteristics } from "../model/characteristics";
 import type { CardDefinition } from "../model/cardDefinition";
-import { cardDefId, playerId, type ObjectId, type StackId } from "../model/ids";
+import { getCharacteristics } from "../model/characteristics";
 import { type TargetSpec } from "../model/effects";
+import { cardDefId, playerId, type ObjectId, type StackId } from "../model/ids";
 import type { GameState, SourceSnapshot, Target } from "../model/state";
 import { moveObject } from "../model/zones";
 import { createGame } from "../setup";
@@ -29,10 +29,16 @@ const bear: CardDefinition = {
 const targetSpecs: TargetSpec[] = [
     { filter: { kind: "player", filter: { kind: "opponent" } }, minCount: 1, maxCount: 1 },
     {
-        filter: { kind: "object", filter: { kind: "all", of: [
-            { kind: "inZone", zone: "battlefield" },
-            { kind: "hasType", type: "Creature" },
-        ] } },
+        filter: {
+            kind: "object",
+            filter: {
+                kind: "all",
+                of: [
+                    { kind: "inZone", zone: "battlefield" },
+                    { kind: "hasType", type: "Creature" },
+                ],
+            },
+        },
         minCount: 1,
         maxCount: 1,
     },
@@ -48,14 +54,16 @@ const targetSpell: CardDefinition = {
     subtypes: [],
     power: null,
     toughness: null,
-    abilities: [{
-        kind: "spell",
-        targets: targetSpecs,
-        effects: [
-            { kind: "gainLife", who: { kind: "target", spec: 0 }, amount: 3 },
-            { kind: "destroy", target: { kind: "target", spec: 1 } },
-        ],
-    }],
+    abilities: [
+        {
+            kind: "spell",
+            targets: targetSpecs,
+            effects: [
+                { kind: "gainLife", who: { kind: "target", spec: 0 }, amount: 3 },
+                { kind: "destroy", target: { kind: "target", spec: 1 } },
+            ],
+        },
+    ],
 };
 
 function stateWithSpellOnStack(): {
@@ -64,29 +72,31 @@ function stateWithSpellOnStack(): {
     creature: ObjectId;
     targets: readonly (readonly Target[])[];
 } {
-    const initial = createGame([bear, targetSpell], [
-        { id: alice, deck: [targetSpell.id, bear.id] },
-        { id: bob, deck: [bear.id] },
-    ]);
+    const initial = createGame(
+        [bear, targetSpell],
+        [
+            { id: alice, deck: [targetSpell.id, bear.id] },
+            { id: bob, deck: [bear.id] },
+        ],
+    );
     const aliceCreature = moveObject(initial, initial.players[alice]!.library[1]!, "battlefield")!;
     const bobCreature = moveObject(aliceCreature.state, aliceCreature.state.players[bob]!.library[0]!, "battlefield")!;
     const movedSpell = moveObject(bobCreature.state, bobCreature.state.players[alice]!.library[0]!, "stack")!;
-    const targets: readonly (readonly Target[])[] = [
-        [{ kind: "player", id: bob }],
-        [{ kind: "object", id: bobCreature.newId }],
-    ];
+    const targets: readonly (readonly Target[])[] = [[{ kind: "player", id: bob }], [{ kind: "object", id: bobCreature.newId }]];
 
     return {
         state: {
             ...movedSpell.state,
-            stack: [{
-                kind: "spell",
-                id: movedSpell.state.nextId as StackId,
-                controller: alice,
-                source: movedSpell.newId,
-                targets,
-                bindings: {},
-            }],
+            stack: [
+                {
+                    kind: "spell",
+                    id: movedSpell.state.nextId as StackId,
+                    controller: alice,
+                    source: movedSpell.newId,
+                    targets,
+                    bindings: {},
+                },
+            ],
             priority: null,
         },
         spell: movedSpell.newId,
@@ -103,10 +113,13 @@ function mustResolve(state: GameState) {
 
 describe("ability resolution", () => {
     test("resolves after its source leaves the battlefield using the source snapshot name", () => {
-        const initial = createGame([bear], [
-            { id: alice, deck: [bear.id] },
-            { id: bob, deck: [bear.id] },
-        ]);
+        const initial = createGame(
+            [bear],
+            [
+                { id: alice, deck: [bear.id] },
+                { id: bob, deck: [bear.id] },
+            ],
+        );
         const source = moveObject(initial, initial.players[alice]!.library[0]!, "battlefield")!;
         const sourceObject = source.state.objects[source.newId]!;
         const sourceCharacteristics = getCharacteristics(source.state, source.newId);
@@ -131,16 +144,18 @@ describe("ability resolution", () => {
         const sourceLeft = moveObject(source.state, source.newId, "graveyard")!;
         const state: GameState = {
             ...sourceLeft.state,
-            stack: [{
-                kind: "ability",
-                id: entryId,
-                controller: alice,
-                source: source.newId,
-                targets: [],
-                bindings: {},
-                ability,
-                sourceSnapshot,
-            }],
+            stack: [
+                {
+                    kind: "ability",
+                    id: entryId,
+                    controller: alice,
+                    source: source.newId,
+                    targets: [],
+                    bindings: {},
+                    ability,
+                    sourceSnapshot,
+                },
+            ],
             priority: null,
         };
 
@@ -153,7 +168,7 @@ describe("ability resolution", () => {
         expect(result.events).toContainEqual({
             type: "stackEntryResolved",
             id: entryId,
-            entryName: "Grizzly Bears",
+            entryName: "Grizzly Bears's ability",
         });
     });
 });

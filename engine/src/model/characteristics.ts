@@ -51,7 +51,7 @@ export function getCharacteristics(state: GameState, id: ObjectId): Characterist
 
 export function getCardName(state: GameState, id: ObjectId, withId?: boolean): string {
     const chars = getCharacteristics(state, id);
-    if (!chars) return "";
+    if (!chars) return `#${id}`;
     return chars.name + (withId ? ` (#${id})` : "");
 }
 

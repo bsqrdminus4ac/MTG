@@ -1,12 +1,12 @@
 import { fail, ok, type ApplyResult } from "../core/result";
 import { withEntry } from "../core/util";
-import { getCardName, getCharacteristics, isPermanentType } from "../model/characteristics";
+import { getCharacteristics, isPermanentType } from "../model/characteristics";
 import type { ResolvedAnswer } from "../model/decisions";
 import type { GameEvent } from "../model/events";
 import type { Binding, Frame, GameState, ResolutionInProgress } from "../model/state";
 import type { Zone } from "../model/vocabulary";
 import { moveObject } from "../model/zones";
-import { getEntryEffects, getEntryTargetSpecs } from "../rules/stack";
+import { getEntryEffects, getEntryName, getEntryTargetSpecs, snapshotEntrySource } from "../rules/stack";
 import { isTargetLegal } from "../rules/targeting";
 import { contextOf, executeEffect } from "./effects";
 import { givePriorityToActivePlayer } from "./priority";
@@ -29,17 +29,24 @@ export function beginResolution(state: GameState): ApplyResult {
 
     if (legalTargets.some((spec) => spec.length > 0) && !legalTargets.some((spec) => spec.includes(true))) {
         // There was at least one target specified, but no targets were legal - entry fizzles
-        const moved = moveObject(next, entry.source, "graveyard");
-        if (!moved) return fail("Unable to move fizzled spell to its owner's graveyard");
-        const entryName = entry.kind === "spell" ? getCardName(state, entry.source) : entry.sourceSnapshot.chars.name;
-        return givePriorityToActivePlayer(moved.state, [{ type: "stackEntryFizzles", id: entry.id, entryName: entryName }, ...moved.events]);
+        const entryName: string = getEntryName(next, entry);
+        if (entry.kind === "spell") {
+            const moved = moveObject(next, entry.source, "graveyard");
+            if (!moved) return fail("Unable to move fizzled spell to its owner's graveyard");
+            return givePriorityToActivePlayer(moved.state, [{ type: "stackEntryFizzles", id: entry.id, entryName }, ...moved.events]);
+        } else {
+            return givePriorityToActivePlayer(next, [{ type: "stackEntryFizzles", id: entry.id, entryName }]);
+        }
     }
 
+    const sourceSnapshot = entry.kind === "ability" ? entry.sourceSnapshot : snapshotEntrySource(state, entry);
+    if (!sourceSnapshot) return fail("Unable to acquire snapshot of spell's source");
     const resolving: ResolutionInProgress = {
         entry,
         frames: [{ effects: getEntryEffects(state, entry), pc: 0 }],
         legalTargets: legalTargets,
         bindings: {},
+        sourceSnapshot,
     };
     return runResolution({ ...next, resolving });
 }
@@ -94,7 +101,7 @@ export function finishResolution(state: GameState, events: readonly GameEvent[])
     if (resolving.entry.kind === "spell" && currentState.objects[resolving.entry.source]?.zone === "stack") {
         const chars = getCharacteristics(currentState, resolving.entry.source);
         if (!chars) return fail("Unable to identify characteristics of resolving spell");
-        out.push({ type: "stackEntryResolved", id: resolving.entry.id, entryName: chars.name });
+        out.push({ type: "stackEntryResolved", id: resolving.entry.id, entryName: getEntryName(state, resolving.entry) });
         const dest: Zone = chars.types.some((t) => isPermanentType(t)) ? "battlefield" : "graveyard";
         const moved = moveObject(currentState, resolving.entry.source, dest);
         if (moved) {
@@ -102,9 +109,9 @@ export function finishResolution(state: GameState, events: readonly GameEvent[])
             out.push(...moved.events);
         }
     } else if (resolving.entry.kind === "ability") {
-        out.push({ type: "stackEntryResolved", id: resolving.entry.id, entryName: resolving.entry.sourceSnapshot.chars.name });
+        out.push({ type: "stackEntryResolved", id: resolving.entry.id, entryName: getEntryName(state, resolving.entry) });
     }
     return givePriorityToActivePlayer(currentState, out);
 }
 
-export const getTopFrame = (state: GameState): Frame | undefined => state.resolving?.frames[state.resolving.frames.length - 1];
+const getTopFrame = (state: GameState): Frame | undefined => state.resolving?.frames[state.resolving.frames.length - 1];

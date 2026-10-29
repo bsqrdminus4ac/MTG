@@ -4,9 +4,8 @@ import { getCardName, getCharacteristics, hasKeyword } from "../model/characteri
 import type { GameEvent } from "../model/events";
 import type { ObjectId, PlayerId } from "../model/ids";
 import { type ManaType, addMana } from "../model/mana";
-import type { GameState } from "../model/state";
+import type { GameState, SourceSnapshot } from "../model/state";
 import { moveObject } from "../model/zones";
-
 
 export function tapPermanent(state: GameState, objId: ObjectId): ApplyResult {
     const obj = state.objects[objId];
@@ -16,12 +15,12 @@ export function tapPermanent(state: GameState, objId: ObjectId): ApplyResult {
     return ok({ ...state, objects: tappedObj }, [{ type: "permanentTapped", object: objId, cardName: getCardName(state, objId) }]);
 }
 
-export function damagePlayer(state: GameState, player: PlayerId, source: ObjectId, amount: number, isCombatDamage: boolean): ApplyResult {
+export function damagePlayer(state: GameState, player: PlayerId, source: SourceSnapshot, amount: number, isCombatDamage: boolean): ApplyResult {
     const p = state.players[player];
     if (!p) return fail("Invalid player to damage");
     if (amount === 0) return ok(state, []);
     return ok({ ...state, players: withEntry(state.players, player, { ...p, life: p.life - amount }) }, [
-        { type: "damageDealt", source, sourceName: getCardName(state, source), amount, target: { kind: "player", id: player }, targetName: "", isCombatDamage },
+        { type: "damageDealt", source: source.id, sourceName: source.chars.name, amount, target: { kind: "player", id: player }, targetName: "", isCombatDamage },
     ]);
 }
 
@@ -56,7 +55,7 @@ export function discardCard(state: GameState, card: ObjectId, cause?: string): A
     return ok(moveResult.state, [discardEvent, ...moveResult.events]);
 }
 
-export function damageObject(state: GameState, target: ObjectId, source: ObjectId, amount: number, isCombatDamage: boolean): ApplyResult {
+export function damageObject(state: GameState, target: ObjectId, source: SourceSnapshot, amount: number, isCombatDamage: boolean): ApplyResult {
     const obj = state.objects[target];
     if (!obj) return ok(state, []);
     if (obj.zone !== "battlefield") return ok(state, []);
@@ -67,26 +66,26 @@ export function damageObject(state: GameState, target: ObjectId, source: ObjectI
     return ok(state, []);
 }
 
-export function damageCreature(state: GameState, target: ObjectId, source: ObjectId, amount: number, isCombatDamage: boolean): ApplyResult {
+export function damageCreature(state: GameState, target: ObjectId, source: SourceSnapshot, amount: number, isCombatDamage: boolean): ApplyResult {
     const obj = state.objects[target];
     if (!obj) return ok(state, []);
     if (amount === 0) return ok(state, []);
     return ok({ ...state, objects: withEntry(state.objects, target, { ...obj, damage: obj.damage + amount }) }, [
-        { type: "damageDealt", source, sourceName: getCardName(state, source), amount, target: { kind: "object", id: target }, targetName: getCardName(state, target), isCombatDamage },
+        { type: "damageDealt", source: source.id, sourceName: source.chars.name, amount, target: { kind: "object", id: target }, targetName: getCardName(state, target), isCombatDamage },
     ]);
 }
 
-export function damagePlaneswalker(state: GameState, target: ObjectId, source: ObjectId, amount: number, isCombatDamage: boolean): ApplyResult {
+export function damagePlaneswalker(state: GameState, target: ObjectId, source: SourceSnapshot, amount: number, isCombatDamage: boolean): ApplyResult {
     const obj = state.objects[target];
     if (!obj) return ok(state, []);
     if (amount === 0) return ok(state, []);
     if (!("loyalty" in obj.counters)) return fail("Planeswalkers have to have loyalty counters defined");
     return ok({ ...state, objects: withEntry(state.objects, target, { ...obj, counters: withEntry(obj.counters, "loyalty", obj.counters["loyalty"] - amount) }) }, [
-        { type: "damageDealt", source, sourceName: getCardName(state, source), amount, target: { kind: "object", id: target }, targetName: getCardName(state, target), isCombatDamage },
+        { type: "damageDealt", source: source.id, sourceName: source.chars.name, amount, target: { kind: "object", id: target }, targetName: getCardName(state, target), isCombatDamage },
     ]);
 }
 
-export function destroyPermanent(state: GameState, target: ObjectId, source: ObjectId): ApplyResult {
+export function destroyPermanent(state: GameState, target: ObjectId, source: SourceSnapshot): ApplyResult {
     const obj = state.objects[target];
     if (!obj) return ok(state, []);
     if (obj.zone !== "battlefield") return ok(state, []);
@@ -94,6 +93,6 @@ export function destroyPermanent(state: GameState, target: ObjectId, source: Obj
     const targetName = getCardName(state, target);
     const result = moveObject(state, target, "graveyard");
     if (!result) return ok(state, []);
-    const event: GameEvent = { type: "permanentDestroyed", object: target, cardName: targetName, source };
+    const event: GameEvent = { type: "permanentDestroyed", object: target, cardName: targetName, source: source.id };
     return ok(result.state, [event, ...result.events]);
 }

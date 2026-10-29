@@ -1,15 +1,15 @@
 import { describe, expect, test } from "vitest";
 import { submitAnswer } from "../engine";
 import type { AbilityOfKind } from "../model/abilities";
-import { getCharacteristics } from "../model/characteristics";
 import type { CardDefinition } from "../model/cardDefinition";
 import { mayDo, type Amount, type Effect } from "../model/effects";
 import { cardDefId, playerId, type CardDefId, type ObjectId, type StackId } from "../model/ids";
-import type { GameState, SourceSnapshot, Target } from "../model/state";
+import type { GameState, Target } from "../model/state";
 import { moveObject } from "../model/zones";
 import { resolveAmount } from "../rules/conditions";
 import { damageObject, damagePlayer } from "../rules/primitives";
 import { createGame } from "../setup";
+import { snapshotSource } from "./combat";
 import { executeEffect, resolvePlayers, type EffectContext, type StepResult } from "./effects";
 import { handleResolutionDecision, runResolution } from "./resolution";
 
@@ -75,15 +75,15 @@ const testAbility: AbilityOfKind<"triggered"> = {
     triggerableZones: ["battlefield"],
 };
 
-function sourceSnapshot(state: GameState, source: ObjectId): SourceSnapshot {
-    const object = state.objects[source];
-    const chars = getCharacteristics(state, source);
-    if (!object || !chars) throw new Error("Expected the ability source to exist");
-    return { id: source, chars, controller: object.controller, owner: object.owner };
+function sourceSnapshot(state: GameState, source: ObjectId) {
+    const snapshot = snapshotSource(state, source);
+    if (!snapshot) throw new Error("Expected the ability source to exist");
+    return snapshot;
 }
 
 function resolvingState(state: GameState, effects: Effect[], targets: readonly (readonly Target[])[] = []): GameState {
     const source = state.players[alice]!.library.at(-1)!;
+    const sourceSnapshot = snapshotSource(state, source)!;
     return {
         ...state,
         priority: null,
@@ -96,11 +96,12 @@ function resolvingState(state: GameState, effects: Effect[], targets: readonly (
                 targets,
                 bindings: {},
                 ability: testAbility,
-                sourceSnapshot: sourceSnapshot(state, source),
+                sourceSnapshot,
             },
             frames: [{ effects, pc: 0 }],
             bindings: {},
             legalTargets: targets.map((spec) => spec.map(() => true)),
+            sourceSnapshot,
         },
     };
 }
@@ -115,14 +116,14 @@ const chooseFromControllerHand: Effect = {
     prompt: "Choose cards",
 };
 
-function context(source: ObjectId, targets: readonly (readonly Target[])[] = []): EffectContext {
+function context(state: GameState, source: ObjectId, targets: readonly (readonly Target[])[] = []): EffectContext {
     return {
         source,
         controller: alice,
         targets,
         legalTargets: targets.map((spec) => spec.map(() => true)),
         bindings: {},
-        sourceSnapshot: undefined,
+        sourceSnapshot: sourceSnapshot(state, source),
     };
 }
 
@@ -131,7 +132,7 @@ describe("resolveAmount", () => {
         const state = newGame();
         const source = state.players[alice]!.library.at(-1)!;
         const amount: Amount = { kind: "bound", name: "amount" };
-        const ctx = { ...context(source), bindings: { amount: 4 } };
+        const ctx = { ...context(state, source), bindings: { amount: 4 } };
 
         expect(resolveAmount(state, ctx, amount)).toEqual({ ok: true, value: 4 });
     });
@@ -141,7 +142,7 @@ describe("resolveAmount", () => {
         const source = state.players[alice]!.library.at(-1)!;
         const amount: Amount = { kind: "bound", name: "chosen" };
         const ctx = {
-            ...context(source),
+            ...context(state, source),
             bindings: {
                 chosen: [
                     { kind: "index" as const, index: 0 },
@@ -159,7 +160,7 @@ describe("resolveAmount", () => {
         const source = state.players[alice]!.library.at(-1)!;
         const amount: Amount = { kind: "bound", name: "missing" };
 
-        expect(resolveAmount(state, context(source), amount)).toEqual({
+        expect(resolveAmount(state, context(state, source), amount)).toEqual({
             ok: false,
             error: "Unbound name 'missing'",
         });
@@ -291,13 +292,13 @@ describe("player effects", () => {
         const state = newGame();
         const source = state.players[alice]!.library.at(-1)!;
 
-        expect(resolvePlayers(state, { ...context(source), controller: bob }, "eachOpponent")).toEqual([alice]);
+        expect(resolvePlayers(state, { ...context(state, source), controller: bob }, "eachOpponent")).toEqual([alice]);
     });
 
     test("eachPlayer gainLife emits one lifeChanged event for each player", () => {
         const state = newGame();
         const source = state.players[alice]!.library.at(-1)!;
-        const result = complete(executeEffect(state, context(source), {
+        const result = complete(executeEffect(state, context(state, source), {
             kind: "gainLife",
             who: { kind: "player", who: "eachPlayer" },
             amount: 2,
@@ -482,6 +483,7 @@ describe("player effects", () => {
                 ],
                 bindings: {},
                 legalTargets: [],
+                sourceSnapshot: sourceSnapshot(state, source),
             },
         };
 
@@ -502,7 +504,7 @@ describe("player effects", () => {
     test("gainLife uses a bound amount", () => {
         const state = newGame();
         const source = state.players[alice]!.library.at(-1)!;
-        const ctx = { ...context(source), bindings: { x: 5 } };
+        const ctx = { ...context(state, source), bindings: { x: 5 } };
 
         const result = complete(
             executeEffect(state, ctx, {
@@ -520,7 +522,7 @@ describe("player effects", () => {
         const state = newGame();
         const source = state.players[alice]!.library.at(-1)!;
 
-        const result = complete(executeEffect(state, context(source), { kind: "gainLife", who: { kind: "player", who: "eachOpponent" }, amount: 3 }));
+        const result = complete(executeEffect(state, context(state, source), { kind: "gainLife", who: { kind: "player", who: "eachOpponent" }, amount: 3 }));
 
         expect(result.state.players[alice]?.life).toBe(20);
         expect(result.state.players[bob]?.life).toBe(23);
@@ -531,7 +533,7 @@ describe("player effects", () => {
         const state = newGame();
         const source = state.players[alice]!.library.at(-1)!;
 
-        const result = complete(executeEffect(state, context(source), { kind: "loseLife", who: { kind: "player", who: "controller" }, amount: 4 }));
+        const result = complete(executeEffect(state, context(state, source), { kind: "loseLife", who: { kind: "player", who: "controller" }, amount: 4 }));
 
         expect(result.state.players[alice]?.life).toBe(16);
         expect(result.state.players[bob]?.life).toBe(20);
@@ -542,7 +544,7 @@ describe("player effects", () => {
         const state = newGame();
         const source = state.players[alice]!.library.at(-1)!;
 
-        const result = complete(executeEffect(state, context(source), { kind: "addMana", mana: "R", amount: 2 }));
+        const result = complete(executeEffect(state, context(state, source), { kind: "addMana", mana: "R", amount: 2 }));
 
         expect(result.state.players[alice]?.manaPool.R).toBe(2);
         expect(result.state.players[bob]?.manaPool.R).toBe(0);
@@ -557,7 +559,7 @@ describe("destroy effect", () => {
     const effect: Effect = { kind: "destroy", target: { kind: "target", spec: 0 } };
 
     const result = complete(
-      executeEffect(target.state, context(source.newId, [[{ kind: "object", id: target.newId }]]), effect),
+      executeEffect(target.state, context(target.state, source.newId, [[{ kind: "object", id: target.newId }]]), effect),
     );
     const graveyardId = result.state.players[bob]?.graveyard.at(-1);
 
@@ -583,7 +585,7 @@ describe("damage helpers", () => {
     const state = newGame();
     const source = state.players[alice]!.library.at(-1)!;
 
-    const result = damagePlayer(state, bob, source, 3, true);
+    const result = damagePlayer(state, bob, sourceSnapshot(state, source), 3, true);
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -605,7 +607,7 @@ describe("damage helpers", () => {
     const source = putOnBattlefield(newGame(), alice);
     const target = putOnBattlefield(source.state, bob);
 
-    const result = damageObject(target.state, target.newId, source.newId, 2, false);
+    const result = damageObject(target.state, target.newId, sourceSnapshot(target.state, source.newId), 2, false);
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -636,7 +638,7 @@ describe("damage helpers", () => {
       },
     };
 
-    const result = damageObject(withLoyalty, target.newId, source.newId, 2, false);
+    const result = damageObject(withLoyalty, target.newId, sourceSnapshot(withLoyalty, source.newId), 2, false);
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;

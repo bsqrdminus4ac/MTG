@@ -131,6 +131,7 @@ export interface ResolutionInProgress {
     frames: readonly Frame[];
     bindings: Bindings;
     legalTargets: readonly (readonly boolean[])[];
+    sourceSnapshot: SourceSnapshot;
 }
 
 export type Binding = readonly ChoiceValue[] | boolean | number;
