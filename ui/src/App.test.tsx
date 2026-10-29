@@ -1,4 +1,4 @@
-import { cardDefId, chooseMany, indexChoice, moveObject, orderingDecision, yesNo, type DecisionId, type GameState, type StackId } from "@mtg/engine";
+import { cardDefId, chooseMany, getCharacteristics, indexChoice, moveObject, orderingDecision, yesNo, type DecisionId, type GameState, type StackId } from "@mtg/engine";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 import { App, ProgressState } from "./App";
@@ -303,6 +303,9 @@ describe("stack panel", () => {
 
         const bolt = must(moveObject(base, find("bolt"), "stack"));
         const forest = must(moveObject(bolt.state, find("forest"), "stack"));
+        const forestObject = must(forest.state.objects[forest.newId]);
+        const forestCharacteristics = must(getCharacteristics(forest.state, forest.newId));
+        const forestAbility = must(forestCharacteristics.abilities.find((ability) => ability.kind === "activated"));
 
         const state: GameState = {
             ...forest.state,
@@ -314,8 +317,13 @@ describe("stack panel", () => {
                     controller: BOB,
                     source: forest.newId,
                     targets: [],
-                    definitionId: forest.state.objects[forest.newId]!.definitionId,
-                    abilityIndex: 0,
+                    ability: forestAbility,
+                    sourceSnapshot: {
+                        id: forest.newId,
+                        chars: forestCharacteristics,
+                        controller: forestObject.controller,
+                        owner: forestObject.owner,
+                    },
                     bindings: {},
                 },
             ],

@@ -2,20 +2,8 @@ import { type Result, goodResult } from "../core/result";
 import { assertNever } from "../core/util";
 import { getCharacteristics, hasKeyword } from "../model/characteristics";
 import type { TargetFilter, TargetSpec } from "../model/effects";
-import type { EvalScope, GameState, StackEntry, Target } from "../model/state";
+import type { EvalScope, GameState, Target } from "../model/state";
 import { evalObjectPredicate, evalPlayerPredicate, evalStackPredicate } from "./predicates";
-
-export function getTargetSpecs(state: GameState, entry: StackEntry): TargetSpec[] {
-    const abilities = getCharacteristics(state, entry.source)?.abilities;
-    if (!abilities) return [];
-    if (entry.kind === "spell") {
-        // TODO: Replace once I decide how ability stack entries should work
-        const ability = abilities.find((a) => a.kind === "spell");
-        if (!ability) return [];
-        return ability.targets;
-    }
-    return [];
-}
 
 export function canBeTargetedBy(state: GameState, scope: EvalScope, target: Target): boolean {
     if (target.kind === "object") {

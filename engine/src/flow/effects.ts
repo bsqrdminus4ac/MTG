@@ -1,12 +1,11 @@
 import { applySequentially, fail, goodResult, type ApplyResult, type Failure, type Result } from "../core/result";
 import { assertNever } from "../core/util";
-import type { Ability } from "../model/abilities";
-import { getCardName, getCharacteristics } from "../model/characteristics";
+import { getCardName } from "../model/characteristics";
 import { chooseMany, objectChoice, yesNo } from "../model/decisions";
 import type { Effect, EffectTarget, PlayerRef } from "../model/effects";
 import type { GameEvent } from "../model/events";
 import type { PlayerId } from "../model/ids";
-import { getRemainingPlayersInTurnOrder, type Binding, type EvalScope, type Frame, type GameState, type ResolutionInProgress, type StackEntry, type Target } from "../model/state";
+import { getRemainingPlayersInTurnOrder, type Binding, type EvalScope, type Frame, type GameState, type ResolutionInProgress, type SourceSnapshot, type Target } from "../model/state";
 import { drawCardResult } from "../model/zones";
 import { getChoiceBinding, getObjectIdsFromBinding } from "../rules/bindings";
 import { evalCondition, resolveAmount } from "../rules/conditions";
@@ -17,7 +16,13 @@ import { addManaEffect, damageObject, damagePlayer, destroyPermanent, discardCar
 export interface EffectContext extends EvalScope {
     readonly targets: readonly (readonly Target[])[];
     readonly legalTargets: readonly (readonly boolean[])[]; // per target index, computed once when resolution starts
+    readonly sourceSnapshot: SourceSnapshot | undefined;
 }
+
+const getSourceName = (state: GameState, ctx: EffectContext): string => {
+    if (ctx.sourceSnapshot) return ctx.sourceSnapshot.chars.name;
+    return getCardName(state, ctx.source);
+};
 
 export type StepBind = Readonly<{ bindAs: string; value: Binding }>;
 export type StepExtras = Readonly<{ bind?: StepBind; enter?: readonly Frame[] }>;
@@ -130,7 +135,7 @@ export function executeEffect(state: GameState, ctx: EffectContext, effect: Effe
         case "discard": {
             const cards = getObjectIdsFromBinding(ctx.bindings, effect.cards.name);
             if (!cards.ok) return cards;
-            const cause = `${ctx.controller}'s ${getCardName(currentState, ctx.source)}`;
+            const cause = `${ctx.controller}'s ${getSourceName(currentState, ctx)}`;
             return stepFromApply(
                 applySequentially(
                     currentState,
@@ -228,6 +233,7 @@ export const contextOf = (resolving: ResolutionInProgress): EffectContext => ({
     targets: resolving.entry.targets,
     legalTargets: resolving.legalTargets, // real check arrives with isTargetLegal
     bindings: resolving.bindings,
+    sourceSnapshot: resolving.entry.kind === "ability" ? resolving.entry.sourceSnapshot : undefined,
 });
 
 export function resolvePlayers(state: GameState, ctx: EffectContext, ref: PlayerRef): PlayerId[] {
@@ -240,23 +246,6 @@ export function resolvePlayers(state: GameState, ctx: EffectContext, ref: Player
     return getRemainingPlayersInTurnOrder(state) as PlayerId[];
 }
 
-export function resolveStackEntryEffects(state: GameState, entry: StackEntry): readonly Effect[] {
-    const chars = getCharacteristics(state, entry.source);
-    if (!chars?.abilities) return [];
-    let ability: Ability | undefined;
-    if (entry.kind === "spell") {
-        if (entry.spellIndex) {
-            ability = chars.abilities[entry.spellIndex];
-            if (ability?.kind !== "spell") return [];
-        } else {
-            ability = chars.abilities.find((a) => a.kind === "spell");
-        }
-    } else {
-        ability = chars.abilities[entry.abilityIndex];
-        if (ability?.kind !== "activated" && ability?.kind !== "triggered") return [];
-    }
-    return ability?.effects ?? [];
-}
 
 function resolveEffectTargets(state: GameState, ctx: EffectContext, t: EffectTarget): Result<Target[]> {
     switch (t.kind) {

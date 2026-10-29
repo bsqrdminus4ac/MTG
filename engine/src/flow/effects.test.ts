@@ -1,9 +1,11 @@
 import { describe, expect, test } from "vitest";
 import { submitAnswer } from "../engine";
+import type { AbilityOfKind } from "../model/abilities";
+import { getCharacteristics } from "../model/characteristics";
 import type { CardDefinition } from "../model/cardDefinition";
 import { mayDo, type Amount, type Effect } from "../model/effects";
 import { cardDefId, playerId, type CardDefId, type ObjectId, type StackId } from "../model/ids";
-import type { GameState, Target } from "../model/state";
+import type { GameState, SourceSnapshot, Target } from "../model/state";
 import { moveObject } from "../model/zones";
 import { resolveAmount } from "../rules/conditions";
 import { damageObject, damagePlayer } from "../rules/primitives";
@@ -65,6 +67,21 @@ function putCardsInHand(state: GameState, player: typeof alice, count: number): 
     return current;
 }
 
+const testAbility: AbilityOfKind<"triggered"> = {
+    kind: "triggered",
+    trigger: { event: "lifeChanged", scope: "any" },
+    targets: [],
+    effects: [],
+    triggerableZones: ["battlefield"],
+};
+
+function sourceSnapshot(state: GameState, source: ObjectId): SourceSnapshot {
+    const object = state.objects[source];
+    const chars = getCharacteristics(state, source);
+    if (!object || !chars) throw new Error("Expected the ability source to exist");
+    return { id: source, chars, controller: object.controller, owner: object.owner };
+}
+
 function resolvingState(state: GameState, effects: Effect[], targets: readonly (readonly Target[])[] = []): GameState {
     const source = state.players[alice]!.library.at(-1)!;
     return {
@@ -78,8 +95,8 @@ function resolvingState(state: GameState, effects: Effect[], targets: readonly (
                 source,
                 targets,
                 bindings: {},
-                definitionId: bear.id,
-                abilityIndex: 0,
+                ability: testAbility,
+                sourceSnapshot: sourceSnapshot(state, source),
             },
             frames: [{ effects, pc: 0 }],
             bindings: {},
@@ -105,6 +122,7 @@ function context(source: ObjectId, targets: readonly (readonly Target[])[] = [])
         targets,
         legalTargets: targets.map((spec) => spec.map(() => true)),
         bindings: {},
+        sourceSnapshot: undefined,
     };
 }
 
@@ -450,8 +468,8 @@ describe("player effects", () => {
                     source,
                     targets: [],
                     bindings: {},
-                    definitionId: bear.id,
-                    abilityIndex: 0,
+                    ability: testAbility,
+                    sourceSnapshot: sourceSnapshot(state, source),
                 },
                 frames: [
                     {

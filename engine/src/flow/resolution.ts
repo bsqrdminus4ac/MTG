@@ -6,8 +6,9 @@ import type { GameEvent } from "../model/events";
 import type { Binding, Frame, GameState, ResolutionInProgress } from "../model/state";
 import type { Zone } from "../model/vocabulary";
 import { moveObject } from "../model/zones";
-import { getTargetSpecs, isTargetLegal } from "../rules/targeting";
-import { contextOf, executeEffect, resolveStackEntryEffects } from "./effects";
+import { getEntryEffects, getEntryTargetSpecs } from "../rules/stack";
+import { isTargetLegal } from "../rules/targeting";
+import { contextOf, executeEffect } from "./effects";
 import { givePriorityToActivePlayer } from "./priority";
 
 export function beginResolution(state: GameState): ApplyResult {
@@ -16,7 +17,7 @@ export function beginResolution(state: GameState): ApplyResult {
 
     const next: GameState = { ...state, stack: state.stack.slice(0, -1) };
 
-    const targetSpecs = getTargetSpecs(state, entry);
+    const targetSpecs = getEntryTargetSpecs(state, entry);
     const legalTargets = entry.targets.map((spec, i) =>
         spec.map((t) => {
             const targetSpec = targetSpecs[i];
@@ -30,15 +31,13 @@ export function beginResolution(state: GameState): ApplyResult {
         // There was at least one target specified, but no targets were legal - entry fizzles
         const moved = moveObject(next, entry.source, "graveyard");
         if (!moved) return fail("Unable to move fizzled spell to its owner's graveyard");
-        return givePriorityToActivePlayer(moved.state, [
-            { type: "stackEntryFizzles", id: entry.id, entryName: getCardName(state, entry.source) },
-            ...moved.events,
-        ]);
+        const entryName = entry.kind === "spell" ? getCardName(state, entry.source) : entry.sourceSnapshot.chars.name;
+        return givePriorityToActivePlayer(moved.state, [{ type: "stackEntryFizzles", id: entry.id, entryName: entryName }, ...moved.events]);
     }
 
     const resolving: ResolutionInProgress = {
         entry,
-        frames: [{ effects: resolveStackEntryEffects(state, entry), pc: 0 }],
+        frames: [{ effects: getEntryEffects(state, entry), pc: 0 }],
         legalTargets: legalTargets,
         bindings: {},
     };

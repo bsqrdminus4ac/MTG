@@ -194,14 +194,26 @@ describe("spell targeting", () => {
             targets: [],
             bindings: {},
         };
+        const sourceObject = spell.state.objects[spell.newId]!;
         const abilityEntry: StackEntry = {
             kind: "ability" as const,
             id: 1001 as StackId,
             controller: bob,
             source: spell.newId,
             targets: [],
-            definitionId: targetSpell.id,
-            abilityIndex: 0,
+            ability: {
+                kind: "triggered",
+                trigger: { event: "lifeChanged", scope: "any" },
+                targets: [],
+                effects: [],
+                triggerableZones: ["battlefield"],
+            },
+            sourceSnapshot: {
+                id: spell.newId,
+                chars: getCharacteristics(spell.state, spell.newId)!,
+                controller: sourceObject.controller,
+                owner: sourceObject.owner,
+            },
             bindings: {},
         };
         return {

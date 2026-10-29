@@ -1,4 +1,5 @@
-import type { CardDefinition } from "./cardDefinition";
+import type { AbilityOfKind } from "./abilities";
+import type { CardDefinition, Characteristics } from "./cardDefinition";
 import type { ContinuousEffect } from "./continuous";
 import type { ChoiceValue, Decision } from "./decisions";
 import type { Effect } from "./effects";
@@ -52,10 +53,18 @@ export interface SpellOnStack extends StackEntryBase {
     readonly kind: "spell";
     readonly spellIndex?: number; // Placeholder for if a card contains more than one spell (MDFC, adventures, etc.)
 }
+
+export interface SourceSnapshot {
+    readonly id: ObjectId; // the id at the time (may no longer exist)
+    readonly chars: Characteristics; // layered characteristics at that moment (name, colors, power, keywords)
+    readonly controller: PlayerId;
+    readonly owner: PlayerId;
+}
+
 export interface AbilityOnStack extends StackEntryBase {
     readonly kind: "ability";
-    readonly definitionId: CardDefId;
-    readonly abilityIndex: number;
+    readonly ability: AbilityOfKind<"activated" | "triggered">; // the ability itself, as plain immutable data
+    readonly sourceSnapshot: SourceSnapshot;
 }
 export type StackEntry = SpellOnStack | AbilityOnStack;
 
