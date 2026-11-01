@@ -5,7 +5,7 @@ import { EventLog } from "./components/EventLog";
 import { PlayerPanel } from "./components/PlayerPanel";
 import { StackPanel } from "./components/StackPanel";
 import { findProblems } from "./describe";
-import { useGame } from "./useGame";
+import { useGame, type GameType } from "./useGame";
 
 function stringifyForDisplay(value: object): string {
   return JSON.stringify(value, (key, nestedValue) => (key === "rollback" ? "[...]" : nestedValue), 2);
@@ -34,6 +34,7 @@ export function ProgressState({ title, value }: { readonly title: string; readon
 
 export function App() {
   const game = useGame();
+  const [newGameType, setNewGameType] = useState<GameType>("demo");
   const { state } = game;
   const problems = useMemo(() => findProblems(state), [state]);
   const { turn } = state;
@@ -71,7 +72,16 @@ export function App() {
           >
             Auto-pass
           </button>
-          <button type="button" onClick={game.reset}>
+          <label htmlFor="new-game-type">New game type</label>
+          <select
+            id="new-game-type"
+            value={newGameType}
+            onChange={(event) => setNewGameType(event.currentTarget.value === "activation" ? "activation" : "demo")}
+          >
+            <option value="demo">Demo game</option>
+            <option value="activation">Activation test</option>
+          </select>
+          <button type="button" onClick={() => game.reset(newGameType)}>
             New game
           </button>
         </div>

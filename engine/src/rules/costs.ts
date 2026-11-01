@@ -14,7 +14,7 @@ export function calculateFinalCost(state: GameState, player: PlayerId, chars: Ch
             return chars?.manaCost ?? null;
         }
         case "activated": {
-            return ability.cost.mana;
+            return ability.cost.mana ?? null;
         }
         default:
             return assertNever(ability);

@@ -87,12 +87,10 @@ export function commitCast(state: GameState): ApplyResult {
     const out: GameEvent[] = [];
     out.push(...castingInfo.events);
 
-    if (castingInfo.cost) {
-        const playerPaid = payCastingCost(currentState, castingInfo);
-        if (!playerPaid.ok) return playerPaid;
-        currentState = playerPaid.state;
-        out.push(...playerPaid.events);
-    }
+    const playerPaid = payCastingCost(currentState, castingInfo);
+    if (!playerPaid.ok) return playerPaid;
+    currentState = playerPaid.state;
+    out.push(...playerPaid.events);
 
     let entry: NewStackEntry | null = null;
     switch (castingInfo.kind) {
@@ -156,18 +154,16 @@ export function payCastingCost(state: GameState, casting: CastingInProgress): Ap
 export function selectTargetOptions(state: GameState): ApplyResult {
     if (!state.casting) return fail("No casting in progress to cancel");
     if (state.casting.targetSpecsSelected.length === 0) return fail("Entered target selection with no target specification for the selected spell");
-    const player = state.casting.player;
-    const card = state.casting.card;
-    const nextSpecIndex = state.casting.targetSpecsSelected.indexOf(false);
+    const casting = state.casting;
+    const player = casting.player;
+    const card = casting.card;
+    const nextSpecIndex = casting.targetSpecsSelected.indexOf(false);
     if (nextSpecIndex === -1) {
         // Targets have all been selected, go to mana payment step
         return payManaOptions(state);
     }
-    const chars = getCharacteristics(state, card);
-    const spellAbilities = chars?.abilities;
-    const spell = spellAbilities?.find((a) => a.kind === "spell");
-    if (!spell) return fail("This card has no spell abilities to cast");
-    const nextSpec = spell.targets[nextSpecIndex];
+
+    const nextSpec = casting.ability.targets[nextSpecIndex];
     if (!nextSpec) return fail("Invalid TargetSpec to select targets for");
     const scope: EvalScope = {
         controller: player,
@@ -181,18 +177,19 @@ export function selectTargetOptions(state: GameState): ApplyResult {
     const options: Choice[] = [];
     for (const target of legalTargets) {
         if (target.kind === "player") {
-            options.push(playerChoice(target.id, `Target player ${target.id} with ${chars?.name}`));
+            options.push(playerChoice(target.id, `Target player ${target.id} with ${getCastName(state, casting)}`));
         } else if (target.kind === "object") {
             const targetChars = getCharacteristics(state, target.id);
             if (!targetChars) continue;
-            options.push(objectChoice(target.id, `Target object ${targetChars.name} (#${target.id}) with ${chars?.name}`));
+            options.push(objectChoice(target.id, `Target object ${targetChars.name} (#${target.id}) with ${getCastName(state, casting)}`));
         }
     }
+    const targetCastName = casting.kind === "spell" ? `spell ${getCastName(state, state.casting)}` : getCastName(state, state.casting);
     const nextState = openDecision(state, (id) =>
         chooseMany({
             id,
             options: options,
-            prompt: buildTargetPrompt(card, chars?.name!, nextSpec),
+            prompt: buildTargetPrompt(card, targetCastName, nextSpec),
             min: nextSpec.minCount,
             max: nextSpec.maxCount,
             player: player,
@@ -221,7 +218,7 @@ export function applyTargetSelections(state: GameState, targets: Target[]): Appl
     return selectTargetOptions(nextState);
 }
 
-function buildTargetPrompt(card: ObjectId, cardName: string, spec: TargetSpec): string {
+function buildTargetPrompt(card: ObjectId, castName: string, spec: TargetSpec): string {
     let prompt = "Select ";
     const targetDesc = spec.description ?? "";
     if (spec.minCount === 1 && spec.maxCount === 1) {
@@ -231,7 +228,7 @@ function buildTargetPrompt(card: ObjectId, cardName: string, spec: TargetSpec): 
     } else {
         prompt += `between ${spec.minCount} and ${spec.maxCount} ${targetDesc} targets `;
     }
-    prompt += `for spell ${cardName} (#${card})`;
+    prompt += `for ${castName} (#${card})`;
     return prompt;
 }
 
@@ -242,9 +239,20 @@ export function payManaOptions(state: GameState): ApplyResult {
     const card = casting.card;
     const chars = getCharacteristics(state, casting.card);
     const cost = casting.cost ?? calculateFinalCost(state, player, chars, casting.ability);
+    const castName = getCastName(state, casting);
     if (!cost) {
         if (casting.kind === "spell") return fail("Invalid mana cost for spell");
-        else return ok(state, []); // Null mana costs on activated abilities are fine, just skip this step
+        else {
+            const decisionState = openDecision(state, (id) =>
+                yesNo({
+                    id,
+                    player,
+                    prompt: `Activate ${castName}?`,
+                    then: { kind: "costPayment" },
+                }),
+            );
+            return ok(decisionState, []); // Null mana costs on activated abilities are fine, just skip this step
+        }
     }
     const nextState: GameState = casting.cost === cost ? state : { ...state, casting: { ...casting, cost } };
 
@@ -252,10 +260,9 @@ export function payManaOptions(state: GameState): ApplyResult {
     if (!p) return fail("Invalid player");
     let prompt = "";
     if (casting.kind === "spell") {
-        const cardName = getCharacteristics(nextState, card)?.name;
-        prompt = `Pay mana to cast ${cardName}?`;
+        prompt = `Pay mana to cast ${castName}?`;
     } else {
-        prompt = `Pay mana to activate ability of ${casting.sourceSnapshot.chars.name}?`;
+        prompt = `Pay mana to activate ${castName}?`;
     }
     if (canPayMana(p.manaPool, cost)) {
         const decisionState = openDecision(nextState, (id) =>
@@ -278,13 +285,9 @@ export function payManaOptions(state: GameState): ApplyResult {
             getCardText(ability.ability.effects)[0] ?? `Ability #${ability.abilityIndex + 1} of ${getCharacteristics(nextState, ability.source)?.name}`,
         ),
     );
-    prompt = "";
-    if (casting.kind === "spell") {
-        const cardName = getCharacteristics(nextState, card)?.name;
-        prompt = `Add mana to cast ${cardName}?`;
-    } else {
-        prompt = `Add mana to activate ability of ${casting.sourceSnapshot.chars.name}?`;
-    }
+
+    prompt = casting.kind === "spell" ? `Add mana to cast ${castName}?` : `Add mana to activate ${castName}?`;
+
     const decisionState = openDecision(nextState, (id) =>
         chooseOne({
             id,
@@ -333,4 +336,10 @@ export function applyCommitSpellDecision(state: GameState, answer: boolean): App
     } else {
         return cancelCast(state);
     }
+}
+
+function getCastName(state: GameState, casting: CastingInProgress): string {
+    if (casting.kind === "spell") return getCardName(state, casting.card);
+    else if (casting.kind === "activated") return `${casting.sourceSnapshot.chars.name}'s ability`;
+    return assertNever(casting);
 }

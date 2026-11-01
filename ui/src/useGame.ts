@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import { submitAnswer, type Answer, type GameEvent, type GameState, type PlayerId, type Submission } from "@mtg/engine";
-import { newDemoGame } from "./demo";
+import { activationTestGame, newDemoGame } from "./demo";
 import { describeAnswer, describeEvent } from "./describe";
 
 export interface LogEntry {
@@ -11,6 +11,7 @@ export interface LogEntry {
 
 interface History {
   readonly startingState: GameState;
+  readonly startDescription: string;
   readonly submissions: Submission[];
 }
 
@@ -35,13 +36,18 @@ function appendLog(log: readonly LogEntry[], drafts: readonly Draft[]): readonly
   return [...log, ...added].slice(-MAX_LOG);
 }
 
-function freshModel(): Model {
-  const startingState = newDemoGame();
+export type GameType = "demo" | "activation";
+
+function freshModel(gameType: GameType = "demo"): Model {
+  const startingState = gameType === "activation" ? activationTestGame() : newDemoGame();
+  const startDescription = gameType === "activation"
+    ? "New game: activation test scenario"
+    : "New game: alice vs bob, 7 cards each (decks are not shuffled)";
   return {
     state: startingState,
-    log: appendLog([], [{ kind: "event", text: "New game: alice vs bob, 7 cards each (decks are not shuffled)" }]),
+    log: appendLog([], [{ kind: "event", text: startDescription }]),
     error: null,
-    history: { startingState, submissions: [] },
+    history: { startingState, startDescription, submissions: [] },
     undoneDecisions: [],
     forcePass: {},
   };
@@ -80,7 +86,7 @@ function undo(model: Model): Model {
   if (submissions.length === 0) return model;
   const newSubmissions = submissions.slice(0, -1);
   let state = startingState;
-  let log: readonly LogEntry[] = appendLog([], [{ kind: "event", text: "New game: alice vs bob, 7 cards each (decks are not shuffled)" }]);
+  let log: readonly LogEntry[] = appendLog([], [{ kind: "event", text: model.history.startDescription }]);
   for (const submission of newSubmissions) {
     const result = submitAnswer(state, submission);
     if (!result.ok) throw new Error("Failed to replay history: " + result.error);
@@ -199,7 +205,7 @@ export function useGame() {
   const submitAnswerAction = useCallback((answer: Answer) => setModel((m) => submit(m, answer)), []);
   const autoPass = useCallback(() => setModel((m) => runAutoPass(m)), []);
   const forcePassAction = useCallback((player: PlayerId) => setModel((m) => toggleForcePass(m, player)), []);
-  const reset = useCallback(() => setModel(freshModel()), []);
+  const reset = useCallback((gameType: GameType = "demo") => setModel(freshModel(gameType)), []);
   const undoAction = useCallback(() => setModel((m) => undo(m)), []);
   const redoAction = useCallback(() => setModel((m) => redo(m)), []);
   const enableUndo = model.history.submissions.length > 0;

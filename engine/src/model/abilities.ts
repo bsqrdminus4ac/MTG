@@ -6,9 +6,9 @@ import type { ManaCost } from "./mana";
 import type { Keyword, Zone } from "./vocabulary";
 
 export type Cost = Readonly<{
-    mana: ManaCost | null;
-    tap: boolean;
-    sacrificeSelf: boolean;
+    mana?: ManaCost;
+    tap?: boolean;
+    sacrificeSelf?: boolean;
 }>;
 
 export type TriggerCondition = Readonly<{
@@ -23,7 +23,7 @@ export type Ability =
     | Readonly<{
           kind: "activated";
           cost: Cost;
-          isManaAbility: boolean; // mana abilities don't use the stack (CR 605)
+          isManaAbility?: boolean; // mana abilities don't use the stack (CR 605)
           targets: TargetSpec[];
           effects: readonly CardEffect[];
           activateableZones: readonly Zone[];

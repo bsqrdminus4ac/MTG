@@ -128,7 +128,7 @@ describe("ability resolution", () => {
 
         const ability: AbilityOfKind<"activated"> = {
             kind: "activated",
-            cost: { mana: null, tap: false, sacrificeSelf: false },
+            cost: {},
             isManaAbility: false,
             targets: [],
             effects: [{ kind: "gainLife", who: { kind: "player", who: "controller" }, amount: 1 }],

@@ -2,7 +2,7 @@ import { type ApplyResult, fail, ok } from "../core/result";
 import { withEntry } from "../core/util";
 import { getCardName, getCharacteristics } from "../model/characteristics";
 import { type PriorityOption, priorityDecision } from "../model/decisions";
-import { getCardText } from "../model/effects";
+import { describeAbility } from "../model/effects";
 import type { GameEvent } from "../model/events";
 import type { ObjectId, PlayerId } from "../model/ids";
 import { type GameState, nextPlayer } from "../model/state";
@@ -70,10 +70,11 @@ export function priorityOptions(state: GameState, player: PlayerId): readonly Pr
         ...getAllActivatableAbilities(state, player)
             .filter(({ source, abilityIndex }) => checkActivatable(state, player, source, abilityIndex).ok)
             .map(({ source, ability, abilityIndex }): PriorityOption => {
-                const cardText = getCardText(ability.effects)[0];
+                const sourceName = getCardName(state, source);
+                const cardText = describeAbility(ability, sourceName);
                 return {
                     id: `activate:${source}:${abilityIndex}`,
-                    label: `Activate ${getCharacteristics(state, source)?.name}'s ability` + (cardText ? ` (${cardText})` : ""),
+                    label: `Activate ${sourceName}'s ability` + (cardText ? ` (${cardText})` : ""),
                     action: {
                         type: "activateAbility",
                         player,

@@ -1,15 +1,16 @@
-import type { Ability, ManaType } from "@mtg/engine";
-
+import type { Ability, Effect, ManaType } from "@mtg/engine";
 
 export const tapForMana = (mana: ManaType): Ability => ({
     kind: "activated",
-    cost: { mana: null, tap: true, sacrificeSelf: false },
+    cost: { tap: true },
     isManaAbility: true,
     targets: [],
     effects: [{ kind: "addMana", mana, amount: 1, description: `Tap: Add ${mana}` }],
     activateableZones: ["battlefield"],
     timingRestriction: "instantSpeed",
 });
+
+export const drawCards = (amount: number): Effect => ({ kind: "draw", count: amount, who: { kind: "player", who: "controller" } });
 
 export const discardThenGainLife = (): Ability => ({
     kind: "spell",

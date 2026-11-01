@@ -12,7 +12,7 @@ export function tapPermanent(state: GameState, objId: ObjectId): ApplyResult {
     if (!obj) return fail(`Unable to find object #${objId}`);
     if (obj.tapped) return fail("That object is already tapped");
     const tappedObj = withEntry(state.objects, objId, { ...obj, tapped: true });
-    return ok({ ...state, objects: tappedObj }, [{ type: "permanentTapped", object: objId, cardName: getCardName(state, objId) }]);
+    return ok({ ...state, objects: tappedObj }, [{ type: "permanentTapped", object: objId, cardName: getCardName(state, objId, true) }]);
 }
 
 export function damagePlayer(state: GameState, player: PlayerId, source: SourceSnapshot, amount: number, isCombatDamage: boolean): ApplyResult {
@@ -20,7 +20,7 @@ export function damagePlayer(state: GameState, player: PlayerId, source: SourceS
     if (!p) return fail("Invalid player to damage");
     if (amount === 0) return ok(state, []);
     return ok({ ...state, players: withEntry(state.players, player, { ...p, life: p.life - amount }) }, [
-        { type: "damageDealt", source: source.id, sourceName: source.chars.name, amount, target: { kind: "player", id: player }, targetName: "", isCombatDamage },
+        { type: "damageDealt", source: source.id, sourceName: source.chars.name, amount, target: { kind: "player", id: player }, targetName: player, isCombatDamage },
     ]);
 }
 
@@ -71,7 +71,7 @@ export function damageCreature(state: GameState, target: ObjectId, source: Sourc
     if (!obj) return ok(state, []);
     if (amount === 0) return ok(state, []);
     return ok({ ...state, objects: withEntry(state.objects, target, { ...obj, damage: obj.damage + amount }) }, [
-        { type: "damageDealt", source: source.id, sourceName: source.chars.name, amount, target: { kind: "object", id: target }, targetName: getCardName(state, target), isCombatDamage },
+        { type: "damageDealt", source: source.id, sourceName: source.chars.name, amount, target: { kind: "object", id: target }, targetName: getCardName(state, target, true), isCombatDamage },
     ]);
 }
 
@@ -81,7 +81,7 @@ export function damagePlaneswalker(state: GameState, target: ObjectId, source: S
     if (amount === 0) return ok(state, []);
     if (!("loyalty" in obj.counters)) return fail("Planeswalkers have to have loyalty counters defined");
     return ok({ ...state, objects: withEntry(state.objects, target, { ...obj, counters: withEntry(obj.counters, "loyalty", obj.counters["loyalty"] - amount) }) }, [
-        { type: "damageDealt", source: source.id, sourceName: source.chars.name, amount, target: { kind: "object", id: target }, targetName: getCardName(state, target), isCombatDamage },
+        { type: "damageDealt", source: source.id, sourceName: source.chars.name, amount, target: { kind: "object", id: target }, targetName: getCardName(state, target, true), isCombatDamage },
     ]);
 }
 

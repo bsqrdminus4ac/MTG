@@ -113,7 +113,7 @@ const stackSpell: CardDefinition = {
 
 const unaffordableAbility: AbilityOfKind<"activated"> = {
     kind: "activated",
-    cost: { mana: oneGeneric, tap: false, sacrificeSelf: false },
+    cost: { mana: oneGeneric },
     isManaAbility: false,
     targets: [],
     effects: [],
@@ -130,7 +130,7 @@ const unaffordableAbilitySource: CardDefinition = {
 
 const selfManaAbility: AbilityOfKind<"activated"> = {
     kind: "activated",
-    cost: { mana: oneGeneric, tap: true, sacrificeSelf: false },
+    cost: { mana: oneGeneric, tap: true },
     isManaAbility: false,
     targets: [],
     effects: [],
@@ -140,7 +140,7 @@ const selfManaAbility: AbilityOfKind<"activated"> = {
 
 const ownManaSourceAbility: AbilityOfKind<"activated"> = {
     kind: "activated",
-    cost: { mana: null, tap: true, sacrificeSelf: false },
+    cost: { tap: true },
     isManaAbility: true,
     targets: [],
     effects: [{ kind: "addMana", mana: "G", amount: 1 }],

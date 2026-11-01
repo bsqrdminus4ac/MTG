@@ -9,7 +9,8 @@ interface EntryProps {
 }
 
 function StackEntryCard({ state, entry, top }: EntryProps) {
-  const name = nameOf(state, entry.source);
+  const name = entry.kind === "ability" ? entry.sourceSnapshot.chars.name : nameOf(state, entry.source);
+  const displayName = entry.kind === "ability" ? `${name}'s ability` : name;
   const source = state.objects[entry.source];
 
   // A spell's effects live on its card; an ability on the stack carries its own copy.
@@ -22,7 +23,7 @@ function StackEntryCard({ state, entry, top }: EntryProps) {
       ["Kind", entry.kind],
       ["Controller", entry.controller],
       ["Source", `${name} (#${entry.source})`],
-      ["Source zone", source?.zone ?? "missing"],
+      ["Source's current zone", source?.zone ?? "missing"],
       ["Targets", <NestedList key="targets" items={entry.targets.flatMap((spec) => spec.map((t) => describeTarget(state, t)))} />],
       ["Effects", <NestedList key="effects" items={effects} />],
   ];
@@ -31,20 +32,20 @@ function StackEntryCard({ state, entry, top }: EntryProps) {
   }
 
   return (
-    <details className="obj">
-      <summary>
-        {top && <span className="badge accent">top</span>}
-        <span className="badge">{entry.kind}</span>
-        <span className="stack-summary-main">
-          <span className="stack-title">
-            <span className="name">{name}</span>
-            <span className="note">by {entry.controller}</span>
-          </span>
-          {abilityText && <span className="stack-ability-text">{abilityText}</span>}
-        </span>
-      </summary>
-      <Bullets items={items} />
-    </details>
+      <details className="obj">
+          <summary>
+              {top && <span className="badge accent">top</span>}
+              <span className="badge">{entry.kind}</span>
+              <span className="stack-summary-main">
+                  <span className="stack-title">
+                      <span className="name">{displayName}</span>
+                      <span className="note">by {entry.controller}</span>
+                  </span>
+                  {abilityText && <span className="stack-ability-text">{abilityText}</span>}
+              </span>
+          </summary>
+          <Bullets items={items} />
+      </details>
   );
 }
 

@@ -1,13 +1,31 @@
 import {
   createGame,
   drawCard,
+  moveObject,
   playerId,
   withPriorityDecision,
   type CardDefId,
   type GameState,
 } from "@mtg/engine";
 
-import { ALL_DEFINITIONS, bear, bolt, discardLife, drake, forest, mountain, skeins } from "@mtg/definitions";
+import {
+  ALL_DEFINITIONS,
+  arcaneElf,
+  bear,
+  bolt,
+  clockworkScribe,
+  discardLife,
+  drake,
+  dustyFilter,
+  forest,
+  mountain,
+  painfulPeak,
+  pyroAdept,
+  scrapIdol,
+  scrapShooter,
+  skeins,
+  treasureChest,
+} from "@mtg/definitions";
 
 export const ALICE = playerId("Alice");
 export const BOB = playerId("Bob");
@@ -28,5 +46,34 @@ export function newDemoGame(): GameState {
     for (let i = 0; i < 7; i++) state = drawCard(state, player).state;
   }
   // Drawing happened outside the engine's turn flow, so ask the opening question again.
+  return withPriorityDecision(state);
+}
+
+/** A fixed activation-testing scenario with all activation cards on the battlefield. */
+export function activationTestGame(): GameState {
+  const permanents = [
+    { player: ALICE, cards: [pyroAdept, clockworkScribe, arcaneElf, scrapIdol] },
+    { player: BOB, cards: [scrapShooter, treasureChest, painfulPeak, dustyFilter] },
+  ] as const;
+  let state = createGame(ALL_DEFINITIONS, permanents.map(({ player, cards }) => ({
+    id: player,
+    deck: cards.map((card) => card.id),
+  })));
+
+  for (const { player, cards } of permanents) {
+    for (const card of cards) {
+      const cardInLibrary = state.players[player]?.library.find((id) => state.objects[id]?.definitionId === card.id);
+      if (cardInLibrary === undefined) throw new Error(`Missing ${card.name} in ${player}'s library`);
+      const moved = moveObject(state, cardInLibrary, "battlefield");
+      if (!moved) throw new Error(`Unable to move ${card.name} to the battlefield`);
+      state = moved.state;
+    }
+  }
+
+  state = {
+    ...state,
+    turn: { number: 2, activePlayer: ALICE, step: "precombatMain" },
+    priority: { holder: ALICE, consecutivePasses: 0 },
+  };
   return withPriorityDecision(state);
 }

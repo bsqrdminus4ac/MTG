@@ -1,6 +1,7 @@
-import { cardDefId, chooseMany, getCharacteristics, indexChoice, moveObject, orderingDecision, yesNo, type DecisionId, type GameState, type StackId } from "@mtg/engine";
+import { chooseMany, getCharacteristics, indexChoice, moveObject, orderingDecision, yesNo, type CardDefinition, type DecisionId, type GameState, type StackId } from "@mtg/engine";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
+import { bolt, drake, forest } from "@mtg/definitions";
 import { App, ProgressState } from "./App";
 import { DecisionPanel } from "./components/DecisionPanel";
 import { ObjectCard } from "./components/ObjectCard";
@@ -22,12 +23,12 @@ function zoneOf(region: HTMLElement, title: string): HTMLDetailsElement {
 
 const cardsIn = (zone: HTMLElement) => [...zone.querySelectorAll<HTMLDetailsElement>("details.obj")];
 
-function withCardText(state: GameState, cardId: string, description: string): GameState {
-    const id = cardDefId(cardId);
+function withCardText(state: GameState, card: CardDefinition, description: string): GameState {
+    const id = card.id;
     const definition = state.definitions[id];
-    if (!definition) throw new Error(`expected ${cardId} definition`);
+    if (!definition) throw new Error(`expected ${card.name} definition`);
     const ability = definition.abilities[0];
-    if (!ability || !("effects" in ability)) throw new Error(`expected effects on ${cardId}`);
+    if (!ability || !("effects" in ability)) throw new Error(`expected effects on ${card.name}`);
 
     const describedAbility = {
         ...ability,
@@ -64,6 +65,24 @@ describe("in-progress state panels", () => {
     });
 });
 
+describe("new game", () => {
+    test("starts the selected activation test scenario", () => {
+        render(<App />);
+        fireEvent.change(screen.getByLabelText("New game type"), { target: { value: "activation" } });
+        fireEvent.click(screen.getByRole("button", { name: "New game" }));
+
+        for (const player of [ALICE, BOB]) {
+            expect(cardsIn(zoneOf(playerRegion(player), "Battlefield"))).toHaveLength(4);
+        }
+        expect(screen.getByText("New game: activation test scenario")).toBeTruthy();
+        const aliceBattlefield = zoneOf(playerRegion(ALICE), "Battlefield");
+        const bobBattlefield = zoneOf(playerRegion(BOB), "Battlefield");
+        const namesIn = (zone: HTMLElement) => [...zone.querySelectorAll(".name")].map((element) => element.textContent);
+        expect(namesIn(aliceBattlefield)).toContain("Scrap Idol");
+        expect(namesIn(bobBattlefield)).toEqual(expect.arrayContaining(["Scrap Shooter", "Treasure Chest"]));
+    });
+});
+
 describe("zones", () => {
     test("each player gets their own containers, with one collapsible element per card", () => {
         render(<App />);
@@ -88,8 +107,8 @@ describe("zones", () => {
     });
 
     test("shows authored effect text under Card Text and replaces the this placeholder", () => {
-        const state = withCardText(newDemoGame(), "forest", "<this> taps to add one green mana.");
-        const id = must(state.players[ALICE]!.hand.find((card) => state.objects[card]?.definitionId === cardDefId("forest")));
+        const state = withCardText(newDemoGame(), forest, "<this> taps to add one green mana.");
+        const id = must(state.players[ALICE]!.hand.find((id) => state.objects[id]?.definitionId === forest.id));
         render(<ObjectCard state={state} id={id} />);
 
         expect(screen.getByText("Card Text")).toBeTruthy();
@@ -103,7 +122,7 @@ describe("zones", () => {
 
     test("includes keyword abilities in the collapsed card text", () => {
         const state = newDemoGame();
-        const id = must(state.players[ALICE]!.hand.find((card) => state.objects[card]?.definitionId === cardDefId("drake")));
+        const id = must(state.players[ALICE]!.hand.find((id) => state.objects[id]?.definitionId === drake.id));
         render(<ObjectCard state={state} id={id} />);
 
         expect(screen.getByText("Flying", { selector: ".obj-card-text" })).toBeTruthy();
@@ -297,26 +316,26 @@ describe("stack panel", () => {
     });
 
     test("lists entries with the top of the stack first", () => {
-        const base = withCardText(withCardText(newDemoGame(), "bolt", "<this> deals three damage."), "forest", "<this> taps for green mana.");
+        const base = withCardText(withCardText(newDemoGame(), bolt, "<this> deals three damage."), forest, "<this> taps for green mana.");
         const hand = must(base.players[ALICE]).hand;
-        const find = (def: string) => must(hand.find((id) => base.objects[id]?.definitionId === cardDefId(def)));
+        const find = (def: CardDefinition) => must(hand.find((id) => base.objects[id]?.definitionId === def.id));
 
-        const bolt = must(moveObject(base, find("bolt"), "stack"));
-        const forest = must(moveObject(bolt.state, find("forest"), "stack"));
-        const boltCharacteristics = must(getCharacteristics(forest.state, bolt.newId));
+        const boltOnStack = must(moveObject(base, find(bolt), "stack"));
+        const forestOnStack = must(moveObject(boltOnStack.state, find(forest), "stack"));
+        const boltCharacteristics = must(getCharacteristics(forestOnStack.state, boltOnStack.newId));
         const boltAbility = must(boltCharacteristics.abilities.find((ability) => ability.kind === "spell"));
-        const forestObject = must(forest.state.objects[forest.newId]);
-        const forestCharacteristics = must(getCharacteristics(forest.state, forest.newId));
+        const forestObject = must(forestOnStack.state.objects[forestOnStack.newId]);
+        const forestCharacteristics = must(getCharacteristics(forestOnStack.state, forestOnStack.newId));
         const forestAbility = must(forestCharacteristics.abilities.find((ability) => ability.kind === "activated"));
 
         const state: GameState = {
-            ...forest.state,
+            ...forestOnStack.state,
             stack: [
                 {
                     kind: "spell",
                     id: 1000 as StackId,
                     controller: ALICE,
-                    source: bolt.newId,
+                    source: boltOnStack.newId,
                     targets: [[{ kind: "player", id: BOB }]],
                     ability: boltAbility,
                     bindings: {},
@@ -325,12 +344,12 @@ describe("stack panel", () => {
                     kind: "ability",
                     id: 1001 as StackId,
                     controller: BOB,
-                    source: forest.newId,
+                    source: forestOnStack.newId,
                     targets: [],
                     ability: forestAbility,
                     sourceSnapshot: {
-                        id: forest.newId,
-                        chars: forestCharacteristics,
+                        id: forestOnStack.newId,
+                        chars: { ...forestCharacteristics, name: "Snapshot Forest" },
                         controller: forestObject.controller,
                         owner: forestObject.owner,
                     },
@@ -342,9 +361,9 @@ describe("stack panel", () => {
 
         const region = screen.getByRole("region", { name: "Stack" });
         const names = [...region.querySelectorAll("ol.stack-list > li > details > summary .name")].map((n) => n.textContent);
-        expect(names).toEqual(["Forest", "Lightning Bolt"]); // last element of the array is the top
+        expect(names).toEqual(["Snapshot Forest's ability", "Lightning Bolt"]); // last element of the array is the top
         expect(must(region.querySelector("summary")).textContent).toContain("top");
-        expect(region.querySelector("summary .stack-ability-text")?.textContent).toContain("Forest taps for green mana.");
+        expect(region.querySelector("summary .stack-ability-text")?.textContent).toContain("Snapshot Forest taps for green mana.");
         expect(region.querySelectorAll("summary .stack-ability-text")[1]?.textContent).toContain("Lightning Bolt deals three damage.");
 
         const text = region.textContent ?? "";

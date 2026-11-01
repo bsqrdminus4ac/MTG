@@ -1,14 +1,8 @@
 import { describe, expect, test } from "vitest";
-import { cardDefId, type GameState, type ObjectId } from "@mtg/engine";
-import { DEFINITIONS } from "@mtg/definitions";
+import { type GameState, type ObjectId } from "@mtg/engine";
+import { bolt, forest, skeins } from "@mtg/definitions";
 import { ALICE, newDemoGame } from "./demo";
 import { describeAbility, describeCardText, describeEffect, describeEffects, describeManaCost, describePool, findProblems } from "./describe";
-
-const definition = (id: string) => {
-  const def = DEFINITIONS.find((d) => d.id === cardDefId(id));
-  if (!def) throw new Error(`no definition ${id}`);
-  return def;
-};
 
 describe("text describers", () => {
   test("mana costs", () => {
@@ -31,8 +25,8 @@ describe("text describers", () => {
       targets: [],
       effects: [{ kind: "gainLife", who: { kind: "player", who: "controller" }, amount: 1, description: "<this> gains life." }],
     }, "Healing Light")).toEqual(["Healing Light gains life."]);
-    expect(describeAbility(definition("forest").abilities[0]!)).toBe("Mana ability: {T} → add 1× {G}");
-    expect(describeAbility(definition("bolt").abilities[0]!)).toBe(
+    expect(describeAbility(forest.abilities[0]!)).toBe("Mana ability: {T} → add 1× {G}");
+    expect(describeAbility(bolt.abilities[0]!)).toBe(
       "Spell targeting 1 player or object: deal 3 damage to target 1",
     );
   });
@@ -64,7 +58,7 @@ describe("text describers", () => {
   });
 
   test("expands loop effects and describes their bound values", () => {
-    const ability = definition("skeins").abilities[0];
+    const ability = skeins.abilities[0];
     const effect = ability?.kind === "spell"
       ? ability.effects[0]
       : undefined;

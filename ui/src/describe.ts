@@ -230,7 +230,7 @@ export function describeEffectChoice(e: Extract<Effect, { kind: "choose" }>): st
 
 export function describeCost(c: Cost): string {
   const parts: string[] = [];
-  if (c.mana !== null) parts.push(describeManaCost(c.mana));
+  if (c.mana !== undefined) parts.push(describeManaCost(c.mana));
   if (c.tap) parts.push("{T}");
   if (c.sacrificeSelf) parts.push("sacrifice this");
   return parts.length > 0 ? parts.join(", ") : "no cost";
@@ -383,7 +383,7 @@ export function describeEvent(state: GameState, e: GameEvent): string {
 
       // Object effects
       case "damageDealt":
-          return `${e.sourceName} deals ${e.amount} damage to ${describeTarget(state, e.target)}`;
+          return `${e.sourceName} deals ${e.amount} damage to ${e.targetName}`;
       case "permanentTapped":
           return `${nameOf(state, e.object)} is tapped`;
       case "permanentUntapped":
