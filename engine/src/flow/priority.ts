@@ -2,36 +2,36 @@ import { type ApplyResult, fail, ok } from "../core/result";
 import { withEntry } from "../core/util";
 import { getCardName, getCharacteristics } from "../model/characteristics";
 import { type PriorityOption, priorityDecision } from "../model/decisions";
+import { getCardText } from "../model/effects";
 import type { GameEvent } from "../model/events";
 import type { ObjectId, PlayerId } from "../model/ids";
 import { type GameState, nextPlayer } from "../model/state";
 import { moveObject } from "../model/zones";
+import { getAllActivatableAbilities } from "../rules/abilityQueries";
 import { openDecision } from "../rules/pending";
 import { checkStateBasedActions } from "../rules/stateBasedActions";
 import { canPlayLand } from "../rules/timing";
-import { getCardText } from "../model/effects";
-import { getAllActivatableAbilities } from "./abilities";
-import { couldHaveManaToPayCost } from "./manaAbilities";
+import { checkActivatable, checkCastable } from "./castability";
 import { beginResolution } from "./resolution";
 import { advanceStep } from "./turn";
 
 export function passPriority(state: GameState, player: PlayerId): ApplyResult {
-  const priority = state.priority;
-  if (!priority) return fail("Nobody has priority right now");
-  if (priority.holder !== player) return fail("You don't have priority");
+    const priority = state.priority;
+    if (!priority) return fail("Nobody has priority right now");
+    if (priority.holder !== player) return fail("You don't have priority");
 
-  const events: GameEvent[] = [{ type: "priorityPassed", player, step: state.turn.step }];
-  const passes = priority.consecutivePasses + 1;
+    const events: GameEvent[] = [{ type: "priorityPassed", player, step: state.turn.step }];
+    const passes = priority.consecutivePasses + 1;
 
-  if (passes < state.turnOrder.length) {
-    const holder = nextPlayer(state, player);
-    const result = checkStateBasedActions(state, events);
-    if (!result.ok) return result;
-    return ok(withPriorityDecision({ ...result.state, priority: { holder, consecutivePasses: passes } }), result.events);
-  }
+    if (passes < state.turnOrder.length) {
+        const holder = nextPlayer(state, player);
+        const result = checkStateBasedActions(state, events);
+        if (!result.ok) return result;
+        return ok(withPriorityDecision({ ...result.state, priority: { holder, consecutivePasses: passes } }), result.events);
+    }
 
-  // Everyone passed in succession: resolve the top of the stack, or end the step.
-  return state.stack.length > 0 ? resolveTopOfStack(state, events) : advanceStep(state, events);
+    // Everyone passed in succession: resolve the top of the stack, or end the step.
+    return state.stack.length > 0 ? resolveTopOfStack(state, events) : advanceStep(state, events);
 }
 
 export function givePriorityToActivePlayer(state: GameState, events: GameEvent[]): ApplyResult {
@@ -48,12 +48,8 @@ export function givePriorityToActivePlayer(state: GameState, events: GameEvent[]
 
 /**
  * Everything this player may legally do right now while holding priority.
- * TODO: castSpell (needs mana payment) and activateAbility.
  */
-export function priorityOptions(
-    state: GameState,
-    player: PlayerId,
-): readonly PriorityOption[] {
+export function priorityOptions(state: GameState, player: PlayerId): readonly PriorityOption[] {
     const options: PriorityOption[] = [];
 
     const p = state.players[player];
@@ -71,21 +67,21 @@ export function priorityOptions(
     }
 
     options.push(
-        ...getAllActivatableAbilities(state, player).map(({ source, ability, abilityIndex }): PriorityOption => {
-            const cardText = getCardText(ability.effects)[0];
-            return {
-                id: `activate:${source}:${abilityIndex}`,
-                label:
-                    `Activate ${getCharacteristics(state, source)?.name}'s ability` +
-                    (cardText ? ` (${cardText})` : ""),
-                action: {
-                    type: "activateAbility",
-                    player,
-                    source,
-                    abilityIndex,
-                }, // TODO: handle targets
-            };
-        }),
+        ...getAllActivatableAbilities(state, player)
+            .filter(({ source, abilityIndex }) => checkActivatable(state, player, source, abilityIndex).ok)
+            .map(({ source, ability, abilityIndex }): PriorityOption => {
+                const cardText = getCardText(ability.effects)[0];
+                return {
+                    id: `activate:${source}:${abilityIndex}`,
+                    label: `Activate ${getCharacteristics(state, source)?.name}'s ability` + (cardText ? ` (${cardText})` : ""),
+                    action: {
+                        type: "activateAbility",
+                        player,
+                        source,
+                        abilityIndex,
+                    },
+                };
+            }),
     );
 
     options.push(
@@ -93,7 +89,7 @@ export function priorityOptions(
             (card): PriorityOption => ({
                 id: `cast:${card}`,
                 label: `Cast ${getCharacteristics(state, card)?.name}`,
-                action: { type: "castSpell", player, card, targets: [] }, // TODO: handle targets
+                action: { type: "castSpell", player, card },
             }),
         ),
     );
@@ -106,20 +102,10 @@ export function priorityOptions(
     return options;
 }
 
-
 function getCastableSpells(state: GameState, player: PlayerId): ObjectId[] {
-    const castable: ObjectId[] = [];
     const p = state.players[player];
-    if (!p) return castable;
-    for (const cardId of p.hand) {
-        const card = getCharacteristics(state, cardId);
-        if (!card) continue;
-        if (card.types.includes("Land")) continue; // Land cards are not castable spells
-        if (!card.manaCost) continue; // Cards without mana costs cannot be cast
-        if (!couldHaveManaToPayCost(state, player, card.manaCost, {})) continue;
-        castable.push(cardId);
-    }
-    return castable;
+    if (!p) return [];
+    return p.hand.filter((card) => checkCastable(state, player, card).ok);
 }
 
 /** Asks the current priority holder what they want to do. Call whenever priority changes hands. */

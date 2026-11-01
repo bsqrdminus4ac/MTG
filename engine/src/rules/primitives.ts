@@ -96,3 +96,15 @@ export function destroyPermanent(state: GameState, target: ObjectId, source: Sou
     const event: GameEvent = { type: "permanentDestroyed", object: target, cardName: targetName, source: source.id };
     return ok(result.state, [event, ...result.events]);
 }
+
+export function sacrificePermanent(state: GameState, target: ObjectId, source: SourceSnapshot): ApplyResult {
+    const obj = state.objects[target];
+    if (!obj) return ok(state, []);
+    if (obj.zone !== "battlefield") return ok(state, []);
+    if (obj.controller !== source.controller) return ok(state, []); // Object no longer controlled by ability owner
+    const targetName = getCardName(state, target);
+    const result = moveObject(state, source.id, "graveyard");
+    if (!result) return ok(state, []);
+    const event: GameEvent = { type: "permanentSacrificed", object: target, cardName: targetName, source: source.id };
+    return ok(result.state, [event, ...result.events]);
+}

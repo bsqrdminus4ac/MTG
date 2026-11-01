@@ -57,12 +57,21 @@ export function getLegalTargets(state: GameState, scope: EvalScope, spec: Target
     const candidates = collectTargets(state, scope, spec.filter);
     if (!candidates.ok) return candidates;
     for (const t of candidates.value) {
+        if (!canBeTargetedBy(state, scope, t)) continue;
         const key = targetKey(t);
         if (seen.has(key)) continue;
         seen.add(key);
         out.push(t);
     }
     return goodResult(out);
+}
+
+export function hasEnoughTargets(state: GameState, scope: EvalScope, specs: readonly TargetSpec[]): boolean {
+    return specs.every((spec) => {
+        if (spec.minCount === 0) return true;
+        const targets = getLegalTargets(state, scope, spec);
+        return targets.ok && targets.value.length >= spec.minCount;
+    });
 }
 
 function collectTargets(state: GameState, scope: EvalScope, filter: TargetFilter): Result<readonly Target[]> {

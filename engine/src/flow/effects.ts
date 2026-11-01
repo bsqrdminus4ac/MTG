@@ -1,11 +1,11 @@
 import { applySequentially, fail, goodResult, type ApplyResult, type Failure, type Result } from "../core/result";
-import { assertNever } from "../core/util";
+import { assertNever, withEntry } from "../core/util";
 import { getCardName } from "../model/characteristics";
 import { chooseMany, objectChoice, yesNo } from "../model/decisions";
 import type { Effect, EffectTarget, PlayerRef } from "../model/effects";
 import type { GameEvent } from "../model/events";
 import type { PlayerId } from "../model/ids";
-import { getRemainingPlayersInTurnOrder, type Binding, type EvalScope, type Frame, type GameState, type ResolutionInProgress, type SourceSnapshot, type Target } from "../model/state";
+import { getRemainingPlayersInTurnOrder, type Binding, type Bindings, type EvalScope, type Frame, type GameState, type ResolutionInProgress, type SourceSnapshot, type Target } from "../model/state";
 import { drawCardResult } from "../model/zones";
 import { getChoiceBinding, getObjectIdsFromBinding } from "../rules/bindings";
 import { evalCondition, resolveAmount } from "../rules/conditions";
@@ -43,6 +43,39 @@ export const stepFromApply = (result: ApplyResult): StepResult => {
     if (!result.ok) return result;
     return done(result.state, result.events);
 };
+
+// advances frames until they're empty or an effect asks for a decision
+export function runFrames(
+    state: GameState,
+    ctx: EffectContext,
+    frames: readonly Frame[],
+    bindings: Bindings,
+):
+    | { ok: true; waiting: false; state: GameState; events: readonly GameEvent[]; bindings?: Bindings }
+    | { ok: true; waiting: true; state: GameState; events: readonly GameEvent[]; frames: readonly Frame[]; bindings?: Bindings }
+    | Failure {
+    const out: GameEvent[] = [];
+    let currentState = state;
+    for (;;) {
+        const topFrame = frames[frames.length - 1];
+        if (!topFrame) return { ok: true, waiting: false, state: currentState, events: out, bindings };
+        const effect = topFrame.effects[topFrame.pc];
+        if (!effect) {
+            frames = frames.slice(0, -1);
+            continue;
+        }
+
+        const step = executeEffect(currentState, { ...ctx, bindings }, effect);
+        if (!step.ok) return step;
+        out.push(...step.events);
+        if (step.waiting) return { ok: true, waiting: true, state: step.state, events: out, bindings, frames }; // paused for a decision
+
+        bindings = step.bind ? withEntry(bindings, step.bind.bindAs, step.bind.value) : bindings;
+        const advanced = [...frames.slice(0, -1), { ...topFrame, pc: topFrame.pc + 1 }];
+        frames = step.enter ? [...advanced, ...[...step.enter].reverse()] : advanced; // If effect resulted in new nested effects to resolve, add those at the end and reverse them since ones at the end should resolve first
+        currentState = step.state;
+    }
+}
 
 //#region Effect Execution
 

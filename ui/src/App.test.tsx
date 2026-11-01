@@ -303,6 +303,8 @@ describe("stack panel", () => {
 
         const bolt = must(moveObject(base, find("bolt"), "stack"));
         const forest = must(moveObject(bolt.state, find("forest"), "stack"));
+        const boltCharacteristics = must(getCharacteristics(forest.state, bolt.newId));
+        const boltAbility = must(boltCharacteristics.abilities.find((ability) => ability.kind === "spell"));
         const forestObject = must(forest.state.objects[forest.newId]);
         const forestCharacteristics = must(getCharacteristics(forest.state, forest.newId));
         const forestAbility = must(forestCharacteristics.abilities.find((ability) => ability.kind === "activated"));
@@ -310,7 +312,15 @@ describe("stack panel", () => {
         const state: GameState = {
             ...forest.state,
             stack: [
-                { kind: "spell", id: 1000 as StackId, controller: ALICE, source: bolt.newId, targets: [[{ kind: "player", id: BOB }]], bindings: {} },
+                {
+                    kind: "spell",
+                    id: 1000 as StackId,
+                    controller: ALICE,
+                    source: bolt.newId,
+                    targets: [[{ kind: "player", id: BOB }]],
+                    ability: boltAbility,
+                    bindings: {},
+                },
                 {
                     kind: "ability",
                     id: 1001 as StackId,

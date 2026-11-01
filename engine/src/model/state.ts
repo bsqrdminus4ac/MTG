@@ -51,7 +51,7 @@ interface StackEntryBase {
 }
 export interface SpellOnStack extends StackEntryBase {
     readonly kind: "spell";
-    readonly spellIndex?: number; // Placeholder for if a card contains more than one spell (MDFC, adventures, etc.)
+    readonly ability: AbilityOfKind<"spell">;
 }
 
 export interface SourceSnapshot {
@@ -110,7 +110,7 @@ export interface CombatInfo {
     blockOrder?: readonly number[];
 }
 
-export interface CastingInProgress {
+interface CastProgress {
     player: PlayerId;
     card: ObjectId; // still in hand until commit
     targets: readonly (readonly Target[])[];
@@ -120,6 +120,19 @@ export interface CastingInProgress {
     rollback: GameState; // state before casting began
     events: readonly GameEvent[]; // buffered until commit
 }
+
+export type SpellCast = CastProgress & {
+    kind: "spell";
+    ability: AbilityOfKind<"spell">;
+};
+
+export type AbilityCast = CastProgress & {
+    kind: "activated";
+    ability: AbilityOfKind<"activated">;
+    sourceSnapshot: SourceSnapshot;
+};
+
+export type CastingInProgress = SpellCast | AbilityCast;
 
 export interface Frame {
     readonly effects: readonly Effect[];

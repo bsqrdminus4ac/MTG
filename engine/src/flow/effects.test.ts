@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import { submitAnswer } from "../engine";
 import type { AbilityOfKind } from "../model/abilities";
 import type { CardDefinition } from "../model/cardDefinition";
+import { snapshotSource } from "../model/characteristics";
 import { mayDo, type Amount, type Effect } from "../model/effects";
 import { cardDefId, playerId, type CardDefId, type ObjectId, type StackId } from "../model/ids";
 import type { GameState, Target } from "../model/state";
@@ -9,7 +10,6 @@ import { moveObject } from "../model/zones";
 import { resolveAmount } from "../rules/conditions";
 import { damageObject, damagePlayer } from "../rules/primitives";
 import { createGame } from "../setup";
-import { snapshotSource } from "./combat";
 import { executeEffect, resolvePlayers, type EffectContext, type StepResult } from "./effects";
 import { handleResolutionDecision, runResolution } from "./resolution";
 

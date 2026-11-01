@@ -1,6 +1,6 @@
 import { applySequentially, fail, ok, type ApplyResult } from "../core/result";
 import { keysOf, withEntry } from "../core/util";
-import { getCardName, getCharacteristics, hasCardType, hasKeyword } from "../model/characteristics";
+import { getCardName, hasCardType, hasKeyword, snapshotSource } from "../model/characteristics";
 import { chooseMany, chooseOne, nullChoice, objectChoice, orderingDecision, playerChoice, type Choice } from "../model/decisions";
 import type { GameEvent } from "../model/events";
 import type { ObjectId, PlayerId } from "../model/ids";
@@ -416,18 +416,6 @@ const snap = (state: GameState, snapshots: Map<ObjectId, SourceSnapshot>, id: Ob
     }
     return s;
 };
-
-export function snapshotSource(state: GameState, id: ObjectId): SourceSnapshot | undefined {
-    const obj = state.objects[id];
-    const chars = getCharacteristics(state, id);
-    if (!obj || !chars) return undefined;
-    return {
-        id,
-        chars,
-        controller: obj.controller,
-        owner: obj.owner,
-    };
-}
 
 function dealCombatDamage(state: GameState, combatInfo: CombatInfo, snapshots: Map<ObjectId, SourceSnapshot>, isFirstStrikeStep?: boolean): ApplyResult {
     if (!combatInfo.attackTarget || !isStillLegalTarget(state, combatInfo.id, combatInfo.attackTarget)) return ok(state, []);

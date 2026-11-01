@@ -389,7 +389,9 @@ export function describeEvent(state: GameState, e: GameEvent): string {
       case "permanentUntapped":
           return `${nameOf(state, e.object)} is untapped`;
       case "permanentDestroyed":
-          return `${e.cardName} (#${e.object}) is destroyed` + e.source ? ` by ${e.source}` : "";
+          return `${e.cardName} (#${e.object}) is destroyed${e.source ? ` by ${nameOf(state, e.source, true)}` : ""}`;
+      case "permanentSacrificed":
+          return `${e.cardName} (#${e.object}) is sacrificed${e.source ? ` by ${nameOf(state, e.source, true)}` : ""}`;
       case "cardDiscarded":
           return e.cause ? `${e.cause} causes ${e.player} to discard ${e.cardName} (#${e.card})` : `${e.player} discards ${e.cardName} (#${e.card})`;
 
@@ -404,12 +406,15 @@ export function describeEvent(state: GameState, e: GameEvent): string {
           return `${e.player} pays mana for ${e.cardName}`;
       case "spellCastCancelled":
           return `${e.player} cancels casting of ${e.cardName}`;
+      case "abilityActivateStart":
+          return `${e.player} starts activating ${e.sourceName}'s ability (${e.description})`;
       case "abilityActivated":
           return (
-              `${e.player} activates ability of ${e.cardName} (#${e.abilitySource})` +
-              (e.stackEntryId ? ` (#${e.stackEntryId})` : "") +
-              (e.targets ? ` targeting ${e.targets.map((t) => describeTarget(state, t)).join(", ")}` : "")
+              `${e.player} activates ${e.sourceName}'s ability (#${e.abilitySource}): ${e.description}` +
+              (e.targets.length > 0 ? ` targeting ${e.targets.map((t) => describeTarget(state, t)).join(", ")}` : "")
           );
+      case "abilityActivateCancelled":
+          return `${e.player} cancels activation of ${e.sourceName}'s ability (${e.description})`;
       case "stackEntryResolved":
           return `${e.entryName} (stack entry #${e.id}) resolves`;
       case "stackEntryFizzles":

@@ -4,7 +4,21 @@ export type Zone = "library" | "hand" | "battlefield" | "graveyard" | "stack" | 
 export type CardType = "Artifact" | "Battle" | "Creature" | "Enchantment" | "Instant" | "Land" | "Planeswalker" | "Sorcery";
 export type PermanentType = Exclude<CardType, "Instant" | "Sorcery">;
 export type Supertype = "Basic" | "Legendary" | "Snow";
-export type Keyword = "flying" | "firstStrike" | "doubleStrike" | "deathtouch" | "haste" | "lifelink" | "reach" | "trample" | "vigilance" | "menace" | "defender" | "hexproof" | "indestructible";
+export type Keyword =
+    | "flying"
+    | "firstStrike"
+    | "doubleStrike"
+    | "deathtouch"
+    | "haste"
+    | "lifelink"
+    | "reach"
+    | "trample"
+    | "vigilance"
+    | "menace"
+    | "defender"
+    | "hexproof"
+    | "indestructible"
+    | "flash";
 
 const DAMAGEABLE: Record<PermanentType, boolean> = {
     Creature: true,

@@ -1,14 +1,14 @@
-import { fail, ok, type ApplyResult } from "../core/result";
+import { fail, type ApplyResult } from "../core/result";
 import { withEntry } from "../core/util";
-import { getCharacteristics, isPermanentType } from "../model/characteristics";
+import { getCharacteristics, isPermanentType, snapshotSource } from "../model/characteristics";
 import type { ResolvedAnswer } from "../model/decisions";
 import type { GameEvent } from "../model/events";
 import type { Binding, Frame, GameState, ResolutionInProgress } from "../model/state";
 import type { Zone } from "../model/vocabulary";
 import { moveObject } from "../model/zones";
-import { getEntryEffects, getEntryName, getEntryTargetSpecs, snapshotEntrySource } from "../rules/stack";
+import { getEntryName } from "../rules/stack";
 import { isTargetLegal } from "../rules/targeting";
-import { contextOf, executeEffect } from "./effects";
+import { ask, contextOf, runFrames } from "./effects";
 import { givePriorityToActivePlayer } from "./priority";
 
 export function beginResolution(state: GameState): ApplyResult {
@@ -17,7 +17,7 @@ export function beginResolution(state: GameState): ApplyResult {
 
     const next: GameState = { ...state, stack: state.stack.slice(0, -1) };
 
-    const targetSpecs = getEntryTargetSpecs(state, entry);
+    const targetSpecs = entry.ability.targets;
     const legalTargets = entry.targets.map((spec, i) =>
         spec.map((t) => {
             const targetSpec = targetSpecs[i];
@@ -39,11 +39,11 @@ export function beginResolution(state: GameState): ApplyResult {
         }
     }
 
-    const sourceSnapshot = entry.kind === "ability" ? entry.sourceSnapshot : snapshotEntrySource(state, entry);
+    const sourceSnapshot = entry.kind === "ability" ? entry.sourceSnapshot : snapshotSource(state, entry.source);
     if (!sourceSnapshot) return fail("Unable to acquire snapshot of spell's source");
     const resolving: ResolutionInProgress = {
         entry,
-        frames: [{ effects: getEntryEffects(state, entry), pc: 0 }],
+        frames: [{ effects: entry.ability.effects, pc: 0 }],
         legalTargets: legalTargets,
         bindings: {},
         sourceSnapshot,
@@ -54,29 +54,16 @@ export function beginResolution(state: GameState): ApplyResult {
 export function runResolution(state: GameState): ApplyResult {
     let currentState: GameState = { ...state, pending: null };
     const out: GameEvent[] = [];
-    for (;;) {
-        const resolving = currentState.resolving;
-        if (!resolving) return fail("Nothing is resolving");
-        const topFrame = getTopFrame(currentState);
-        if (!topFrame) return finishResolution(currentState, out);
-        const effect = topFrame.effects[topFrame.pc];
-        if (!effect) {
-            currentState = { ...currentState, resolving: { ...resolving, frames: resolving.frames.slice(0, -1) } };
-            continue;
-        }
+    const resolving = currentState.resolving;
+    if (!resolving) return fail("Nothing is resolving");
 
-        const ctx = contextOf(resolving);
-        if (!ctx) return finishResolution(currentState, out);
-        const step = executeEffect(currentState, ctx, effect);
-        if (!step.ok) return step;
-        out.push(...step.events);
-        if (step.waiting) return ok(step.state, out); // paused for a decision
+    const ctx = contextOf(resolving);
 
-        const bindings = step.bind ? withEntry(resolving.bindings, step.bind.bindAs, step.bind.value) : resolving.bindings;
-        const advanced = [...resolving.frames.slice(0, -1), { ...topFrame, pc: topFrame.pc + 1 }];
-        const frames = step.enter ? [...advanced, ...[...step.enter].reverse()] : advanced; // If effect resulted in new nested effects to resolve, add those at the end and reverse them since ones at the end should resolve first
-        currentState = { ...step.state, resolving: { ...resolving, frames, bindings } };
-    }
+    const result = runFrames(currentState, ctx, resolving.frames, resolving.bindings);
+    if (!result.ok) return result;
+
+    if (result.waiting) return ask({ ...result.state, resolving: { ...resolving, frames: result.frames, bindings: result.bindings ?? resolving.bindings } }, result.events);
+    return finishResolution(result.state, result.events);
 }
 
 export function handleResolutionDecision(state: GameState, bindAs: string, answer: ResolvedAnswer): ApplyResult {

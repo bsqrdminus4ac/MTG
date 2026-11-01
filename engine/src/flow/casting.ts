@@ -1,35 +1,40 @@
 import { fail, ok, type ApplyResult } from "../core/result";
-import { withEntry } from "../core/util";
-import { getCardName, getCharacteristics, isPermanentType } from "../model/characteristics";
+import { assertNever } from "../core/util";
+import { getCardName, getCharacteristics } from "../model/characteristics";
 import { chooseMany, chooseOne, manaAbilityChoice, objectChoice, playerChoice, yesNo, type Choice } from "../model/decisions";
-import { getCardText, type TargetSpec } from "../model/effects";
+import { describeAbility, getCardText, type TargetSpec } from "../model/effects";
 import type { GameEvent } from "../model/events";
-import { nextID, type ObjectId, type PlayerId, type StackId } from "../model/ids";
-import { canPayMana, payMana, type ManaCost } from "../model/mana";
-import type { EvalScope, GameState, SpellOnStack, Target } from "../model/state";
+import { type ObjectId, type PlayerId } from "../model/ids";
+import { canPayMana } from "../model/mana";
+import type { CastingInProgress, EvalScope, GameState, Target } from "../model/state";
 import { moveObject } from "../model/zones";
+import { calculateFinalCost, payAbilityCosts, paySpellCosts } from "../rules/costs";
 import { openDecision } from "../rules/pending";
+import { getAbilityForSpell, pushStackEntry, type NewStackEntry } from "../rules/stack";
 import { getLegalTargets } from "../rules/targeting";
-import { activateAbility } from "./abilities";
-import { getAllManaSources } from "./manaAbilities";
+import { checkCastable } from "./castability";
+import { activateManaAbility, getAllManaSources } from "./manaAbilities";
 import { withPriorityDecision } from "./priority";
 
-export function beginCast(state: GameState, player: PlayerId, card: ObjectId): ApplyResult {
+export function beginSpellCast(state: GameState, player: PlayerId, card: ObjectId): ApplyResult {
+    const castable = checkCastable(state, player, card);
+    if (!castable.ok) return castable;
+
     const rollback = state;
     const spellInfo = getCharacteristics(state, card);
     if (!spellInfo) return fail(`Unable to get characteristics of #${card}`);
     let targetSpecs: boolean[] = [];
-    if (!spellInfo.types.some((t) => isPermanentType(t))) {
-        const spellAbilities = spellInfo.abilities;
-        const spell = spellAbilities?.find((a) => a.kind === "spell");
-        if (!spell) return fail("This card has no spell abilities to cast");
-        targetSpecs = new Array(spell.targets.length).fill(false);
-    }
-    let currentState: GameState = {
+    const spell = getAbilityForSpell(spellInfo);
+    if (!spell) return fail("This card has no spell abilities to cast");
+    targetSpecs = new Array(spell.targets.length).fill(false);
+
+    let castingState: GameState = {
         ...state,
         casting: {
             player,
             card,
+            kind: spell.kind,
+            ability: spell,
             targets: [],
             targetSpecsSelected: targetSpecs,
             cost: null,
@@ -38,25 +43,37 @@ export function beginCast(state: GameState, player: PlayerId, card: ObjectId): A
             events: [{ type: "spellCastStart", player, card, cardName: spellInfo.name }],
         },
     };
-    if (targetSpecs.length === 0) {
+    return continueCasting(castingState);
+}
+
+export function continueCasting(state: GameState): ApplyResult {
+    if (!state.casting) return fail("No cast in progress");
+    if (state.casting.targetSpecsSelected.length === 0) {
         // No targets, skip to mana payment step
-        return payManaOptions(currentState);
+        return payManaOptions(state);
     } else {
-        return selectTargetOptions(currentState);
+        return selectTargetOptions(state);
     }
 }
 
 export function cancelCast(state: GameState): ApplyResult {
     if (!state.casting) return fail("No casting in progress to cancel");
-    return ok(state.casting.rollback, [
-        ...state.casting.events,
-        {
-            type: "spellCastCancelled",
-            player: state.casting.player,
-            card: state.casting.card,
-            cardName: getCardName(state, state.casting.card),
-        },
-    ]);
+    const event: GameEvent =
+        state.casting.kind === "spell"
+            ? {
+                  type: "spellCastCancelled",
+                  player: state.casting.player,
+                  card: state.casting.card,
+                  cardName: getCardName(state, state.casting.card),
+              }
+            : {
+                  type: "abilityActivateCancelled",
+                  player: state.casting.player,
+                  abilitySource: state.casting.sourceSnapshot.id,
+                  description: describeAbility(state.casting.ability, state.casting.sourceSnapshot.chars.name),
+                  sourceName: state.casting.sourceSnapshot.chars.name,
+              };
+    return ok(state.casting.rollback, [...state.casting.events, event]);
 }
 
 export function commitCast(state: GameState): ApplyResult {
@@ -65,40 +82,75 @@ export function commitCast(state: GameState): ApplyResult {
 
     const p = state.players[castingInfo.player];
     if (!p) return fail("Invalid player");
+
     let currentState = state;
+    const out: GameEvent[] = [];
+    out.push(...castingInfo.events);
+
     if (castingInfo.cost) {
-        const playerPaid = payMana(p, castingInfo.cost);
-        if (!playerPaid) return fail("Unable to pay for the spell");
-        currentState = {
-            ...currentState,
-            players: withEntry(state.players, castingInfo.player, playerPaid),
-        };
+        const playerPaid = payCastingCost(currentState, castingInfo);
+        if (!playerPaid.ok) return playerPaid;
+        currentState = playerPaid.state;
+        out.push(...playerPaid.events);
     }
 
-    const [stackState, stackID] = nextID<StackId>(currentState);
-    currentState = stackState;
-    const moved = moveObject(currentState, castingInfo.card, "stack");
-    if (!moved) return fail("Unable to move spell to the stack");
-    currentState = moved.state;
-    const spell: SpellOnStack = {
-        controller: castingInfo.player,
-        id: stackID,
-        kind: "spell",
-        source: moved.newId,
-        targets: castingInfo.targets,
-        bindings: {},
-    };
-    const spellEvent: GameEvent = {
-        type: "spellCastSuccess",
-        card: moved.newId,
-        player: castingInfo.player,
-        targets: castingInfo.targets.flat(), //TODO: Consider making event layered too
-        cardName: getCardName(currentState, moved.newId),
-    };
-    const addedToStack = [...currentState.stack, spell];
-    const allEvents = [...castingInfo.events, ...moved.events, spellEvent];
-    currentState = { ...currentState, stack: addedToStack, casting: null };
-    return ok(withPriorityDecision(currentState), allEvents);
+    let entry: NewStackEntry | null = null;
+    switch (castingInfo.kind) {
+        case "spell": {
+            const moved = moveObject(currentState, castingInfo.card, "stack");
+            if (!moved) return fail("Unable to move spell to the stack");
+            out.push(...moved.events);
+            entry = {
+                controller: castingInfo.player,
+                kind: castingInfo.kind,
+                ability: castingInfo.ability,
+                source: moved.newId,
+                targets: castingInfo.targets,
+                bindings: castingInfo.bindings,
+            };
+            out.push({
+                type: "spellCastSuccess",
+                card: moved.newId,
+                player: castingInfo.player,
+                targets: castingInfo.targets.flat(), //TODO: Consider making event layered too
+                cardName: getCardName(currentState, moved.newId),
+            });
+            const stackState = pushStackEntry(moved.state, entry);
+            return ok(withPriorityDecision({ ...stackState.state, casting: null }), out);
+        }
+        case "activated": {
+            entry = {
+                controller: castingInfo.player,
+                kind: "ability",
+                ability: castingInfo.ability,
+                source: castingInfo.sourceSnapshot.id,
+                targets: castingInfo.targets,
+                bindings: castingInfo.bindings,
+                sourceSnapshot: castingInfo.sourceSnapshot,
+            };
+            out.push({
+                type: "abilityActivated",
+                abilitySource: entry.source,
+                player: castingInfo.player,
+                targets: castingInfo.targets.flat(), //TODO: Consider making event layered too
+                description: describeAbility(entry.ability, entry.sourceSnapshot.chars.name),
+                sourceName: entry.sourceSnapshot.chars.name,
+            });
+            const stackState = pushStackEntry(currentState, entry);
+            return ok(withPriorityDecision({ ...stackState.state, casting: null }), out);
+        }
+        default:
+            return assertNever(castingInfo);
+    }
+}
+
+export function payCastingCost(state: GameState, casting: CastingInProgress): ApplyResult {
+    if (casting.kind === "spell") {
+        return casting.cost ? paySpellCosts(state, casting.player, casting.card, casting.ability, casting.cost) : fail("Spells require a mana cost to cast, even if the cost is 0");
+    } else if (casting.kind === "activated") {
+        return payAbilityCosts(state, casting.player, casting.sourceSnapshot, casting.ability);
+    }
+    return assertNever(casting);
 }
 
 export function selectTargetOptions(state: GameState): ApplyResult {
@@ -183,39 +235,41 @@ function buildTargetPrompt(card: ObjectId, cardName: string, spec: TargetSpec): 
     return prompt;
 }
 
-// No real logic for now, could add logic around target decisions changing costs later
-function calculateFinalCost(state: GameState, player: PlayerId, card: ObjectId): ManaCost | null {
-    if (!state?.casting) return null;
-    const obj = getCharacteristics(state, card);
-    if (!obj) return null;
-    return obj.manaCost;
-}
-
 export function payManaOptions(state: GameState): ApplyResult {
     if (!state.casting) return fail("No casting in progress to pay for");
     const casting = state.casting;
     const player = casting.player;
     const card = casting.card;
-    const cost = casting.cost ?? calculateFinalCost(state, player, card);
-    if (!cost) return fail("Invalid mana cost for spell");
+    const chars = getCharacteristics(state, casting.card);
+    const cost = casting.cost ?? calculateFinalCost(state, player, chars, casting.ability);
+    if (!cost) {
+        if (casting.kind === "spell") return fail("Invalid mana cost for spell");
+        else return ok(state, []); // Null mana costs on activated abilities are fine, just skip this step
+    }
     const nextState: GameState = casting.cost === cost ? state : { ...state, casting: { ...casting, cost } };
 
     const p = nextState.players[player];
     if (!p) return fail("Invalid player");
-    const cardName = getCharacteristics(nextState, card)?.name;
+    let prompt = "";
+    if (casting.kind === "spell") {
+        const cardName = getCharacteristics(nextState, card)?.name;
+        prompt = `Pay mana to cast ${cardName}?`;
+    } else {
+        prompt = `Pay mana to activate ability of ${casting.sourceSnapshot.chars.name}?`;
+    }
     if (canPayMana(p.manaPool, cost)) {
         const decisionState = openDecision(nextState, (id) =>
             yesNo({
                 id: id,
                 player: player,
-                prompt: `Pay mana to cast ${cardName}?`,
+                prompt,
                 then: { kind: "costPayment" },
             }),
         );
         return ok(decisionState, []);
     }
 
-    const manaAbilities = getAllManaSources(nextState, player);
+    const manaAbilities = getAllManaSources(nextState, player, card);
     if (manaAbilities.length === 0) return fail("Not enough mana abilities left to pay for this spell");
     const options = manaAbilities.map((ability) =>
         manaAbilityChoice(
@@ -224,12 +278,19 @@ export function payManaOptions(state: GameState): ApplyResult {
             getCardText(ability.ability.effects)[0] ?? `Ability #${ability.abilityIndex + 1} of ${getCharacteristics(nextState, ability.source)?.name}`,
         ),
     );
+    prompt = "";
+    if (casting.kind === "spell") {
+        const cardName = getCharacteristics(nextState, card)?.name;
+        prompt = `Add mana to cast ${cardName}?`;
+    } else {
+        prompt = `Add mana to activate ability of ${casting.sourceSnapshot.chars.name}?`;
+    }
     const decisionState = openDecision(nextState, (id) =>
         chooseOne({
             id,
             options,
             player,
-            prompt: `Add mana to cast ${cardName}`,
+            prompt,
             then: { kind: "costPayment" },
             onCancel: { kind: "cancelAbility" },
         }),
@@ -252,7 +313,7 @@ export function applyAddManaDecision(state: GameState, answer: readonly Choice[]
     if (answer.length !== 1) return fail("Can only select one mana ability to use at a time");
     const choice = answer[0]!;
     if (choice.value.kind !== "ability") return fail("Adding mana while casting has to be via an ability");
-    const activatedResult = activateAbility(state, state.casting.player, choice.value.id, choice.value.index);
+    const activatedResult = activateManaAbility(state, state.casting.player, choice.value.id, choice.value.index);
     if (!activatedResult.ok) return activatedResult;
     const casting = activatedResult.state.casting;
     if (!casting) return fail("No spell is currently being cast");

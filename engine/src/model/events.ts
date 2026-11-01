@@ -29,7 +29,8 @@ type ObjectEvent =
     | Readonly<{ type: "damageDealt"; source: ObjectId; sourceName: string; target: Target; targetName: string; amount: number; isCombatDamage: boolean }>
     | Readonly<{ type: "permanentTapped"; object: ObjectId; cardName: string }>
     | Readonly<{ type: "permanentUntapped"; object: ObjectId; cardName: string }>
-    | Readonly<{ type: "permanentDestroyed"; object: ObjectId; cardName: string; source?: ObjectId }>;
+    | Readonly<{ type: "permanentDestroyed"; object: ObjectId; cardName: string; source?: ObjectId }>
+    | Readonly<{ type: "permanentSacrificed"; object: ObjectId; cardName: string; source?: ObjectId }>;
 
 type StackEvent =
     | Readonly<{ type: "spellCastSuccess"; player: PlayerId; card: ObjectId; cardName: string; targets: readonly Target[] }>
@@ -37,7 +38,9 @@ type StackEvent =
     | Readonly<{ type: "spellTargetsSelected"; player: PlayerId; card: ObjectId; cardName: string }>
     | Readonly<{ type: "spellManaPaid"; player: PlayerId; card: ObjectId; cardName: string }>
     | Readonly<{ type: "spellCastCancelled"; player: PlayerId; card: ObjectId; cardName: string }>
-    | Readonly<{ type: "abilityActivated"; player: PlayerId; abilitySource: ObjectId; cardName: string; stackEntryId?: StackId; targets?: Target[] }>
+    | Readonly<{ type: "abilityActivateStart"; player: PlayerId; abilitySource: ObjectId; sourceName: string; description: string }>
+    | Readonly<{ type: "abilityActivated"; player: PlayerId; abilitySource: ObjectId; sourceName: string; description: string; targets: readonly Target[] }>
+    | Readonly<{ type: "abilityActivateCancelled"; player: PlayerId; abilitySource: ObjectId; sourceName: string; description: string }>
     | Readonly<{ type: "stackEntryResolved"; id: StackId; entryName: string }>
     | Readonly<{ type: "stackEntryFizzles"; id: StackId; entryName: string }>;
 

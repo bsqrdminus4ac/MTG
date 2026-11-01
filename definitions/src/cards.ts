@@ -25,7 +25,7 @@ const discardThenGainLife = (): Ability => ({
             description: "Target player discards any number of cards.",
         },
         { kind: "discard", cards: { kind: "bound", name: "cardsToDiscard" } },
-        { kind: "gainLife", who: { kind: "player", who: "controller" }, amount: { kind: "bound", name: "cardsToDiscard" }, description: "You gain 1 life for each card discarded this way" },
+        { kind: "gainLife", who: { kind: "player", who: "controller" }, amount: { kind: "bound", name: "cardsToDiscard" }, description: "You gain 1 life for each card discarded this way." },
     ],
 });
 
@@ -49,7 +49,7 @@ const eachPlayerDiscards = (amount: number): Ability => ({
                 },
                 { kind: "discard", cards: { kind: "bound", name: "picked" } },
             ],
-            description: "Each player discards a card",
+            description: "Each player discards a card.",
         },
     ],
 });
@@ -121,7 +121,7 @@ export const bolt: CardDefinition = {
                     maxCount: 1,
                 },
             ],
-            effects: [{ kind: "damage", to: { kind: "target", spec: 0 }, amount: 3, description: "<this> deals 3 damage to any target" }],
+            effects: [{ kind: "damage", to: { kind: "target", spec: 0 }, amount: 3, description: "<this> deals 3 damage to any target." }],
         },
     ],
 };

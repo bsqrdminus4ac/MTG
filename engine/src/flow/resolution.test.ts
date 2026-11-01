@@ -44,6 +44,15 @@ const targetSpecs: TargetSpec[] = [
     },
 ];
 
+const targetSpellAbility: AbilityOfKind<"spell"> = {
+    kind: "spell",
+    targets: targetSpecs,
+    effects: [
+        { kind: "gainLife", who: { kind: "target", spec: 0 }, amount: 3 },
+        { kind: "destroy", target: { kind: "target", spec: 1 } },
+    ],
+};
+
 const targetSpell: CardDefinition = {
     id: cardDefId("target-spell"),
     name: "Target Spell",
@@ -54,16 +63,7 @@ const targetSpell: CardDefinition = {
     subtypes: [],
     power: null,
     toughness: null,
-    abilities: [
-        {
-            kind: "spell",
-            targets: targetSpecs,
-            effects: [
-                { kind: "gainLife", who: { kind: "target", spec: 0 }, amount: 3 },
-                { kind: "destroy", target: { kind: "target", spec: 1 } },
-            ],
-        },
-    ],
+    abilities: [targetSpellAbility],
 };
 
 function stateWithSpellOnStack(): {
@@ -94,6 +94,7 @@ function stateWithSpellOnStack(): {
                     controller: alice,
                     source: movedSpell.newId,
                     targets,
+                    ability: targetSpellAbility,
                     bindings: {},
                 },
             ],
@@ -186,7 +187,6 @@ describe("spell resolution with multiple target specs", () => {
             type: "castSpell",
             player: alice,
             card: inHand.newId,
-            targets: [],
         });
         if (!startCast.ok || startCast.state.pending?.kind !== "choose") {
             throw new Error("Expected the first target choice");

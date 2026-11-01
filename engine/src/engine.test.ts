@@ -1,6 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
 import { applySequentially, fail, ok } from "./core/result";
 import { applyAction, submitAnswer } from "./engine";
+import type { AbilityOfKind } from "./model/abilities";
 import type { CardDefinition } from "./model/cardDefinition";
 import { getCharacteristics } from "./model/characteristics";
 import type { ContinuousEffect } from "./model/continuous";
@@ -27,6 +28,22 @@ const bear: CardDefinition = {
   abilities: [],
 };
 
+const targetSpellAbility: AbilityOfKind<"spell"> = {
+    kind: "spell",
+    targets: [
+        {
+            filter: {
+                kind: "player",
+                filter: { kind: "anyPlayer" },
+            },
+            minCount: 1,
+            maxCount: 1,
+            description: "player",
+        },
+    ],
+    effects: [],
+};
+
 const targetSpell: CardDefinition = {
     ...bear,
     id: cardDefId("target-spell"),
@@ -36,23 +53,7 @@ const targetSpell: CardDefinition = {
     subtypes: [],
     power: null,
     toughness: null,
-    abilities: [
-        {
-            kind: "spell",
-            targets: [
-                {
-                    filter: {
-                        kind: "player",
-                        filter: { kind: "anyPlayer" },
-                    },
-                    minCount: 1,
-                    maxCount: 1,
-                    description: "player",
-                },
-            ],
-            effects: [],
-        },
-    ],
+    abilities: [targetSpellAbility],
 };
 
 function newGame(): GameState {
@@ -192,6 +193,7 @@ describe("spell targeting", () => {
             controller: alice,
             source: spell.newId,
             targets: [],
+            ability: targetSpellAbility,
             bindings: {},
         };
         const sourceObject = spell.state.objects[spell.newId]!;
@@ -311,7 +313,6 @@ describe("spell targeting", () => {
             type: "castSpell",
             player: alice,
             card: moved.newId,
-            targets: [],
         });
         if (!cast.ok) throw new Error(cast.error);
         const decision = cast.state.pending;
@@ -350,7 +351,6 @@ describe("spell targeting", () => {
             type: "castSpell",
             player: alice,
             card: cardInHand,
-            targets: [],
         });
         if (!cast.ok) throw new Error(cast.error);
         const decision = cast.state.pending;

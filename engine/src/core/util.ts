@@ -18,3 +18,5 @@ export function without<K extends PropertyKey, V>(record: Readonly<Record<K, V>>
 export function keysOf<T extends object>(obj: T): (keyof T)[] {
     return Object.keys(obj) as (keyof T)[];
 }
+
+export type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;

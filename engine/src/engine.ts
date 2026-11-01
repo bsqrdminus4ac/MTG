@@ -1,7 +1,7 @@
 import { applySequentially, fail, type ApplyResult } from "./core/result";
 import { assertNever } from "./core/util";
 import { activateAbilityForPriority } from "./flow/abilities";
-import { applyAddManaDecision, applyCommitSpellDecision, applyTargetingDecision, beginCast, cancelCast } from "./flow/casting";
+import { applyAddManaDecision, applyCommitSpellDecision, applyTargetingDecision, beginSpellCast, cancelCast } from "./flow/casting";
 import {
     applyAttackSelectionDecision,
     applyAttackTargetDecision,
@@ -79,7 +79,7 @@ export function applyAction(state: GameState, action: Action): ApplyResult {
         case "playLand":
             return playLand(state, action.player, action.card);
         case "castSpell":
-            return beginCast(state, action.player, action.card);
+            return beginSpellCast(state, action.player, action.card);
         case "activateAbility":
             return activateAbilityForPriority(state, action.player, action.source, action.abilityIndex);
         default:

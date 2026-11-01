@@ -70,6 +70,11 @@ export function getCardText(effects: readonly CardEffect[]): string[] {
     return effects.flatMap((effect) => (effect.description?.trim() ? [effect.description] : []));
 }
 
+export function describeAbility(ability: { readonly effects: readonly CardEffect[] }, sourceName: string): string {
+    const text = getCardText(ability.effects).map((t) => t.replaceAll("<this>", sourceName));
+    return text.length > 0 ? text.join(" ") : `${sourceName}'s ability`;
+}
+
 export const mayDo = (who: EffectTarget, prompt: string, bindAs: string, then: readonly Effect[]): Effect[] => {
     return [
         { kind: "askYesNo", prompt, who, bindAs },

@@ -1,5 +1,4 @@
 import type { ObjectId, PlayerId } from "./ids";
-import type { Target } from "./state";
 
 /** Everything a player can ask the engine to do. The engine validates each one against the rules. */
 export type Action =
@@ -9,7 +8,6 @@ export type Action =
           type: "castSpell";
           player: PlayerId;
           card: ObjectId;
-          targets: Target[];
       }>
     | Readonly<{
           type: "activateAbility";
