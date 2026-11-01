@@ -12,6 +12,9 @@ export interface ManaCost {
     readonly pips: readonly ManaType[];
 }
 
+export const colorIdentity = (cost: ManaCost): Color[] => cost.pips.flatMap((c) => (c === "C" ? [] : c));
+
+
 export type ManaPool = Readonly<Record<ManaType, number>>;
 
 export const emptyPool = (): ManaPool => ({

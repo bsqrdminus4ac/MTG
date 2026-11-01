@@ -4,7 +4,11 @@
   "private": true,
   "type": "module",
   "exports": { ".": "./src/index.ts" },
-  "scripts": { "typecheck": "tsc --noEmit" },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
   "dependencies": { "@mtg/engine": "workspace:*" },
-  "devDependencies": { "typescript": "^7.0.2" }
+  "devDependencies": { "typescript": "^7.0.2",  "vitest": "^5.0.3" }
 }

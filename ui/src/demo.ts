@@ -7,7 +7,7 @@ import {
   type GameState,
 } from "@mtg/engine";
 
-import { bear, bolt, DEFINITIONS, discardLife, drake, forest, mountain, skeins } from "@mtg/definitions";
+import { ALL_DEFINITIONS, bear, bolt, discardLife, drake, forest, mountain, skeins } from "@mtg/definitions";
 
 export const ALICE = playerId("Alice");
 export const BOB = playerId("Bob");
@@ -20,9 +20,9 @@ const deck = (): CardDefId[] => Array.from({ length: 3 }, () => CYCLE.map((c) =>
 
 /** Two players, unshuffled 21-card decks, and a 7-card hand each. */
 export function newDemoGame(): GameState {
-  let state = createGame(DEFINITIONS, [
-    { id: ALICE, deck: deck() },
-    { id: BOB, deck: deck() },
+  let state = createGame(ALL_DEFINITIONS, [
+      { id: ALICE, deck: deck() },
+      { id: BOB, deck: deck() },
   ]);
   for (const player of [ALICE, BOB]) {
     for (let i = 0; i < 7; i++) state = drawCard(state, player).state;
