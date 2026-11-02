@@ -75,6 +75,11 @@ function canFinishManaAbility(result: StepResult, player: PlayerId, cost: ManaCo
 function answersFor(decision: Decision): ResolvedAnswer[] {
     if (decision.kind === "choose") {
         return decision.options.map((option) => ({ kind: "choose", chosen: [option] }));
+    } else if (decision.kind === "yesNo") {
+        return [
+            { kind: "yesNo", value: true },
+            { kind: "yesNo", value: false },
+        ];
     }
     return [];
 }
