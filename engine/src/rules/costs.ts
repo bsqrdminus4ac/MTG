@@ -35,7 +35,7 @@ export function payAbilityCosts(state: GameState, player: PlayerId, sourceSnapsh
       steps.push((currentState: GameState) => tapPermanent(currentState, sourceSnapshot.id));
   }
   if (ability.cost.sacrificeSelf) {
-    steps.push((currentState: GameState) => sacrificePermanent(currentState, sourceSnapshot.id, sourceSnapshot));
+    steps.push((currentState: GameState) => sacrificePermanent(currentState, sourceSnapshot.id, sourceSnapshot, `the ${ability.kind} ability of ${sourceSnapshot.chars.name}`));
   }
   return applySequentially(state, steps);
 }

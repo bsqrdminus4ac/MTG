@@ -85,7 +85,7 @@ export function damagePlaneswalker(state: GameState, target: ObjectId, source: S
     ]);
 }
 
-export function destroyPermanent(state: GameState, target: ObjectId, source: SourceSnapshot): ApplyResult {
+export function destroyPermanent(state: GameState, target: ObjectId, source: SourceSnapshot, sourceDescription?: string): ApplyResult {
     const obj = state.objects[target];
     if (!obj) return ok(state, []);
     if (obj.zone !== "battlefield") return ok(state, []);
@@ -93,11 +93,11 @@ export function destroyPermanent(state: GameState, target: ObjectId, source: Sou
     const targetName = getCardName(state, target);
     const result = moveObject(state, target, "graveyard");
     if (!result) return ok(state, []);
-    const event: GameEvent = { type: "permanentDestroyed", object: target, cardName: targetName, source: source.id };
+    const event: GameEvent = { type: "permanentDestroyed", object: target, cardName: targetName, sourceName: sourceDescription ?? source.chars.name };
     return ok(result.state, [event, ...result.events]);
 }
 
-export function sacrificePermanent(state: GameState, target: ObjectId, source: SourceSnapshot): ApplyResult {
+export function sacrificePermanent(state: GameState, target: ObjectId, source: SourceSnapshot, sourceDescription?: string): ApplyResult {
     const obj = state.objects[target];
     if (!obj) return ok(state, []);
     if (obj.zone !== "battlefield") return ok(state, []);
@@ -105,6 +105,6 @@ export function sacrificePermanent(state: GameState, target: ObjectId, source: S
     const targetName = getCardName(state, target);
     const result = moveObject(state, source.id, "graveyard");
     if (!result) return ok(state, []);
-    const event: GameEvent = { type: "permanentSacrificed", object: target, cardName: targetName, source: source.id };
+    const event: GameEvent = { type: "permanentSacrificed", object: target, cardName: targetName, sourceName: sourceDescription ?? source.chars.name };
     return ok(result.state, [event, ...result.events]);
 }

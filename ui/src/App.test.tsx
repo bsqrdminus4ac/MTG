@@ -71,14 +71,13 @@ describe("new game", () => {
         fireEvent.change(screen.getByLabelText("New game type"), { target: { value: "activation" } });
         fireEvent.click(screen.getByRole("button", { name: "New game" }));
 
-        for (const player of [ALICE, BOB]) {
-            expect(cardsIn(zoneOf(playerRegion(player), "Battlefield"))).toHaveLength(4);
-        }
+        expect(cardsIn(zoneOf(playerRegion(ALICE), "Battlefield"))).toHaveLength(6);
+        expect(cardsIn(zoneOf(playerRegion(BOB), "Battlefield"))).toHaveLength(4);
         expect(screen.getByText("New game: activation test scenario")).toBeTruthy();
         const aliceBattlefield = zoneOf(playerRegion(ALICE), "Battlefield");
         const bobBattlefield = zoneOf(playerRegion(BOB), "Battlefield");
         const namesIn = (zone: HTMLElement) => [...zone.querySelectorAll(".name")].map((element) => element.textContent);
-        expect(namesIn(aliceBattlefield)).toContain("Scrap Idol");
+        expect(namesIn(aliceBattlefield)).toEqual(expect.arrayContaining(["Scrap Idol", "Treasure Chest", "Dusty Filter"]));
         expect(namesIn(bobBattlefield)).toEqual(expect.arrayContaining(["Scrap Shooter", "Treasure Chest"]));
     });
 });

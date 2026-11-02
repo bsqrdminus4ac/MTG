@@ -29,8 +29,8 @@ type ObjectEvent =
     | Readonly<{ type: "damageDealt"; source: ObjectId; sourceName: string; target: Target; targetName: string; amount: number; isCombatDamage: boolean }>
     | Readonly<{ type: "permanentTapped"; object: ObjectId; cardName: string }>
     | Readonly<{ type: "permanentUntapped"; object: ObjectId; cardName: string }>
-    | Readonly<{ type: "permanentDestroyed"; object: ObjectId; cardName: string; source?: ObjectId }>
-    | Readonly<{ type: "permanentSacrificed"; object: ObjectId; cardName: string; source?: ObjectId }>;
+    | Readonly<{ type: "permanentDestroyed"; object: ObjectId; cardName: string; sourceName?: string }>
+    | Readonly<{ type: "permanentSacrificed"; object: ObjectId; cardName: string; sourceName?: string }>;
 
 type StackEvent =
     | Readonly<{ type: "spellCastSuccess"; player: PlayerId; card: ObjectId; cardName: string; targets: readonly Target[] }>

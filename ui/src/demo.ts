@@ -52,7 +52,7 @@ export function newDemoGame(): GameState {
 /** A fixed activation-testing scenario with all activation cards on the battlefield. */
 export function activationTestGame(): GameState {
   const permanents = [
-    { player: ALICE, cards: [pyroAdept, clockworkScribe, arcaneElf, scrapIdol] },
+    { player: ALICE, cards: [pyroAdept, clockworkScribe, arcaneElf, scrapIdol, treasureChest, dustyFilter] },
     { player: BOB, cards: [scrapShooter, treasureChest, painfulPeak, dustyFilter] },
   ] as const;
   let state = createGame(ALL_DEFINITIONS, permanents.map(({ player, cards }) => ({

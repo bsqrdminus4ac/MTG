@@ -17,6 +17,7 @@ export interface EffectContext extends EvalScope {
     readonly targets: readonly (readonly Target[])[];
     readonly legalTargets: readonly (readonly boolean[])[]; // per target index, computed once when resolution starts
     readonly sourceSnapshot: SourceSnapshot;
+    readonly sourceDescription: string; // for logging purposes, e.g. "the activated ability of [card name]"
 }
 
 const getSourceName = (state: GameState, ctx: EffectContext): string => {
@@ -154,7 +155,7 @@ export function executeEffect(state: GameState, ctx: EffectContext, effect: Effe
                 return applySequentially(
                     currentState,
                     targets.map((target) => {
-                        if (target.kind === "object") return (s) => destroyPermanent(s, target.id, ctx.sourceSnapshot);
+                        if (target.kind === "object") return (s) => destroyPermanent(s, target.id, ctx.sourceSnapshot, ctx.sourceDescription);
                         return () => fail("Destroying non-permanents has not been implemented yet");
                     }),
                 );
@@ -267,6 +268,7 @@ export const contextOf = (resolving: ResolutionInProgress): EffectContext => ({
     legalTargets: resolving.legalTargets, // real check arrives with isTargetLegal
     bindings: resolving.bindings,
     sourceSnapshot: resolving.sourceSnapshot,
+    sourceDescription: resolving.entry.kind === "ability" ? `the ${resolving.entry.ability.kind} ability of ${resolving.sourceSnapshot.chars.name}` : `${resolving.sourceSnapshot.chars.name}`,
 });
 
 export function resolvePlayers(state: GameState, ctx: EffectContext, ref: PlayerRef): PlayerId[] {

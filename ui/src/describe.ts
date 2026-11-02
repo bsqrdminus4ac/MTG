@@ -385,13 +385,13 @@ export function describeEvent(state: GameState, e: GameEvent): string {
       case "damageDealt":
           return `${e.sourceName} deals ${e.amount} damage to ${e.targetName}`;
       case "permanentTapped":
-          return `${nameOf(state, e.object)} is tapped`;
+          return `${e.cardName} is tapped`;
       case "permanentUntapped":
-          return `${nameOf(state, e.object)} is untapped`;
+          return `${e.cardName} is untapped`;
       case "permanentDestroyed":
-          return `${e.cardName} (#${e.object}) is destroyed${e.source ? ` by ${nameOf(state, e.source, true)}` : ""}`;
+          return `${e.cardName} (#${e.object}) is destroyed${e.sourceName ? ` by ${e.sourceName}` : ""}`;
       case "permanentSacrificed":
-          return `${e.cardName} (#${e.object}) is sacrificed${e.source ? ` by ${nameOf(state, e.source, true)}` : ""}`;
+          return `${e.cardName} (#${e.object}) is sacrificed${e.sourceName ? ` by ${e.sourceName}` : ""}`;
       case "cardDiscarded":
           return e.cause ? `${e.cause} causes ${e.player} to discard ${e.cardName} (#${e.card})` : `${e.player} discards ${e.cardName} (#${e.card})`;
 
