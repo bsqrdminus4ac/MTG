@@ -1,7 +1,7 @@
 import { fail, ok, type ApplyResult } from "../core/result";
 import { assertNever } from "../core/util";
 import { getCardName, getCharacteristics } from "../model/characteristics";
-import { chooseMany, chooseOne, manaAbilityChoice, objectChoice, playerChoice, yesNo, type Choice } from "../model/decisions";
+import { abilityChoice, chooseMany, chooseOne, objectChoice, playerChoice, yesNo, type Choice } from "../model/decisions";
 import { describeAbility, getCardText, type TargetSpec } from "../model/effects";
 import type { GameEvent } from "../model/events";
 import { type ObjectId, type PlayerId } from "../model/ids";
@@ -279,7 +279,7 @@ export function payManaOptions(state: GameState): ApplyResult {
     const manaAbilities = getAllManaSources(nextState, player, card);
     if (manaAbilities.length === 0) return fail("Not enough mana abilities left to pay for this spell");
     const options = manaAbilities.map((ability) =>
-        manaAbilityChoice(
+        abilityChoice(
             ability.source,
             ability.abilityIndex,
             getCardText(ability.ability.effects)[0] ?? `Ability #${ability.abilityIndex + 1} of ${getCharacteristics(nextState, ability.source)?.name}`,

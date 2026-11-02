@@ -121,7 +121,7 @@ export const treasureChest = noncreatureArtifact({
             isManaAbility: true,
             targets: [],
             timingRestriction: "instantSpeed",
-            effects: [{ kind: "addMana", mana: "R", amount: 1, description: "Add R." }],
+            effects: [{ kind: "addMana", mana: { kind: "mana", type: "R" }, amount: 1, description: "Add R." }],
         },
     ],
 });
@@ -137,7 +137,7 @@ export const painfulPeak = land({
             timingRestriction: "instantSpeed",
             isManaAbility: true,
             effects: [
-                { kind: "addMana", mana: "R", amount: 1, description: "Add R." },
+                { kind: "addMana", mana: { kind: "mana", type: "R" }, amount: 1, description: "Add R." },
                 { kind: "loseLife", amount: 1, who: { kind: "player", who: "controller" }, description: "You lose 1 life." },
             ],
         },
@@ -154,7 +154,7 @@ export const dustyFilter = land({
             targets: [],
             timingRestriction: "instantSpeed",
             isManaAbility: true,
-            effects: [{ kind: "addMana", mana: "G", amount: 2, description: "Add GG." }],
+            effects: [{ kind: "addMana", mana: { kind: "mana", type: "G" }, amount: 2, description: "Add GG." }],
         },
     ],
 });

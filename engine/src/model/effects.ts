@@ -43,8 +43,10 @@ export type EffectTarget =
     | Readonly<{ kind: "player"; who: PlayerRef }>
     | Readonly<{ kind: "bound"; name: string }>;
 
+type EffectChoice = Readonly<{ kind: "hand"; of: EffectTarget }> | Readonly<{ kind: "manaType"; allowed: ManaType[] }>;
+
 type ControlFlowEffect =
-    | Readonly<{ kind: "choose"; chooser: EffectTarget; from: { kind: "hand"; of: EffectTarget }; min: Amount; max: Amount; bindAs: string; prompt: string }>
+    | Readonly<{ kind: "choose"; chooser: EffectTarget; from: EffectChoice; min: Amount; max: Amount; bindAs: string; prompt: string }>
     | Readonly<{ kind: "if"; condition: Condition; then: readonly Effect[]; else?: readonly Effect[] }>
     | Readonly<{ kind: "forEach"; over: EffectTarget; as: string; body: readonly Effect[] }>
     | Readonly<{ kind: "askYesNo"; who: EffectTarget; prompt: string; bindAs: string }>;
@@ -55,7 +57,7 @@ type PrimitiveEffect =
     | Readonly<{ kind: "gainLife"; who: EffectTarget; amount: Amount }>
     | Readonly<{ kind: "loseLife"; who: EffectTarget; amount: Amount }>
     | Readonly<{ kind: "destroy"; target: EffectTarget }>
-    | Readonly<{ kind: "addMana"; mana: ManaType; amount: Amount }>
+    | Readonly<{ kind: "addMana"; mana: { kind: "mana"; type: ManaType } | BindingRef; amount: Amount }>
     | Readonly<{ kind: "discard"; cards: BindingRef }>
     | Readonly<{ kind: "applyContinuousEffect"; template: ContinuousEffectTemplate }>;
 

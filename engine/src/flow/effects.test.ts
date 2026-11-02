@@ -124,6 +124,7 @@ function context(state: GameState, source: ObjectId, targets: readonly (readonly
         legalTargets: targets.map((spec) => spec.map(() => true)),
         bindings: {},
         sourceSnapshot: sourceSnapshot(state, source),
+        sourceDescription: `the ability of ${state.objects[source]?.definitionId}`,
     };
 }
 
@@ -192,12 +193,7 @@ describe("control-flow effects", () => {
             { kind: "gainLife", who: { kind: "player", who: "controller" }, amount: 2 },
         ];
 
-        const result = runResolution(
-            resolvingState(state, effects, [
-                [{ kind: "player", id: alice }],
-                [{ kind: "player", id: bob }],
-            ]),
-        );
+        const result = runResolution(resolvingState(state, effects, [[{ kind: "player", id: alice }], [{ kind: "player", id: bob }]]));
 
         expect(result.ok).toBe(true);
         if (!result.ok) return;
@@ -231,12 +227,7 @@ describe("control-flow effects", () => {
 
     test("mayDo resolves its nested effects when accepted", () => {
         const effects: Effect[] = [
-            ...mayDo(
-                { kind: "player", who: "controller" },
-                "Gain life?",
-                "gainLife",
-                [{ kind: "gainLife", who: { kind: "player", who: "controller" }, amount: 2 }],
-            ),
+            ...mayDo({ kind: "player", who: "controller" }, "Gain life?", "gainLife", [{ kind: "gainLife", who: { kind: "player", who: "controller" }, amount: 2 }]),
             { kind: "gainLife", who: { kind: "player", who: "controller" }, amount: 1 },
         ];
         const waiting = runResolution(resolvingState(newGame(), effects));
@@ -260,12 +251,7 @@ describe("control-flow effects", () => {
 
     test("mayDo skips its nested effects when declined", () => {
         const effects: Effect[] = [
-            ...mayDo(
-                { kind: "player", who: "controller" },
-                "Gain life?",
-                "gainLife",
-                [{ kind: "gainLife", who: { kind: "player", who: "controller" }, amount: 2 }],
-            ),
+            ...mayDo({ kind: "player", who: "controller" }, "Gain life?", "gainLife", [{ kind: "gainLife", who: { kind: "player", who: "controller" }, amount: 2 }]),
             { kind: "gainLife", who: { kind: "player", who: "controller" }, amount: 1 },
         ];
         const waiting = runResolution(resolvingState(newGame(), effects));
@@ -280,9 +266,7 @@ describe("control-flow effects", () => {
         expect(result.ok).toBe(true);
         if (!result.ok) return;
         expect(result.state.players[alice]?.life).toBe(21);
-        expect(result.events.filter((event) => event.type === "lifeChanged")).toEqual([
-            { type: "lifeChanged", player: alice, delta: 1 },
-        ]);
+        expect(result.events.filter((event) => event.type === "lifeChanged")).toEqual([{ type: "lifeChanged", player: alice, delta: 1 }]);
         expect(result.state.resolving).toBeNull();
     });
 });
@@ -298,11 +282,13 @@ describe("player effects", () => {
     test("eachPlayer gainLife emits one lifeChanged event for each player", () => {
         const state = newGame();
         const source = state.players[alice]!.library.at(-1)!;
-        const result = complete(executeEffect(state, context(state, source), {
-            kind: "gainLife",
-            who: { kind: "player", who: "eachPlayer" },
-            amount: 2,
-        }));
+        const result = complete(
+            executeEffect(state, context(state, source), {
+                kind: "gainLife",
+                who: { kind: "player", who: "eachPlayer" },
+                amount: 2,
+            }),
+        );
 
         expect(result.state.players[alice]?.life).toBe(22);
         expect(result.state.players[bob]?.life).toBe(22);
@@ -314,23 +300,25 @@ describe("player effects", () => {
 
     test("each player chooses and discards a card in turn order", () => {
         const state = putCardsInHand(putCardsInHand(newGame(), alice, 2), bob, 2);
-        const effects: Effect[] = [{
-            kind: "forEach",
-            over: { kind: "player", who: "eachPlayer" },
-            as: "player",
-            body: [
-                {
-                    kind: "choose",
-                    chooser: { kind: "bound", name: "player" },
-                    from: { kind: "hand", of: { kind: "bound", name: "player" } },
-                    min: 1,
-                    max: 1,
-                    bindAs: "discarded",
-                    prompt: "Choose a card to discard",
-                },
-                { kind: "discard", cards: { kind: "bound", name: "discarded" } },
-            ],
-        }];
+        const effects: Effect[] = [
+            {
+                kind: "forEach",
+                over: { kind: "player", who: "eachPlayer" },
+                as: "player",
+                body: [
+                    {
+                        kind: "choose",
+                        chooser: { kind: "bound", name: "player" },
+                        from: { kind: "hand", of: { kind: "bound", name: "player" } },
+                        min: 1,
+                        max: 1,
+                        bindAs: "discarded",
+                        prompt: "Choose a card to discard",
+                    },
+                    { kind: "discard", cards: { kind: "bound", name: "discarded" } },
+                ],
+            },
+        ];
         const initialAliceHandSize = state.players[alice]!.hand.length;
         const initialBobHandSize = state.players[bob]!.hand.length;
         const firstDecision = runResolution(resolvingState(state, effects));
@@ -544,7 +532,7 @@ describe("player effects", () => {
         const state = newGame();
         const source = state.players[alice]!.library.at(-1)!;
 
-        const result = complete(executeEffect(state, context(state, source), { kind: "addMana", mana: "R", amount: 2 }));
+        const result = complete(executeEffect(state, context(state, source), { kind: "addMana", mana: { kind: "mana", type: "R" }, amount: 2 }));
 
         expect(result.state.players[alice]?.manaPool.R).toBe(2);
         expect(result.state.players[bob]?.manaPool.R).toBe(0);
@@ -567,7 +555,7 @@ describe("destroy effect", () => {
     expect(graveyardId).toBeDefined();
     expect(result.state.objects[graveyardId!]).toMatchObject({ definitionId: bear.id, zone: "graveyard" });
     expect(result.events).toEqual([
-      { type: "permanentDestroyed", object: target.newId, cardName: "Grizzly Bears", source: source.newId },
+      { type: "permanentDestroyed", object: target.newId, cardName: "Grizzly Bears", sourceName: "the ability of bear" },
       {
         type: "cardMoved",
         from: "battlefield",
@@ -597,7 +585,7 @@ describe("damage helpers", () => {
         sourceName: "Grizzly Bears",
         amount: 3,
         target: { kind: "player", id: bob },
-        targetName: "",
+        targetName: "bob",
         isCombatDamage: true,
       },
     ]);
@@ -619,7 +607,7 @@ describe("damage helpers", () => {
         sourceName: "Grizzly Bears",
         amount: 2,
         target: { kind: "object", id: target.newId },
-        targetName: "Grizzly Bears",
+        targetName: `Grizzly Bears (#${target.newId})`,
         isCombatDamage: false,
       },
     ]);
@@ -650,7 +638,7 @@ describe("damage helpers", () => {
         sourceName: "Grizzly Bears",
         amount: 2,
         target: { kind: "object", id: target.newId },
-        targetName: "Test Planeswalker",
+        targetName: `Test Planeswalker (#${target.newId})`,
         isCombatDamage: false,
       },
     ]);

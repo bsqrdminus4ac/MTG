@@ -134,8 +134,12 @@ function expandEffect(e: Effect, bindings: Readonly<Record<string, string>>): st
           return `${describeEffectTarget(e.who, bindings)} ${effectVerb(e.who, bindings, "loses", "lose")} ${describeAmountWithBindings(e.amount, bindings)} life`;
       case "destroy":
           return `destroy ${describeEffectTarget(e.target, bindings)}`;
-      case "addMana":
-          return `add ${describeAmountWithBindings(e.amount, bindings)}× {${e.mana}}`;
+      case "addMana": {
+          const mana = e.mana.kind === "mana"
+              ? `{${e.mana.type}}`
+              : bindings[e.mana.name] ?? `the mana type chosen as ${e.mana.name}`;
+          return `add ${describeAmountWithBindings(e.amount, bindings)}× ${mana}`;
+      }
       case "applyContinuousEffect":
           return `apply ${describeTemplate(e.template)}`;
       case "choose":
@@ -174,7 +178,10 @@ function describeEffectsWithBindings(effects: readonly Effect[], bindings: Reado
     const descriptions = effects.map((effect) => {
         const description = expandEffect(effect, currentBindings);
         if (effect.kind === "askYesNo") currentBindings = { ...currentBindings, [effect.bindAs]: effect.prompt };
-        if (effect.kind === "choose") currentBindings = { ...currentBindings, [effect.bindAs]: "the cards selected by the choice" };
+        if (effect.kind === "choose") {
+            const valueDescription = effect.from.kind === "manaType" ? "the chosen mana type" : "the cards selected by the choice";
+            currentBindings = { ...currentBindings, [effect.bindAs]: valueDescription };
+        }
         return description;
     }).filter(Boolean);
     return descriptions.length > 0 ? descriptions.join("; ") : "do nothing";
@@ -310,6 +317,8 @@ export function describeChoiceValue(state: GameState, v: ChoiceValue): string {
           return `activate ability ${v.index + 1} of ${nameOf(state, v.id)} (#${v.id})`;
       case "stackEntry":
           return nameOfStackEntry(state, v.id, true);
+      case "mana":
+          return `Add {${v.mana}} mana`;
       case "null":
           return "";
       default:

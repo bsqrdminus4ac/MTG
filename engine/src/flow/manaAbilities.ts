@@ -72,6 +72,7 @@ export function activateManaAbility(state: GameState, player: PlayerId, source: 
         legalTargets: [],
         source,
         sourceSnapshot,
+        sourceDescription: `the mana ability of ${chars.name}`,
         bindings: {},
     };
     const resolveResult = runFrames(payResult.state, ctx, [{ effects: ability.effects, pc: 0 }], {});

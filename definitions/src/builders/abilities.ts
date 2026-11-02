@@ -1,14 +1,16 @@
-import type { Ability, Effect, ManaType } from "@mtg/engine";
+import { COLORS, type Ability, type Effect, type ManaType } from "@mtg/engine";
 
 export const tapForMana = (mana: ManaType): Ability => ({
     kind: "activated",
     cost: { tap: true },
     isManaAbility: true,
     targets: [],
-    effects: [{ kind: "addMana", mana, amount: 1, description: `Tap: Add ${mana}` }],
+    effects: [{ kind: "addMana", mana: { kind: "mana", type: mana }, amount: 1, description: `Tap: Add ${mana}` }],
     activateableZones: ["battlefield"],
     timingRestriction: "instantSpeed",
 });
+
+export const manaOfAnyColor = (includeColorless?: boolean): ManaType[] => (includeColorless ? [...COLORS, "C"] : [...COLORS]);
 
 export const drawCards = (amount: number): Effect => ({ kind: "draw", count: amount, who: { kind: "player", who: "controller" } });
 

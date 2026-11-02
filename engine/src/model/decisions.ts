@@ -1,6 +1,7 @@
 import { badResult, goodResult, type Result } from "../core/result";
 import type { Action } from "./actions";
 import type { DecisionId, ObjectId, PlayerId, StackId } from "./ids";
+import type { ManaType } from "./mana";
 
 /**
  * A Decision is a question the engine asks one player. The engine stops, stores the question in
@@ -23,6 +24,7 @@ export type ChoiceValue =
     | Readonly<{ kind: "index"; index: number }> // e.g. which mode of a modal spell
     | Readonly<{ kind: "ability"; id: ObjectId; index: number }>
     | Readonly<{ kind: "stackEntry"; id: StackId }>
+    | Readonly<{ kind: "mana"; mana: ManaType }>
     | Readonly<{ kind: "null" }>;
 
 export interface Choice {
@@ -55,10 +57,15 @@ export const indexChoice = (index: number, label: string): Choice => ({
     label,
     value: { kind: "index", index },
 });
-export const manaAbilityChoice = (id: ObjectId, abilityIndex: number, label: string): Choice => ({
+export const abilityChoice = (id: ObjectId, abilityIndex: number, label: string): Choice => ({
     id: `object:${id}#${abilityIndex}`,
     label,
     value: { kind: "ability", id, index: abilityIndex },
+});
+export const manaChoice = (mana: ManaType, label: string): Choice => ({
+    id: `mana:${mana}`,
+    label,
+    value: { kind: "mana", mana },
 });
 export const nullChoice = (id: string, label: string): Choice => ({
     id,

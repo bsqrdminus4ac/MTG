@@ -105,7 +105,7 @@ describe("combat damage", () => {
                 sourceName: "attacker",
                 amount: 3,
                 target: { kind: "player", id: bob },
-                targetName: "",
+                targetName: "bob",
                 isCombatDamage: true,
             },
         ]);

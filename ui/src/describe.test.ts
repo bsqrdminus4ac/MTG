@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { type GameState, type ObjectId } from "@mtg/engine";
-import { bolt, forest, skeins } from "@mtg/definitions";
+import { bolt, forest, grove, skeins } from "@mtg/definitions";
 import { ALICE, newDemoGame } from "./demo";
 import { describeAbility, describeCardText, describeEffect, describeEffects, describeManaCost, describePool, findProblems } from "./describe";
 
@@ -66,6 +66,27 @@ describe("text describers", () => {
     expect(effect).toBeDefined();
     expect(describeEffect(effect!)).toBe(
       "For each player, Choice: Discard a card; the cards selected by the choice are discarded from their owner's hand",
+    );
+  });
+
+  test("describes mana added using a chosen mana type", () => {
+    expect(describeEffects([
+      {
+        kind: "choose",
+        chooser: { kind: "player", who: "controller" },
+        from: { kind: "manaType", allowed: ["R", "G"] },
+        min: 1,
+        max: 1,
+        bindAs: "chosenManaType",
+        prompt: "Add {R} or {G}.",
+      },
+      { kind: "addMana", mana: { kind: "bound", name: "chosenManaType" }, amount: 1 },
+    ])).toBe("Choice: Add {R} or {G}.; add 1× the chosen mana type");
+  });
+
+  test("describes a mana ability that adds a chosen mana type", () => {
+    expect(describeAbility(grove.abilities[1])).toBe(
+      "Mana ability: {T} → Choice: Add {R} or {G}. Each opponent gains 1 life.; add 1× the chosen mana type; For each opponent, that opponent gains 1 life",
     );
   });
 

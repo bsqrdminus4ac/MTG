@@ -143,7 +143,7 @@ const ownManaSourceAbility: AbilityOfKind<"activated"> = {
     cost: { tap: true },
     isManaAbility: true,
     targets: [],
-    effects: [{ kind: "addMana", mana: "G", amount: 1 }],
+    effects: [{ kind: "addMana", mana: { kind: "mana", type: "G" }, amount: 1 }],
     activateableZones: ["battlefield"],
     timingRestriction: "instantSpeed",
 };

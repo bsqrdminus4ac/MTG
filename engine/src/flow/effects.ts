@@ -1,10 +1,11 @@
 import { applySequentially, fail, goodResult, type ApplyResult, type Failure, type Result } from "../core/result";
 import { assertNever, withEntry } from "../core/util";
 import { getCardName } from "../model/characteristics";
-import { chooseMany, objectChoice, yesNo } from "../model/decisions";
+import { chooseMany, manaChoice, objectChoice, yesNo } from "../model/decisions";
 import type { Effect, EffectTarget, PlayerRef } from "../model/effects";
 import type { GameEvent } from "../model/events";
 import type { PlayerId } from "../model/ids";
+import type { ManaType } from "../model/mana";
 import { getRemainingPlayersInTurnOrder, type Binding, type Bindings, type EvalScope, type Frame, type GameState, type ResolutionInProgress, type SourceSnapshot, type Target } from "../model/state";
 import { drawCardResult } from "../model/zones";
 import { getChoiceBinding, getObjectIdsFromBinding } from "../rules/bindings";
@@ -164,7 +165,21 @@ export function executeEffect(state: GameState, ctx: EffectContext, effect: Effe
         case "addMana": {
             const a = resolveAmount(currentState, ctx, effect.amount);
             if (!a.ok) return a;
-            return stepFromApply(addManaEffect(currentState, ctx.controller, effect.mana, a.value));
+
+            let manaTypes: ManaType[] = [];
+            if (effect.mana.kind === "bound") {
+                const b = getChoiceBinding(ctx.bindings, effect.mana.name);
+                if (!b.ok) return b;
+                manaTypes = b.value.flatMap((c) => (c.kind === "mana" ? [c.mana] : []));
+            } else {
+                manaTypes = [effect.mana.type];
+            }
+            return stepFromApply(
+                applySequentially(
+                    currentState,
+                    manaTypes.map((manaType) => () => addManaEffect(currentState, ctx.controller, manaType, a.value)),
+                ),
+            );
         }
         case "discard": {
             const cards = getObjectIdsFromBinding(ctx.bindings, effect.cards.name);
@@ -216,8 +231,30 @@ function executeChoiceEffect(state: GameState, ctx: EffectContext, effect: Extra
                 }),
             ),
         );
+    } else if (effect.from.kind === "manaType") {
+        const minAmount = resolveAmount(state, ctx, effect.min);
+        if (!minAmount.ok) return fail(minAmount.error);
+        const maxAmount = resolveAmount(state, ctx, effect.max);
+        if (!maxAmount.ok) return fail(maxAmount.error);
+
+        const options = effect.from.allowed.map((manaType) => manaChoice(manaType, `Add {${manaType}}`));
+        if (options.length === 0) return done(state, [], { bind: { bindAs: effect.bindAs, value: [] } }); // Skip decision and bind empty Choice array if no options available
+
+        return ask(
+            openDecision(state, (id) =>
+                chooseMany({
+                    id,
+                    options,
+                    player: chooser,
+                    min: Math.min(options.length, minAmount.value),
+                    max: Math.min(options.length, maxAmount.value),
+                    prompt: effect.prompt,
+                    then: { kind: "resolveEffect", bindAs: effect.bindAs },
+                }),
+            ),
+        );
     }
-    return assertNever(effect.from.kind);
+    return assertNever(effect.from);
 }
 
 function executeYesNoEffect(state: GameState, ctx: EffectContext, effect: Extract<Effect, { kind: "askYesNo" }>): StepResult {
