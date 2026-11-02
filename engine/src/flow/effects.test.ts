@@ -125,6 +125,7 @@ function context(state: GameState, source: ObjectId, targets: readonly (readonly
         bindings: {},
         sourceSnapshot: sourceSnapshot(state, source),
         sourceDescription: `the ability of ${state.objects[source]?.definitionId}`,
+        resumeAs: "stack",
     };
 }
 

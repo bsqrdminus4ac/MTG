@@ -73,6 +73,7 @@ export function createGame(definitions: readonly CardDefinition[], setups: reado
         casting: null,
         combat: null,
         resolving: null,
+        resolvingMana: null,
     };
     return withPriorityDecision(state);
 }

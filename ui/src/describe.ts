@@ -17,6 +17,7 @@ import {
     type GameState,
     type ManaCost,
     type ManaPool,
+    type ManaType,
     type Modification,
     type ObjectId,
     type StackId,
@@ -318,13 +319,32 @@ export function describeChoiceValue(state: GameState, v: ChoiceValue): string {
       case "stackEntry":
           return nameOfStackEntry(state, v.id, true);
       case "mana":
-          return `Add {${v.mana}} mana`;
+          return `Add ${describeManaType(v.mana)} mana`;
       case "null":
           return "";
       default:
           return unreachable(v);
   }
 }
+
+const describeManaType = (mana: ManaType): string => {
+    switch (mana) {
+        case "W":
+            return "white";
+        case "U":
+            return "blue";
+        case "B":
+            return "black";
+        case "R":
+            return "red";
+        case "G":
+            return "green";
+        case "C":
+            return "colorless";
+        default:
+            return unreachable(mana);
+    }
+};
 
 export function describeAction(state: GameState, a: Action): string {
   switch (a.type) {

@@ -1,14 +1,19 @@
 import { fail, ok, type ApplyResult } from "../core/result";
+import { withEntry } from "../core/util";
 import type { ActivatableAbilityInfo } from "../model/abilities";
 import { snapshotSource } from "../model/characteristics";
+import type { ResolvedAnswer } from "../model/decisions";
 import { describeAbility } from "../model/effects";
 import type { GameEvent } from "../model/events";
 import type { ObjectId, PlayerId } from "../model/ids";
 import { canPayMana, type ManaCost, type ManaPool } from "../model/mana";
-import type { GameState } from "../model/state";
+import type { Binding, Frame, GameState, ManaResolutionInProgress } from "../model/state";
 import { findActivatableAbility, getAllActivatableAbilities } from "../rules/abilityQueries";
 import { payAbilityCosts } from "../rules/costs";
-import { runFrames, type EffectContext } from "./effects";
+import { checkStateBasedActions } from "../rules/stateBasedActions";
+import { payManaOptions } from "./casting";
+import { ask, runFrames, stepFromApply, type EffectContext, type StepResult } from "./effects";
+import { withPriorityDecision } from "./priority";
 
 export function getAllManaSources(state: GameState, player: PlayerId, excludeSource?: ObjectId): ActivatableAbilityInfo[] {
     return getAllActivatableAbilities(state, player, excludeSource).filter(({ ability }) => ability.isManaAbility && ability.effects.some((effect) => effect.kind === "addMana"));
@@ -53,7 +58,7 @@ export function couldHaveManaToPayCost(state: GameState, player: PlayerId, cost:
     return couldHaveMana;
 }
 
-export function activateManaAbility(state: GameState, player: PlayerId, source: ObjectId, abilityIndex: number): ApplyResult {
+export function activateManaAbility(state: GameState, player: PlayerId, source: ObjectId, abilityIndex: number): StepResult {
     const found = findActivatableAbility(state, player, source, abilityIndex);
     if (!found.ok) return fail(found.error);
     const { chars, ability } = found.value;
@@ -66,29 +71,75 @@ export function activateManaAbility(state: GameState, player: PlayerId, source: 
     // Mana abilities don't use the stack (CR 605). We just resolve it immediately.
     const payResult = payAbilityCosts(state, player, sourceSnapshot, ability);
     if (!payResult.ok) return fail(payResult.error);
-    const ctx: EffectContext = {
-        controller: player,
-        targets: [],
-        legalTargets: [],
+
+    const resolving: ManaResolutionInProgress = {
+        player,
         source,
         sourceSnapshot,
-        sourceDescription: `the mana ability of ${chars.name}`,
+        frames: [{ effects: ability.effects, pc: 0 }],
+        bindings: {},
+        abilityDescription: describeAbility(ability, chars.name),
+    };
+
+    return runManaAbilityResolution({ ...payResult.state, resolvingMana: resolving });
+}
+
+export function runManaAbilityResolution(state: GameState): StepResult {
+    let currentState: GameState = { ...state, pending: null };
+    const resolving = currentState.resolvingMana;
+    if (!resolving) return fail("No mana ability is resolving");
+
+    const ctx: EffectContext = {
+        controller: resolving.player,
+        targets: [],
+        legalTargets: [],
+        source: resolving.source,
+        sourceSnapshot: resolving.sourceSnapshot,
+        resumeAs: "mana",
+        sourceDescription: `the mana ability of ${resolving.sourceSnapshot.chars.name}`,
         bindings: {},
     };
-    const resolveResult = runFrames(payResult.state, ctx, [{ effects: ability.effects, pc: 0 }], {});
-    if (!resolveResult.ok) return fail(resolveResult.error);
-    if (resolveResult.waiting) return fail("Mana abilities cannot make decisions yet");
-    const next = {
-        ...resolveResult.state,
-        priority: { holder: player, consecutivePasses: 0 },
-    };
+
+    const result = runFrames(currentState, ctx, resolving.frames, resolving.bindings);
+    if (!result.ok) return result;
+
+    if (result.waiting) return ask({ ...result.state, resolvingMana: { ...resolving, frames: result.frames, bindings: result.bindings ?? resolving.bindings } }, result.events);
+    return stepFromApply(finishManaAbilityResolution(result.state, result.events));
+}
+
+export function handleManaAbilityDecision(state: GameState, bindAs: string, answer: ResolvedAnswer): ApplyResult {
+    const resolving = state.resolvingMana;
+    if (!resolving) return fail("No mana ability is resolving");
+    let binding: Binding;
+    if (answer.kind === "choose") binding = answer.chosen.map((c) => c.value);
+    else if (answer.kind === "yesNo") binding = answer.value;
+    else return fail("Unsupported answer for a mana ability resolution decision");
+    const topFrame = getTopFrame(state);
+    if (!topFrame) return fail("No effect frame to bind decision to");
+    const advanced = [...resolving.frames.slice(0, -1), { ...topFrame, pc: topFrame.pc + 1 }];
+    return runManaAbilityResolution({ ...state, resolvingMana: { ...resolving, frames: advanced, bindings: withEntry(resolving.bindings, bindAs, binding) } });
+}
+
+export function finishManaAbilityResolution(state: GameState, events: readonly GameEvent[]): ApplyResult {
+    const resolving = state.resolvingMana;
+    if (!resolving) return fail("No mana ability is resolving");
     const event: GameEvent = {
         type: "abilityActivated",
-        player: player,
-        abilitySource: sourceSnapshot.id,
-        description: describeAbility(ability, sourceSnapshot.chars.name),
-        sourceName: sourceSnapshot.chars.name,
+        player: resolving.player,
+        abilitySource: resolving.sourceSnapshot.id,
+        description: resolving.abilityDescription,
+        sourceName: resolving.sourceSnapshot.chars.name,
         targets: [],
     };
-    return ok(next, [...payResult.events, event, ...resolveResult.events]);
+
+    if (state.casting) {
+        return payManaOptions({ ...state, resolvingMana: null, casting: { ...state.casting, events: [...state.casting.events, event] } });
+    }
+
+    const next = { ...state, resolvingMana: null, priority: { holder: resolving.player, consecutivePasses: 0 } };
+    const result = checkStateBasedActions(next, [...events, event]);
+    if (!result.ok) return result;
+    return ok(withPriorityDecision(result.state), result.events);
 }
+
+const getTopFrame = (state: GameState): Frame | undefined => state.resolvingMana?.frames[state.resolvingMana.frames.length - 1];

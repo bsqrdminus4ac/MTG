@@ -1,12 +1,12 @@
 import { applySequentially, fail, goodResult, type ApplyResult, type Failure, type Result } from "../core/result";
 import { assertNever, withEntry } from "../core/util";
 import { getCardName } from "../model/characteristics";
-import { chooseMany, manaChoice, objectChoice, yesNo } from "../model/decisions";
+import { chooseMany, manaChoice, objectChoice, yesNo, type Continuation } from "../model/decisions";
 import type { Effect, EffectTarget, PlayerRef } from "../model/effects";
 import type { GameEvent } from "../model/events";
 import type { PlayerId } from "../model/ids";
 import type { ManaType } from "../model/mana";
-import { getRemainingPlayersInTurnOrder, type Binding, type Bindings, type EvalScope, type Frame, type GameState, type ResolutionInProgress, type SourceSnapshot, type Target } from "../model/state";
+import { getRemainingPlayersInTurnOrder, type Binding, type Bindings, type EvalScope, type Frame, type GameState, type SourceSnapshot, type Target } from "../model/state";
 import { drawCardResult } from "../model/zones";
 import { getChoiceBinding, getObjectIdsFromBinding } from "../rules/bindings";
 import { evalCondition, resolveAmount } from "../rules/conditions";
@@ -19,12 +19,15 @@ export interface EffectContext extends EvalScope {
     readonly legalTargets: readonly (readonly boolean[])[]; // per target index, computed once when resolution starts
     readonly sourceSnapshot: SourceSnapshot;
     readonly sourceDescription: string; // for logging purposes, e.g. "the activated ability of [card name]"
+    readonly resumeAs: "stack" | "mana"; // whether the effect is resolving as part of a stack entry or a mana ability
 }
 
 const getSourceName = (state: GameState, ctx: EffectContext): string => {
     if (ctx.sourceSnapshot) return ctx.sourceSnapshot.chars.name;
     return getCardName(state, ctx.source);
 };
+
+export const resumeContinuation = (ctx: EffectContext, bindAs: string): Continuation => (ctx.resumeAs === "mana" ? { kind: "resolveManaEffect", bindAs } : { kind: "resolveEffect", bindAs });
 
 export type StepBind = Readonly<{ bindAs: string; value: Binding }>;
 export type StepExtras = Readonly<{ bind?: StepBind; enter?: readonly Frame[] }>;
@@ -227,7 +230,7 @@ function executeChoiceEffect(state: GameState, ctx: EffectContext, effect: Extra
                     min: Math.min(options.length, minAmount.value), // Later, if min >= options.length, just add all options to binding without asking
                     max: Math.min(options.length, maxAmount.value),
                     prompt: effect.prompt,
-                    then: { kind: "resolveEffect", bindAs: effect.bindAs },
+                    then: resumeContinuation(ctx, effect.bindAs),
                 }),
             ),
         );
@@ -249,7 +252,7 @@ function executeChoiceEffect(state: GameState, ctx: EffectContext, effect: Extra
                     min: Math.min(options.length, minAmount.value),
                     max: Math.min(options.length, maxAmount.value),
                     prompt: effect.prompt,
-                    then: { kind: "resolveEffect", bindAs: effect.bindAs },
+                    then: resumeContinuation(ctx, effect.bindAs),
                 }),
             ),
         );
@@ -270,7 +273,7 @@ function executeYesNoEffect(state: GameState, ctx: EffectContext, effect: Extrac
                 id,
                 player: chooser,
                 prompt: effect.prompt,
-                then: { kind: "resolveEffect", bindAs: effect.bindAs },
+                then: resumeContinuation(ctx, effect.bindAs),
             }),
         ),
     );
@@ -297,16 +300,6 @@ function executeForEachEffect(state: GameState, ctx: EffectContext, effect: Extr
 //#endregion
 
 //#region Helpers
-
-export const contextOf = (resolving: ResolutionInProgress): EffectContext => ({
-    source: resolving.entry.source,
-    controller: resolving.entry.controller,
-    targets: resolving.entry.targets,
-    legalTargets: resolving.legalTargets, // real check arrives with isTargetLegal
-    bindings: resolving.bindings,
-    sourceSnapshot: resolving.sourceSnapshot,
-    sourceDescription: resolving.entry.kind === "ability" ? `the ${resolving.entry.ability.kind} ability of ${resolving.sourceSnapshot.chars.name}` : `${resolving.sourceSnapshot.chars.name}`,
-});
 
 export function resolvePlayers(state: GameState, ctx: EffectContext, ref: PlayerRef): PlayerId[] {
     if (ref === "controller") return [ctx.controller];

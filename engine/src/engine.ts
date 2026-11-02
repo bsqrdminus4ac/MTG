@@ -12,6 +12,7 @@ import {
     cancelAttacks,
     cancelBlocks,
 } from "./flow/combat";
+import { handleManaAbilityDecision } from "./flow/manaAbilities";
 import { passPriority, playLand } from "./flow/priority";
 import { handleResolutionDecision } from "./flow/resolution";
 import { finishDiscard } from "./flow/turn";
@@ -119,6 +120,9 @@ function resume(state: GameState, then: Continuation, player: PlayerId, answer: 
         }
         case "resolveEffect":
             return handleResolutionDecision(state, then.bindAs, answer);
+        case "resolveManaEffect":
+            return handleManaAbilityDecision(state, then.bindAs, answer);
+
         case "selectAttackers":
             if (answer.kind === "cancel") return cancelAttacks(state, player);
             if (answer.kind !== "choose") return fail("Expected a selection");

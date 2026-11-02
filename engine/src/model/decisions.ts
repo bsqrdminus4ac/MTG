@@ -93,6 +93,7 @@ export type Continuation = Readonly<
     | { kind: "cancelBlocks" }
     | { kind: "selectDamageOrder"; attacker: ObjectId }
     | { kind: "resolveEffect"; bindAs: string }
+    | { kind: "resolveManaEffect"; bindAs: string }
 >;
 
 interface DecisionBase {

@@ -8,7 +8,7 @@ import type { Zone } from "../model/vocabulary";
 import { moveObject } from "../model/zones";
 import { getEntryName } from "../rules/stack";
 import { isTargetLegal } from "../rules/targeting";
-import { ask, contextOf, runFrames } from "./effects";
+import { ask, runFrames, type EffectContext } from "./effects";
 import { givePriorityToActivePlayer } from "./priority";
 
 export function beginResolution(state: GameState): ApplyResult {
@@ -53,11 +53,19 @@ export function beginResolution(state: GameState): ApplyResult {
 
 export function runResolution(state: GameState): ApplyResult {
     let currentState: GameState = { ...state, pending: null };
-    const out: GameEvent[] = [];
     const resolving = currentState.resolving;
     if (!resolving) return fail("Nothing is resolving");
 
-    const ctx = contextOf(resolving);
+    const ctx: EffectContext = {
+        source: resolving.entry.source,
+        controller: resolving.entry.controller,
+        targets: resolving.entry.targets,
+        legalTargets: resolving.legalTargets, // real check arrives with isTargetLegal
+        bindings: resolving.bindings,
+        sourceSnapshot: resolving.sourceSnapshot,
+        sourceDescription: resolving.entry.kind === "ability" ? `the ${resolving.entry.ability.kind} ability of ${resolving.sourceSnapshot.chars.name}` : `${resolving.sourceSnapshot.chars.name}`,
+        resumeAs: "stack",
+    };
 
     const result = runFrames(currentState, ctx, resolving.frames, resolving.bindings);
     if (!result.ok) return result;

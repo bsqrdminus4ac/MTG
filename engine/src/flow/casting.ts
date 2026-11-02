@@ -318,6 +318,7 @@ export function applyAddManaDecision(state: GameState, answer: readonly Choice[]
     if (choice.value.kind !== "ability") return fail("Adding mana while casting has to be via an ability");
     const activatedResult = activateManaAbility(state, state.casting.player, choice.value.id, choice.value.index);
     if (!activatedResult.ok) return activatedResult;
+    if (activatedResult.waiting) return activatedResult; // waiting for a decision; return as is
     const casting = activatedResult.state.casting;
     if (!casting) return fail("No spell is currently being cast");
     const nextState: GameState = {

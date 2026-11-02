@@ -150,7 +150,7 @@ export function playLand(state: GameState, player: PlayerId, card: ObjectId): Ap
     players: withEntry(moved.state.players, player, { ...p, landsPlayedThisTurn: p.landsPlayedThisTurn + 1 }),
     priority: { holder: player, consecutivePasses: 0 },
   };
-  const result = checkStateBasedActions(state, []);
+  const result = checkStateBasedActions(next, []);
   if (!result.ok) return result;
   return ok(withPriorityDecision(next), [...moved.events, ...result.events, { type: "landPlayed", player, card: moved.newId, cardName: getCardName(result.state, moved.newId) }]);
 }

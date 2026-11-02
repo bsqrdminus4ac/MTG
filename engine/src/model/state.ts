@@ -147,6 +147,15 @@ export interface ResolutionInProgress {
     sourceSnapshot: SourceSnapshot;
 }
 
+export interface ManaResolutionInProgress {
+    player: PlayerId;
+    source: ObjectId;
+    sourceSnapshot: SourceSnapshot;
+    frames: readonly Frame[];
+    bindings: Bindings;
+    abilityDescription: string;
+}
+
 export type Binding = readonly ChoiceValue[] | boolean | number;
 export type Bindings = Readonly<Record<string, Binding>>;
 export interface EvalScope {
@@ -179,4 +188,5 @@ export interface GameState {
     readonly casting: CastingInProgress | null;
     readonly combat: CombatInProgress | null;
     readonly resolving: ResolutionInProgress | null;
+    readonly resolvingMana: ManaResolutionInProgress | null;
 }
