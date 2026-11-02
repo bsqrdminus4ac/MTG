@@ -2,7 +2,7 @@ import { fail, ok, type ApplyResult } from "../core/result";
 import { withEntry } from "../core/util";
 import type { ActivatableAbilityInfo } from "../model/abilities";
 import { snapshotSource } from "../model/characteristics";
-import type { ResolvedAnswer } from "../model/decisions";
+import type { Decision, ResolvedAnswer } from "../model/decisions";
 import { describeAbility } from "../model/effects";
 import type { GameEvent } from "../model/events";
 import type { ObjectId, PlayerId } from "../model/ids";
@@ -49,13 +49,34 @@ export function couldHaveManaToPayCost(state: GameState, player: PlayerId, cost:
     let couldHaveMana = false;
     for (const ability of availableManaAbilities) {
         const stateToCheck = activateManaAbility(state, player, ability.source, ability.abilityIndex);
-        if (stateToCheck.ok && couldHaveManaToPayCost(stateToCheck.state, player, cost, searchedStates, excludeSource)) {
+        if (canFinishManaAbility(stateToCheck, player, cost, searchedStates, excludeSource)) {
             couldHaveMana = true;
             break;
         }
     }
     searchedStates[currentSearchState] = couldHaveMana;
     return couldHaveMana;
+}
+
+function canFinishManaAbility(result: StepResult, player: PlayerId, cost: ManaCost, searchedStates: { [searchState: string]: boolean }, excludeSource?: ObjectId): boolean {
+    if (!result.ok) return false;
+
+    if (!result.waiting) {
+        return couldHaveManaToPayCost(result.state, player, cost, searchedStates, excludeSource);
+    }
+
+    const decision = result.state.pending;
+    if (!decision || decision.kind !== "choose" || decision.then.kind !== "resolveManaEffect") return false;
+    const bindAs = decision.then.bindAs;
+
+    return answersFor(decision).some((answer) => canFinishManaAbility(handleManaAbilityDecision(result.state, bindAs, answer), player, cost, searchedStates, excludeSource));
+}
+
+function answersFor(decision: Decision): ResolvedAnswer[] {
+    if (decision.kind === "choose") {
+        return decision.options.map((option) => ({ kind: "choose", chosen: [option] }));
+    }
+    return [];
 }
 
 export function activateManaAbility(state: GameState, player: PlayerId, source: ObjectId, abilityIndex: number): StepResult {
@@ -107,7 +128,7 @@ export function runManaAbilityResolution(state: GameState): StepResult {
     return stepFromApply(finishManaAbilityResolution(result.state, result.events));
 }
 
-export function handleManaAbilityDecision(state: GameState, bindAs: string, answer: ResolvedAnswer): ApplyResult {
+export function handleManaAbilityDecision(state: GameState, bindAs: string, answer: ResolvedAnswer): StepResult {
     const resolving = state.resolvingMana;
     if (!resolving) return fail("No mana ability is resolving");
     let binding: Binding;

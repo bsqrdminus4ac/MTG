@@ -162,6 +162,60 @@ const hastyTapAbilitySource: CardDefinition = {
     abilities: [{ kind: "keyword", keyword: "haste" }, ownManaSourceAbility],
 };
 
+const multipleChoiceManaSource: CardDefinition = {
+    ...creature,
+    id: cardDefId("castability-multiple-choice-mana-source"),
+    name: "Multiple Choice Mana Source",
+    types: ["Artifact"],
+    power: null,
+    toughness: null,
+    abilities: [{
+        kind: "activated",
+        activateableZones: ["battlefield"],
+        cost: { tap: true },
+        timingRestriction: "instantSpeed",
+        isManaAbility: true,
+        targets: [],
+        effects: [
+            {
+                kind: "choose",
+                chooser: { kind: "player", who: "controller" },
+                from: { kind: "manaType", allowed: ["R", "G"] },
+                min: 1,
+                max: 1,
+                bindAs: "firstMana",
+                prompt: "Choose the first mana type",
+            },
+            {
+                kind: "choose",
+                chooser: { kind: "player", who: "controller" },
+                from: { kind: "manaType", allowed: ["B", "U"] },
+                min: 1,
+                max: 1,
+                bindAs: "secondMana",
+                prompt: "Choose the second mana type",
+            },
+            { kind: "addMana", mana: { kind: "bound", name: "firstMana" }, amount: 1 },
+            { kind: "addMana", mana: { kind: "bound", name: "secondMana" }, amount: 1 },
+        ],
+    }],
+};
+
+const redBlackSpell: CardDefinition = {
+    ...optionalTargetSpell,
+    id: cardDefId("castability-red-black-spell"),
+    name: "Red Black Spell",
+    manaCost: { generic: 0, pips: ["R", "B"] },
+    abilities: [{ kind: "spell", targets: [], effects: [] }],
+};
+
+const whiteSpell: CardDefinition = {
+    ...redBlackSpell,
+    id: cardDefId("castability-white-spell"),
+    name: "White Spell",
+    manaCost: { generic: 0, pips: ["W"] },
+};
+
 function game(
     definitions: readonly CardDefinition[],
     aliceDeck: readonly CardDefinition[],
@@ -273,6 +327,21 @@ describe("castability and activatability options", () => {
         const source = moveDefinition(state, alice, sharedSourceAbilities, "battlefield");
 
         expect(offersActivation(source.state, source.id, 0)).toBe(false);
+    });
+
+    test("considers each decision when checking whether a mana ability can pay a spell cost", () => {
+        let state = game(
+            [multipleChoiceManaSource, redBlackSpell, whiteSpell],
+            [multipleChoiceManaSource, redBlackSpell, whiteSpell],
+        );
+        const source = moveDefinition(state, alice, multipleChoiceManaSource, "battlefield");
+        state = source.state;
+        const payableSpell = moveDefinition(state, alice, redBlackSpell, "hand");
+        state = payableSpell.state;
+        const unpayableSpell = moveDefinition(state, alice, whiteSpell, "hand");
+
+        expect(offersCast(atPrecombatMain(unpayableSpell.state), payableSpell.id)).toBe(true);
+        expect(offersCast(atPrecombatMain(unpayableSpell.state), unpayableSpell.id)).toBe(false);
     });
 
     test("a creature entering this turn can use a tap ability only if it has haste", () => {
