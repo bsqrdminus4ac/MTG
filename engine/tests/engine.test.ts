@@ -1,16 +1,16 @@
 import { describe, expect, test, vi } from "vitest";
-import { applySequentially, fail, ok } from "./core/result";
-import { applyAction, submitAnswer } from "./engine";
-import type { AbilityOfKind } from "./model/abilities";
-import type { CardDefinition } from "./model/cardDefinition";
-import { getCharacteristics, snapshotSource } from "./model/characteristics";
-import type { ContinuousEffect } from "./model/continuous";
-import { anyTarget, permanentOfType, type TargetFilter } from "./model/effects";
-import { cardDefId, playerId, type StackId, type Timestamp } from "./model/ids";
-import type { GameState, StackEntry, Target } from "./model/state";
-import { drawCard, moveObject } from "./model/zones";
-import { getLegalTargets } from "./rules/targeting";
-import { createGame } from "./setup";
+import { applySequentially, fail, ok } from "../src/core/result";
+import { applyAction, submitAnswer } from "../src/engine";
+import type { AbilityOfKind } from "../src/model/abilities";
+import type { CardDefinition } from "../src/model/cardDefinition";
+import { getCharacteristics, snapshotSource } from "../src/model/characteristics";
+import type { ContinuousEffect } from "../src/model/continuous";
+import { anyTarget, permanentOfType, type TargetFilter } from "../src/model/effects";
+import { cardDefId, playerId, type StackId, type Timestamp } from "../src/model/ids";
+import type { GameState, StackEntry, Target } from "../src/model/state";
+import { drawCard, moveObject } from "../src/model/zones";
+import { getLegalTargets } from "../src/rules/targeting";
+import { createGame } from "../src/setup";
 
 const alice = playerId("alice");
 const bob = playerId("bob");

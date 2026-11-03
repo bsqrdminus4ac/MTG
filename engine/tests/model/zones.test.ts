@@ -1,10 +1,10 @@
 import { describe, expect, test } from "vitest";
-import type { CardDefinition } from "./cardDefinition";
-import { snapshotSource } from "./characteristics";
-import { cardDefId, playerId, type Timestamp } from "./ids";
-import type { ContinuousEffect } from "./continuous";
-import { moveObject } from "./zones";
-import { createGame } from "../setup";
+import type { CardDefinition } from "../../src/model/cardDefinition";
+import { snapshotSource } from "../../src/model/characteristics";
+import { cardDefId, playerId, type Timestamp } from "../../src/model/ids";
+import type { ContinuousEffect } from "../../src/model/continuous";
+import { moveObject } from "../../src/model/zones";
+import { createGame } from "../../src/setup";
 
 const alice = playerId("alice");
 const bob = playerId("bob");

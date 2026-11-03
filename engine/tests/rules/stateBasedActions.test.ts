@@ -1,11 +1,11 @@
 import { describe, expect, test } from "vitest";
-import type { CardDefinition } from "../model/cardDefinition";
-import type { ContinuousEffect } from "../model/continuous";
-import { cardDefId, playerId, type Timestamp } from "../model/ids";
-import type { GameState } from "../model/state";
-import { moveObject } from "../model/zones";
-import { createGame } from "../setup";
-import { checkStateBasedActions } from "./stateBasedActions";
+import type { CardDefinition } from "../../src/model/cardDefinition";
+import type { ContinuousEffect } from "../../src/model/continuous";
+import { cardDefId, playerId, type Timestamp } from "../../src/model/ids";
+import type { GameState } from "../../src/model/state";
+import { moveObject } from "../../src/model/zones";
+import { createGame } from "../../src/setup";
+import { checkStateBasedActions } from "../../src/rules/stateBasedActions";
 
 const alice = playerId("alice");
 const bob = playerId("bob");

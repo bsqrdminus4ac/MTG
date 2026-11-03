@@ -1,13 +1,13 @@
 import { describe, expect, test } from "vitest";
-import type { CardDefinition } from "../model/cardDefinition";
-import { getCharacteristics } from "../model/characteristics";
-import type { ContinuousEffect } from "../model/continuous";
-import { cardDefId, playerId, type Timestamp } from "../model/ids";
-import type { ObjectPredicate } from "../model/predicates";
-import type { GameState } from "../model/state";
-import { moveObject } from "../model/zones";
-import { createGame } from "../setup";
-import { evalObjectPredicate } from "./predicates";
+import type { CardDefinition } from "../../src/model/cardDefinition";
+import { getCharacteristics } from "../../src/model/characteristics";
+import type { ContinuousEffect } from "../../src/model/continuous";
+import { cardDefId, playerId, type Timestamp } from "../../src/model/ids";
+import type { ObjectPredicate } from "../../src/model/predicates";
+import type { GameState } from "../../src/model/state";
+import { moveObject } from "../../src/model/zones";
+import { createGame } from "../../src/setup";
+import { evalObjectPredicate } from "../../src/rules/predicates";
 
 const alice = playerId("alice");
 const bear: CardDefinition = {

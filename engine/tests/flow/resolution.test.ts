@@ -1,14 +1,14 @@
 import { describe, expect, test } from "vitest";
-import { applyAction, submitAnswer } from "../engine";
-import type { AbilityOfKind } from "../model/abilities";
-import type { CardDefinition } from "../model/cardDefinition";
-import { snapshotSource } from "../model/characteristics";
-import { type TargetSpec } from "../model/effects";
-import { cardDefId, playerId, type ObjectId, type StackId } from "../model/ids";
-import type { GameState, Target } from "../model/state";
-import { moveObject } from "../model/zones";
-import { createGame } from "../setup";
-import { beginResolution } from "./resolution";
+import { applyAction, submitAnswer } from "../../src/engine";
+import type { AbilityOfKind } from "../../src/model/abilities";
+import type { CardDefinition } from "../../src/model/cardDefinition";
+import { snapshotSource } from "../../src/model/characteristics";
+import { type TargetSpec } from "../../src/model/effects";
+import { cardDefId, playerId, type ObjectId, type StackId } from "../../src/model/ids";
+import type { GameState, Target } from "../../src/model/state";
+import { moveObject } from "../../src/model/zones";
+import { createGame } from "../../src/setup";
+import { beginResolution } from "../../src/flow/resolution";
 
 const alice = playerId("alice");
 const bob = playerId("bob");

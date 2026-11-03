@@ -1,8 +1,8 @@
 import { describe, expect, test } from "vitest";
-import { createGame } from "../setup";
-import type { CardDefinition } from "./cardDefinition";
-import { cardDefId, playerId } from "./ids";
-import { getRemainingPlayersInTurnOrder } from "./state";
+import { createGame } from "../../src/setup";
+import type { CardDefinition } from "../../src/model/cardDefinition";
+import { cardDefId, playerId } from "../../src/model/ids";
+import { getRemainingPlayersInTurnOrder } from "../../src/model/state";
 
 const alice = playerId("alice");
 const bob = playerId("bob");

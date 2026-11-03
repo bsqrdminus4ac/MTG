@@ -1,12 +1,12 @@
 import { describe, expect, test } from "vitest";
-import { submitAnswer } from "../engine";
-import type { CardDefinition } from "../model/cardDefinition";
-import type { GameEvent } from "../model/events";
-import { cardDefId, playerId, type ObjectId } from "../model/ids";
-import type { GameState } from "../model/state";
-import { moveObject } from "../model/zones";
-import { createGame } from "../setup";
-import { processCombatDamage, startCombatDamage } from "./combat";
+import { submitAnswer } from "../../src/engine";
+import type { CardDefinition } from "../../src/model/cardDefinition";
+import type { GameEvent } from "../../src/model/events";
+import { cardDefId, playerId, type ObjectId } from "../../src/model/ids";
+import type { GameState } from "../../src/model/state";
+import { moveObject } from "../../src/model/zones";
+import { createGame } from "../../src/setup";
+import { processCombatDamage, startCombatDamage } from "../../src/flow/combat";
 
 const alice = playerId("alice");
 const bob = playerId("bob");

@@ -1,12 +1,12 @@
 import { describe, expect, test } from "vitest";
-import { applyAction, submitAnswer } from "../engine";
-import { priorityOptions, withPriorityDecision } from "../flow/priority";
-import { createGame } from "../setup";
-import type { CardDefinition } from "./cardDefinition";
-import { type Answer, chooseMany, chooseOne, indexChoice, resolveChooseAnswer, resolveYesNoAnswer, validateAnswer, yesNo } from "./decisions";
-import { cardDefId, type DecisionId, playerId, type PlayerId } from "./ids";
-import type { GameState } from "./state";
-import { drawCard } from "./zones";
+import { applyAction, submitAnswer } from "../../src/engine";
+import { priorityOptions, withPriorityDecision } from "../../src/flow/priority";
+import { createGame } from "../../src/setup";
+import type { CardDefinition } from "../../src/model/cardDefinition";
+import { type Answer, chooseMany, chooseOne, indexChoice, resolveChooseAnswer, resolveYesNoAnswer, validateAnswer, yesNo } from "../../src/model/decisions";
+import { cardDefId, type DecisionId, playerId, type PlayerId } from "../../src/model/ids";
+import type { GameState } from "../../src/model/state";
+import { drawCard } from "../../src/model/zones";
 
 
 const alice = playerId("alice");
