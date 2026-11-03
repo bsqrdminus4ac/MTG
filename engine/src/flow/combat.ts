@@ -148,14 +148,32 @@ export function declareAttacks(state: GameState): ApplyResult {
         Object.values(state.combat.attackers).map((a) => (currentState: GameState) => tapPermanent(currentState, a.id)),
     );
     if (!result.ok) return result;
-    const attackEvents: GameEvent[] = Object.values(state.combat.attackers).map((a) => ({
-        type: "attackDeclared",
-        object: a.id,
-        cardName: getCardName(result.state, a.id),
-        player: state.turn.activePlayer,
-        target: a.attackTarget!,
-        targetName: a.attackTarget!.kind === "object" ? `${getCardName(result.state, a.attackTarget!.id)} (#${a.attackTarget!.id})` : a.attackTarget!.id,
-    }));
+    const attackEvents: GameEvent[] = Object.values(state.combat.attackers).flatMap((a) => {
+        const attackerLki = snapshotSource(result.state, a.id);
+        if (!attackerLki) return [];
+        if (!a.attackTarget) return [];
+        if (a.attackTarget.kind === "object") {
+            const targetLki = snapshotSource(result.state, a.attackTarget.id);
+            if (!targetLki) return [];
+            return {
+                type: "attackDeclared",
+                object: a.id,
+                attackerLki,
+                player: state.turn.activePlayer,
+                target: a.attackTarget,
+                targetLki,
+            };
+        } else {
+            return {
+                type: "attackDeclared",
+                object: a.id,
+                attackerLki,
+                player: state.turn.activePlayer,
+                target: a.attackTarget,
+                targetName: a.attackTarget.id,
+            };
+        }
+    });
     return givePriorityToActivePlayer(result.state, [...result.events, ...attackEvents]);
 }
 
@@ -286,16 +304,15 @@ export function declareBlocks(state: GameState, player: PlayerId): ApplyResult {
 
     const events: GameEvent[] = [];
     for (const attacker of Object.values(state.combat.attackers)) {
+        const attackerLki = snapshotSource(state, attacker.id)!;
         if (attacker.blockedBy) {
             events.push(
                 ...attacker.blockedBy.map(
                     (blocker): GameEvent => ({
                         type: "blockDeclared",
                         player,
-                        blocker,
-                        blockerName: getCardName(state, blocker),
-                        attacker: attacker.id,
-                        attackerName: getCardName(state, attacker.id),
+                        attackerLki,
+                        blockerLki: snapshotSource(state, blocker)!,
                     }),
                 ),
             );

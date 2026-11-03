@@ -38,6 +38,15 @@ export interface PlayerState {
     readonly hasLostTheGame?: boolean;
 }
 
+
+export type Binding = readonly ChoiceValue[] | boolean | number;
+export type Bindings = Readonly<Record<string, Binding>>;
+export interface EvalScope {
+    bindings: Bindings;
+    controller: PlayerId;
+    source: ObjectId;
+}
+
 export type Target = Readonly<{ kind: "object"; id: ObjectId }> | Readonly<{ kind: "player"; id: PlayerId }> | Readonly<{ kind: "stackEntry"; id: StackId }>;
 export type AttackableTarget = Exclude<Target, { kind: "stackEntry" }>;
 
@@ -160,13 +169,15 @@ export interface ManaResolutionInProgress {
     abilityDescription: string;
 }
 
-export type Binding = readonly ChoiceValue[] | boolean | number;
-export type Bindings = Readonly<Record<string, Binding>>;
-export interface EvalScope {
-    bindings: Bindings;
-    controller: PlayerId;
-    source: ObjectId;
+export interface PendingTrigger {
+    readonly ability: AbilityOfKind<"triggered">;
+    readonly abilityIndex: number;
+    readonly source: ObjectId;
+    readonly controlller: PlayerId;
+    readonly event: GameEvent;
+    readonly lki: ObjectSnapshot;
 }
+
 
 export interface GameState {
     readonly definitions: Readonly<Record<CardDefId, CardDefinition>>;
@@ -193,4 +204,6 @@ export interface GameState {
     readonly combat: CombatInProgress | null;
     readonly resolving: ResolutionInProgress | null;
     readonly resolvingMana: ManaResolutionInProgress | null;
+
+    readonly pendingTriggers: readonly PendingTrigger[];
 }

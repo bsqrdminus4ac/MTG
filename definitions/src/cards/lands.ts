@@ -2,10 +2,24 @@ import type { CardDefinition } from "@mtg/engine";
 import { tapForMana } from "../builders/abilities";
 import { land } from "../builders/defineCard";
 
-export const forest = land({
-    name: "Forest",
-    subtypes: ["Forest"],
-    abilities: [tapForMana("G")],
+export const plains = land({
+    name: "Plains",
+    subtypes: ["plains"],
+    abilities: [tapForMana("W")],
+    isBasic: true,
+});
+
+export const island = land({
+    name: "Island",
+    subtypes: ["island"],
+    abilities: [tapForMana("U")],
+    isBasic: true,
+});
+
+export const swamp = land({
+    name: "Swamp",
+    subtypes: ["swamp"],
+    abilities: [tapForMana("B")],
     isBasic: true,
 });
 
@@ -13,6 +27,13 @@ export const mountain = land({
     name: "Mountain",
     subtypes: ["mountain"],
     abilities: [tapForMana("R")],
+    isBasic: true,
+});
+
+export const forest = land({
+    name: "Forest",
+    subtypes: ["Forest"],
+    abilities: [tapForMana("G")],
     isBasic: true,
 });
 
@@ -45,4 +66,4 @@ export const grove = land({
     ],
 });
 
-export const LANDS: readonly CardDefinition[] = [forest, mountain, grove];
+export const LANDS: readonly CardDefinition[] = [plains, island, swamp, mountain, forest, grove];

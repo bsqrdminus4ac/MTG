@@ -1,6 +1,6 @@
 import type { ContinuousEffectTemplate } from "./continuous";
 import type { ManaType } from "./mana";
-import type { ObjectPredicate, PlayerPredicate, Predicate, StackPredicate } from "./predicates";
+import type { Comparison, ObjectPredicate, PlayerPredicate, Predicate, StackPredicate } from "./predicates";
 import type { Binding } from "./state";
 import { DAMAGEABLE_TYPES, type PermanentType } from "./vocabulary";
 
@@ -85,8 +85,6 @@ export const mayDo = (who: EffectTarget, prompt: string, bindAs: string, then: r
 };
 
 export const YOU: EffectTarget = { kind: "player", who: "controller" };
-
-export type Comparison = ">" | ">=" | "==" | "<" | "<=" | "!=";
 
 type ConditionLeaf = { kind: "flag"; name: string } | { kind: "compare"; left: Amount; op: Comparison; right: Amount };
 

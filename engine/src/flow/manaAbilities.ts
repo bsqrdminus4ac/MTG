@@ -152,9 +152,8 @@ export function finishManaAbilityResolution(state: GameState, events: readonly G
     const event: GameEvent = {
         type: "abilityActivated",
         player: resolving.player,
-        abilitySource: resolving.sourceSnapshot.id,
+        abilitySourceLki: resolving.sourceSnapshot,
         description: resolving.abilityDescription,
-        sourceName: resolving.sourceSnapshot.chars.name,
         targets: [],
     };
 

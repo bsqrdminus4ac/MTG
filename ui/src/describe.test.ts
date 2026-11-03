@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 import { type GameState, type ObjectId } from "@mtg/engine";
 import { bolt, forest, grove, skeins } from "@mtg/definitions";
 import { ALICE, newDemoGame } from "./demo";
-import { describeAbility, describeCardText, describeEffect, describeEffects, describeManaCost, describePool, findProblems } from "./describe";
+import { describeAbility, describeCardText, describeEffect, describeEffects, describeEventPredicate, describeManaCost, describePool, findProblems } from "./describe";
 
 describe("text describers", () => {
   test("mana costs", () => {
@@ -29,6 +29,92 @@ describe("text describers", () => {
     expect(describeAbility(bolt.abilities[0]!)).toBe(
       "Spell targeting 1 player or object: deal 3 damage to target 1",
     );
+  });
+
+  test("describes event predicates for triggered abilities", () => {
+    expect(describeAbility({
+      kind: "triggered",
+      trigger: {
+        when: {
+          kind: "moved",
+          object: { kind: "all", of: [{ kind: "hasType", type: "Creature" }, { kind: "controlledBy", who: "you" }] },
+          from: "battlefield",
+          to: "graveyard",
+        },
+      },
+      targets: [],
+      effects: [{ kind: "gainLife", who: { kind: "player", who: "controller" }, amount: 1 }],
+      triggerableZones: ["battlefield"],
+    })).toBe(
+      "Triggered: Whenever an object that is a creature and is controlled by you moves from battlefield to graveyard → you gain 1 life",
+    );
+
+    expect(describeAbility({
+      kind: "triggered",
+      trigger: {
+        when: { kind: "cardDrawn", player: { kind: "you" } },
+        interveningIf: { kind: "compare", left: 2, op: ">=", right: 1 },
+      },
+      targets: [],
+      effects: [],
+      triggerableZones: ["battlefield"],
+    })).toBe("Triggered: Whenever you draw a card if 2 >= 1 → do nothing");
+  });
+
+  test("describes each event predicate and its qualifiers", () => {
+    expect(describeEventPredicate({
+      kind: "damaged",
+      target: { kind: "hasType", type: "Creature" },
+      source: { kind: "hasColor", color: "R" },
+      amount: { op: ">=", value: 3 },
+      isCombatDamage: true,
+    })).toBe(
+      "Whenever an object that is a creature is dealt at least 3 damage by an object that is red as combat damage",
+    );
+    expect(describeEventPredicate({ kind: "stepStarted", step: "upkeep", player: { kind: "you" } })).toBe(
+      "At the beginning of your upkeep",
+    );
+    expect(describeEventPredicate({
+      kind: "spellCast",
+      by: { kind: "opponent" },
+      spell: { kind: "hasType", type: "Instant" },
+    })).toBe("Whenever an opponent casts an object that is an instant");
+    expect(describeEventPredicate({
+      kind: "abilityActivated",
+      by: { kind: "you" },
+      source: { kind: "isSource" },
+    })).toBe("Whenever you activate an ability of this object");
+    expect(describeEventPredicate({
+      kind: "lifeChanged",
+      player: { kind: "you" },
+      delta: { op: ">=", value: 2 },
+    })).toBe("Whenever your life total changes by a value at least +2");
+    expect(describeEventPredicate({
+      kind: "attacked",
+      player: { kind: "you" },
+      attacker: { kind: "hasType", type: "Creature" },
+    })).toBe("Whenever you attack with an object that is a creature");
+    expect(describeEventPredicate({
+      kind: "blocked",
+      player: { kind: "opponent" },
+      blocker: { kind: "hasKeyword", keyword: "flying" },
+      attacker: { kind: "hasType", type: "Creature" },
+    })).toBe("Whenever an opponent blocks with an object that has flying, blocking an object that is a creature");
+    expect(describeEventPredicate({ kind: "cardDrawn" })).toBe("Whenever a player draws a card");
+  });
+
+  test("describes boolean event predicate combinations", () => {
+    expect(describeEventPredicate({
+      kind: "all",
+      of: [
+        { kind: "moved", from: "battlefield" },
+        { kind: "cardDrawn", player: { kind: "opponent" } },
+      ],
+    })).toBe("Whenever an event matches all of: a card moves from battlefield and an opponent draws a card");
+    expect(describeEventPredicate({
+      kind: "not",
+      of: { kind: "spellCast", by: { kind: "you" } },
+    })).toBe("Whenever an event does not match: you cast a spell");
   });
 
   test("target descriptions use custom text or fall back to the filter kind", () => {

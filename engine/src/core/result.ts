@@ -7,6 +7,8 @@ export type Result<T> = Readonly<{ ok: true; value: T }> | Failure;
 export const goodResult = <T>(value: T): Result<T> => ({ ok: true, value });
 export const badResult = (error: string): Result<never> => ({ ok: false, error });
 
+export const isTrue = (result: Result<boolean>): result is Readonly<{ ok: true; value: true }> => result.ok && result.value === true;
+
 export type ApplyResult = Readonly<{ ok: true; state: GameState; events: readonly GameEvent[]; changesMade?: boolean }> | Failure;
 
 export const fail = (error: string): Failure => ({ ok: false, error });

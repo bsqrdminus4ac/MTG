@@ -1,19 +1,14 @@
 import type { ContinuousEffectTemplate } from "./continuous";
-import type { CardEffect, TargetSpec } from "./effects";
-import type { GameEvent } from "./events";
+import type { CardEffect, Condition, TargetSpec } from "./effects";
 import type { ObjectId } from "./ids";
 import type { ManaCost } from "./mana";
+import type { EventPredicate } from "./predicates";
 import type { Keyword, Zone } from "./vocabulary";
 
 export type Cost = Readonly<{
     mana?: ManaCost;
     tap?: boolean;
     sacrificeSelf?: boolean;
-}>;
-
-export type TriggerCondition = Readonly<{
-    event: GameEvent["type"];
-    scope: "self" | "any";
 }>;
 
 export type Ability =
@@ -31,7 +26,7 @@ export type Ability =
       }>
     | Readonly<{
           kind: "triggered";
-          trigger: TriggerCondition;
+          trigger: { when: EventPredicate; interveningIf?: Condition };
           targets: TargetSpec[];
           effects: readonly CardEffect[];
           triggerableZones: readonly Zone[];

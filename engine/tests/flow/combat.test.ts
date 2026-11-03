@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { submitAnswer } from "../../src/engine";
 import type { CardDefinition } from "../../src/model/cardDefinition";
+import { snapshotSource } from "../../src/model/characteristics";
 import type { GameEvent } from "../../src/model/events";
 import { cardDefId, playerId, type ObjectId } from "../../src/model/ids";
 import type { GameState } from "../../src/model/state";
@@ -102,7 +103,7 @@ describe("combat damage", () => {
             {
                 type: "damageDealt",
                 source: attacker,
-                sourceName: "attacker",
+                sourceLki: snapshotSource(state, attacker),
                 amount: 3,
                 target: { kind: "player", id: bob },
                 targetName: "bob",

@@ -1,6 +1,6 @@
 import { type ApplyResult, fail, ok } from "../core/result";
 import { withEntry } from "../core/util";
-import { getCardName, getCharacteristics, hasKeyword } from "../model/characteristics";
+import { getCardName, getCharacteristics, hasKeyword, snapshotSource } from "../model/characteristics";
 import type { GameEvent } from "../model/events";
 import type { ObjectId, PlayerId } from "../model/ids";
 import { type ManaType, addMana } from "../model/mana";
@@ -20,7 +20,7 @@ export function damagePlayer(state: GameState, player: PlayerId, source: ObjectS
     if (!p) return fail("Invalid player to damage");
     if (amount === 0) return ok(state, []);
     return ok({ ...state, players: withEntry(state.players, player, { ...p, life: p.life - amount }) }, [
-        { type: "damageDealt", source: source.id, sourceName: source.chars.name, amount, target: { kind: "player", id: player }, targetName: player, isCombatDamage },
+        { type: "damageDealt", source: source.id, sourceLki: source, amount, target: { kind: "player", id: player }, targetName: player, isCombatDamage },
     ]);
 }
 
@@ -70,9 +70,10 @@ export function damageCreature(state: GameState, target: ObjectId, source: Objec
     const obj = state.objects[target];
     if (!obj) return ok(state, []);
     if (amount === 0) return ok(state, []);
-    return ok({ ...state, objects: withEntry(state.objects, target, { ...obj, damage: obj.damage + amount }) }, [
-        { type: "damageDealt", source: source.id, sourceName: source.chars.name, amount, target: { kind: "object", id: target }, targetName: getCardName(state, target, true), isCombatDamage },
-    ]);
+    const next = { ...state, objects: withEntry(state.objects, target, { ...obj, damage: obj.damage + amount }) };
+    const targetLki = snapshotSource(next, target);
+    if (!targetLki) return fail("Unable to locate characteristics of target");
+    return ok(next, [{ type: "damageDealt", source: source.id, sourceLki: source, amount, target: { kind: "object", id: target }, targetLki, isCombatDamage }]);
 }
 
 export function damagePlaneswalker(state: GameState, target: ObjectId, source: ObjectSnapshot, amount: number, isCombatDamage: boolean): ApplyResult {
@@ -80,9 +81,10 @@ export function damagePlaneswalker(state: GameState, target: ObjectId, source: O
     if (!obj) return ok(state, []);
     if (amount === 0) return ok(state, []);
     if (!("loyalty" in obj.counters)) return fail("Planeswalkers have to have loyalty counters defined");
-    return ok({ ...state, objects: withEntry(state.objects, target, { ...obj, counters: withEntry(obj.counters, "loyalty", obj.counters["loyalty"] - amount) }) }, [
-        { type: "damageDealt", source: source.id, sourceName: source.chars.name, amount, target: { kind: "object", id: target }, targetName: getCardName(state, target, true), isCombatDamage },
-    ]);
+    const next = { ...state, objects: withEntry(state.objects, target, { ...obj, counters: withEntry(obj.counters, "loyalty", obj.counters["loyalty"] - amount) }) };
+    const targetLki = snapshotSource(next, target);
+    if (!targetLki) return fail("Unable to locate characteristics of target");
+    return ok(next, [{ type: "damageDealt", source: source.id, sourceLki: source, amount, target: { kind: "object", id: target }, targetLki, isCombatDamage }]);
 }
 
 export function destroyPermanent(state: GameState, target: ObjectId, source: ObjectSnapshot, sourceDescription?: string): ApplyResult {

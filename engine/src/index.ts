@@ -10,6 +10,7 @@ export * from "./model/effects";
 export * from "./model/events";
 export * from "./model/ids";
 export * from "./model/mana";
+export * from "./model/predicates";
 export * from "./model/state";
 export * from "./model/vocabulary";
 export * from "./model/zones";

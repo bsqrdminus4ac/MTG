@@ -7,7 +7,7 @@ type WinLossEvent = Readonly<{ type: "lostTheGame"; player: PlayerId; cause: str
 
 type StepEvent =
     | Readonly<{ type: "turnStarted"; turn: number; activePlayer: PlayerId }>
-    | Readonly<{ type: "stepStarted"; step: Step }>
+    | Readonly<{ type: "stepStarted"; step: Step; activePlayer: PlayerId }>
     | Readonly<{ type: "priorityPassed"; player: PlayerId; step: Step }>
     | Readonly<{
           type: "cardMoved";
@@ -27,28 +27,28 @@ type PlayerEvent =
     | Readonly<{ type: "cardDiscarded"; player: PlayerId; card: ObjectId; cardName: string; cause?: string }>;
 
 type ObjectEvent =
-    | Readonly<{ type: "damageDealt"; source: ObjectId; sourceName: string; target: Target; targetName: string; amount: number; isCombatDamage: boolean }>
+    | Readonly<{ type: "damageDealt"; source: ObjectId; target: Target; sourceLki: ObjectSnapshot; targetLki?: ObjectSnapshot; targetName?: string; amount: number; isCombatDamage: boolean }>
     | Readonly<{ type: "permanentTapped"; object: ObjectId; cardName: string }>
     | Readonly<{ type: "permanentUntapped"; object: ObjectId; cardName: string }>
     | Readonly<{ type: "permanentDestroyed"; object: ObjectId; cardName: string; sourceName?: string }>
     | Readonly<{ type: "permanentSacrificed"; object: ObjectId; cardName: string; sourceName?: string }>;
 
 type StackEvent =
-    | Readonly<{ type: "spellCastSuccess"; player: PlayerId; card: ObjectId; cardName: string; targets: readonly Target[] }>
+    | Readonly<{ type: "spellCastSuccess"; player: PlayerId; card: ObjectId; spellLki: ObjectSnapshot; targets: readonly Target[] }>
     | Readonly<{ type: "spellCastStart"; player: PlayerId; card: ObjectId; cardName: string }>
     | Readonly<{ type: "spellTargetsSelected"; player: PlayerId; card: ObjectId; cardName: string }>
     | Readonly<{ type: "spellManaPaid"; player: PlayerId; card: ObjectId; cardName: string }>
     | Readonly<{ type: "spellCastCancelled"; player: PlayerId; card: ObjectId; cardName: string }>
     | Readonly<{ type: "abilityActivateStart"; player: PlayerId; abilitySource: ObjectId; sourceName: string; description: string }>
-    | Readonly<{ type: "abilityActivated"; player: PlayerId; abilitySource: ObjectId; sourceName: string; description: string; targets: readonly Target[] }>
+    | Readonly<{ type: "abilityActivated"; player: PlayerId; abilitySourceLki: ObjectSnapshot; description: string; targets: readonly Target[] }>
     | Readonly<{ type: "abilityActivateCancelled"; player: PlayerId; abilitySource: ObjectId; sourceName: string; description: string }>
     | Readonly<{ type: "stackEntryResolved"; id: StackId; entryName: string }>
     | Readonly<{ type: "stackEntryFizzles"; id: StackId; entryName: string }>;
 
 type CombatEvent =
-    | Readonly<{ type: "attackDeclared"; player: PlayerId; object: ObjectId; cardName: string; target: AttackableTarget; targetName: string }>
+    | Readonly<{ type: "attackDeclared"; player: PlayerId; attackerLki: ObjectSnapshot; target: AttackableTarget; targetLki?: ObjectSnapshot; targetName?: string }>
     | Readonly<{ type: "attacksCancelled"; player: PlayerId }>
-    | Readonly<{ type: "blockDeclared"; player: PlayerId; blocker: ObjectId; blockerName: string; attacker: ObjectId; attackerName: string }>
+    | Readonly<{ type: "blockDeclared"; player: PlayerId; blockerLki: ObjectSnapshot; attackerLki: ObjectSnapshot }>
     | Readonly<{ type: "blocksCancelled"; player: PlayerId }>;
 
 /**

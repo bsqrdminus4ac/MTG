@@ -1,6 +1,6 @@
 import { fail, ok, type ApplyResult } from "../core/result";
 import { assertNever } from "../core/util";
-import { getCardName, getCharacteristics } from "../model/characteristics";
+import { getCardName, getCharacteristics, snapshotSource } from "../model/characteristics";
 import { abilityChoice, chooseMany, chooseOne, objectChoice, playerChoice, yesNo, type Choice } from "../model/decisions";
 import { describeAbility, getCardText, type TargetSpec } from "../model/effects";
 import type { GameEvent } from "../model/events";
@@ -106,12 +106,14 @@ export function commitCast(state: GameState): ApplyResult {
                 targets: castingInfo.targets,
                 bindings: castingInfo.bindings,
             };
+            const spellLki = snapshotSource(moved.state, moved.newId);
+            if (!spellLki) return fail("Unable to snapshot spell on the stack");
             out.push({
                 type: "spellCastSuccess",
                 card: moved.newId,
                 player: castingInfo.player,
                 targets: castingInfo.targets.flat(), //TODO: Consider making event layered too
-                cardName: getCardName(currentState, moved.newId),
+                spellLki: spellLki,
             });
             const stackState = pushStackEntry(moved.state, entry);
             return grantPriority({ ...stackState.state, casting: null }, out, castingInfo.player, 0);
@@ -128,11 +130,10 @@ export function commitCast(state: GameState): ApplyResult {
             };
             out.push({
                 type: "abilityActivated",
-                abilitySource: entry.source,
+                abilitySourceLki: entry.sourceSnapshot,
                 player: castingInfo.player,
                 targets: castingInfo.targets.flat(), //TODO: Consider making event layered too
                 description: describeAbility(entry.ability, entry.sourceSnapshot.chars.name),
-                sourceName: entry.sourceSnapshot.chars.name,
             });
             const stackState = pushStackEntry(currentState, entry);
             return grantPriority({ ...stackState.state, casting: null }, out, castingInfo.player, 0);

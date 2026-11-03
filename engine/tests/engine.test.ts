@@ -204,7 +204,7 @@ describe("spell targeting", () => {
             targets: [],
             ability: {
                 kind: "triggered",
-                trigger: { event: "lifeChanged", scope: "any" },
+                trigger: { when: { kind: "lifeChanged", player: { kind: "anyPlayer" } } },
                 targets: [],
                 effects: [],
                 triggerableZones: ["battlefield"],

@@ -1,6 +1,6 @@
 import { type Result, goodResult } from "../core/result";
 import { assertNever } from "../core/util";
-import { getCharacteristics, hasKeyword } from "../model/characteristics";
+import { hasKeyword, snapshotSource } from "../model/characteristics";
 import type { TargetFilter, TargetSpec } from "../model/effects";
 import type { EvalScope, GameState, Target } from "../model/state";
 import { evalObjectPredicate, evalPlayerPredicate, evalStackPredicate } from "./predicates";
@@ -40,10 +40,9 @@ function matchesFilter(state: GameState, scope: EvalScope, target: Target, filte
             return evalStackPredicate(state, scope, entry, filter.filter);
         case "object":
             if (target.kind !== "object") return goodResult(false);
-            if (!state.objects[target.id]) return goodResult(false);
-            const chars = getCharacteristics(state, target.id);
-            if (!chars) return goodResult(false);
-            return evalObjectPredicate(state, scope, target.id, chars, filter.filter);
+            const lki = snapshotSource(state, target.id);
+            if (!lki) return goodResult(false);
+            return evalObjectPredicate(state, scope, lki, filter.filter);
         default:
             return assertNever(filter);
     }
@@ -97,9 +96,9 @@ function collectTargets(state: GameState, scope: EvalScope, filter: TargetFilter
         case "object": {
             const targets: Target[] = [];
             for (const obj of Object.values(state.objects)) {
-                const chars = getCharacteristics(state, obj.id);
-                if (!chars) continue;
-                const matches = evalObjectPredicate(state, scope, obj.id, chars, filter.filter);
+                const lki = snapshotSource(state, obj.id);
+                if (!lki) continue;
+                const matches = evalObjectPredicate(state, scope, lki, filter.filter);
                 if (!matches.ok) return matches;
                 if (matches.value) targets.push({ kind: "object", id: obj.id });
             }

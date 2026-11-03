@@ -1,9 +1,9 @@
 import { type Result, goodResult } from "../core/result";
 import { assertNever } from "../core/util";
-import type { Amount, Comparison, Condition } from "../model/effects";
+import type { Amount, Condition } from "../model/effects";
+import { compareNumbers } from "../model/predicates";
 import type { EvalScope, GameState } from "../model/state";
 import { getCountBinding, getFlagBinding } from "./bindings";
-
 
 export const resolveAmount = (state: GameState, ctx: EvalScope, amount: Amount): Result<number> => {
     return typeof amount === "number" ? goodResult(amount) : getCountBinding(ctx.bindings, amount.name);
@@ -37,24 +37,5 @@ export function evalCondition(state: GameState, scope: EvalScope, c: Condition):
         }
         default:
             return assertNever(c);
-    }
-}
-
-function compareNumbers(a: number, op: Comparison, b: number): boolean {
-    switch (op) {
-        case "<":
-            return a < b;
-        case "<=":
-            return a <= b;
-        case "==":
-            return a === b;
-        case "!=":
-            return a !== b;
-        case ">=":
-            return a >= b;
-        case ">":
-            return a > b;
-        default:
-            return assertNever(op);
     }
 }

@@ -32,7 +32,7 @@ export function advanceStep(state: GameState, events: readonly GameEvent[]): App
         }
 
         next = { ...next, turn: { number, activePlayer, step }, pending: null };
-        out.push({ type: "stepStarted", step });
+        out.push({ type: "stepStarted", step, activePlayer });
         const result = onEnterStep(next, step, wrapped);
         if (!result.ok) return result;
         next = result.state;

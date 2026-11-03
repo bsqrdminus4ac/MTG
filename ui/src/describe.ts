@@ -7,12 +7,15 @@ import {
     type Answer,
     type ChoiceValue,
     type Condition,
+    type Comparison,
     type ContinuousEffect,
     type ContinuousEffectTemplate,
     type Cost,
     type Decision,
     type Effect,
     type EffectTarget,
+    type EventLeaf,
+    type EventPredicate,
     type GameEvent,
     type GameState,
     type ManaCost,
@@ -20,6 +23,11 @@ import {
     type ManaType,
     type Modification,
     type ObjectId,
+    type ObjectLeaf,
+    type ObjectPredicate,
+    type PlayerLeaf,
+    type PlayerPredicate,
+    type Predicate,
     type StackId,
     type Target,
     type TargetFilter,
@@ -228,6 +236,220 @@ function describeCondition(condition: Condition, bindings: Readonly<Record<strin
     }
 }
 
+function describeObjectPredicate(predicate: ObjectPredicate): string {
+    if (predicate.kind === "isSource") return "this object";
+    return `an object that ${describeObjectCondition(predicate)}`;
+}
+
+function describeObjectCondition(predicate: ObjectPredicate): string {
+    if (predicate.kind === "not") return `does not match ${describeObjectPredicate(predicate.of)}`;
+    if (predicate.kind === "all" || predicate.kind === "any") {
+        const parts = predicate.of.map(describeObjectCondition);
+        const conjunction = predicate.kind === "all" ? "and" : "or";
+        return parts.join(` ${conjunction} `);
+    }
+    switch (predicate.kind) {
+        case "hasType":
+            return `is ${indefiniteArticle(predicate.type)} ${predicate.type.toLowerCase()}`;
+        case "hasColor":
+            return `is ${describeColor(predicate.color)}`;
+        case "hasSupertype":
+            return `is ${predicate.type.toLowerCase()}`;
+        case "hasSubtype":
+            return `has subtype ${predicate.type}`;
+        case "hasKeyword":
+            return `has ${predicate.keyword}`;
+        case "controlledBy":
+            return predicate.who === "you" ? "is controlled by you" : "is controlled by an opponent";
+        case "inZone":
+            return `is in ${predicate.zone}`;
+        case "isSource":
+            return "is this object";
+        default:
+            return unreachable(predicate);
+    }
+}
+
+function describePlayerPredicate(predicate: PlayerPredicate): string {
+    if (predicate.kind === "not") return `someone other than ${describePlayerPredicate(predicate.of)}`;
+    if (predicate.kind === "all" || predicate.kind === "any") {
+        const parts = predicate.of.map(describePlayerPredicate);
+        return parts.join(predicate.kind === "all" ? " and " : " or ");
+    }
+
+    switch (predicate.kind) {
+        case "anyPlayer":
+            return "a player";
+        case "you":
+            return "you";
+        case "opponent":
+            return "an opponent";
+        default:
+            return unreachable(predicate);
+    }
+}
+
+function describeEventLeaf(predicate: EventLeaf): string {
+    switch (predicate.kind) {
+        case "moved": {
+            const object = predicate.object ? describeObjectPredicate(predicate.object) : "a card";
+            const from = predicate.from ? ` from ${predicate.from}` : "";
+            const to = predicate.to ? ` to ${predicate.to}` : "";
+            return `${object} moves${from}${to}`;
+        }
+        case "damaged": {
+            const target = predicate.target
+                ? isPlayerPredicate(predicate.target)
+                    ? `${describePlayerPredicate(predicate.target)} ${predicate.target.kind === "you" ? "are" : "is"} dealt`
+                    : `${describeObjectPredicate(predicate.target)} is dealt`
+                : "something is dealt";
+            const source = predicate.source ? ` by ${describeObjectPredicate(predicate.source)}` : "";
+            const amount = predicate.amount ? ` ${describeNumberTest(predicate.amount)} damage` : " damage";
+            const combat = predicate.isCombatDamage === undefined ? "" : predicate.isCombatDamage ? " as combat damage" : " as noncombat damage";
+            return `${target}${amount}${source}${combat}`;
+        }
+        case "stepStarted": {
+            const step = describeStep(predicate.step);
+            const player = predicate.player ? describePlayerPossessive(predicate.player) : "the";
+            return `${player} ${step} step begins`;
+        }
+        case "spellCast": {
+            const spell = predicate.spell ? describeObjectPredicate(predicate.spell) : "a spell";
+            return `${describePlayerAction(predicate.by, "cast", "casts")} ${spell}`;
+        }
+        case "abilityActivated": {
+            const source = predicate.source ? ` of ${describeObjectPredicate(predicate.source)}` : "";
+            return `${describePlayerAction(predicate.by, "activate", "activates")} an ability${source}`;
+        }
+        case "lifeChanged": {
+            const player = predicate.player ? describePlayerPossessive(predicate.player) : "a player's";
+            const delta = predicate.delta ? ` by a value ${describeDeltaTest(predicate.delta)}` : "";
+            return `${player} life total changes${delta}`;
+        }
+        case "attacked": {
+            const attacker = predicate.attacker ? ` with ${describeObjectPredicate(predicate.attacker)}` : "";
+            return `${describePlayerAction(predicate.player, "attack", "attacks")}${attacker}`;
+        }
+        case "blocked": {
+            const blocker = predicate.blocker ? ` with ${describeObjectPredicate(predicate.blocker)}` : "";
+            const attacker = predicate.attacker ? `, blocking ${describeObjectPredicate(predicate.attacker)}` : "";
+            return `${describePlayerAction(predicate.player, "block", "blocks")}${blocker}${attacker}`;
+        }
+        case "cardDrawn":
+            return `${describePlayerAction(predicate.player, "draw", "draws")} a card`;
+        default:
+            return unreachable(predicate);
+    }
+}
+
+function isPlayerPredicate(predicate: ObjectPredicate | PlayerPredicate): predicate is PlayerPredicate {
+    if (predicate.kind === "not") return isPlayerPredicate(predicate.of);
+    if (predicate.kind === "all" || predicate.kind === "any") {
+        const first = predicate.of[0];
+        return first ? isPlayerPredicate(first) : false;
+    }
+    return predicate.kind === "anyPlayer" || predicate.kind === "you" || predicate.kind === "opponent";
+}
+
+function describePlayerPossessive(predicate: PlayerPredicate): string {
+    if (predicate.kind === "not") return `${describePlayerPredicate(predicate.of)}'s`;
+    if (predicate.kind === "all" || predicate.kind === "any") {
+        return `${predicate.of.map(describePlayerPossessive).join(predicate.kind === "all" ? " and " : " or ")}`;
+    }
+    switch (predicate.kind) {
+        case "anyPlayer":
+            return "a player's";
+        case "you":
+            return "your";
+        case "opponent":
+            return "an opponent's";
+        default:
+            return unreachable(predicate);
+    }
+}
+
+function describePlayerAction(predicate: PlayerPredicate | undefined, verb: string, thirdPersonVerb: string): string {
+    if (!predicate) return `a player ${thirdPersonVerb}`;
+    if (predicate.kind === "you") return `you ${verb}`;
+    if (predicate.kind === "opponent") return `an opponent ${thirdPersonVerb}`;
+    if (predicate.kind === "anyPlayer") return `a player ${thirdPersonVerb}`;
+    return `a qualifying player ${thirdPersonVerb}`;
+}
+
+function describeNumberTest(test: { op: Comparison; value: number }): string {
+    const operators: Readonly<Record<Comparison, string>> = {
+        ">": "more than",
+        ">=": "at least",
+        "==": "exactly",
+        "!=": "other than",
+        "<": "less than",
+        "<=": "at most",
+    };
+    return `${operators[test.op]} ${test.value}`;
+}
+
+function describeDeltaTest(test: { op: Comparison; value: number }): string {
+    const operators: Readonly<Record<Comparison, string>> = {
+        ">": "more than",
+        ">=": "at least",
+        "==": "exactly",
+        "!=": "other than",
+        "<": "less than",
+        "<=": "at most",
+    };
+    return `${operators[test.op]} ${signed(test.value)}`;
+}
+
+function indefiniteArticle(noun: string): "a" | "an" {
+    return /^[aeiou]/i.test(noun) ? "an" : "a";
+}
+
+function describeColor(color: "W" | "U" | "B" | "R" | "G"): string {
+    switch (color) {
+        case "W":
+            return "white";
+        case "U":
+            return "blue";
+        case "B":
+            return "black";
+        case "R":
+            return "red";
+        case "G":
+            return "green";
+        default:
+            return unreachable(color);
+    }
+}
+
+function describeStep(step: GameState["turn"]["step"]): string {
+    return step.replace(/[A-Z]/g, (letter) => ` ${letter.toLowerCase()}`);
+}
+
+/** Describes the event condition that causes a triggered ability to trigger. */
+export function describeEventPredicate(predicate: EventPredicate): string {
+    if (predicate.kind === "not") {
+        return `Whenever an event does not match: ${stripEventTiming(describeEventPredicate(predicate.of))}`;
+    }
+    if (predicate.kind === "all" || predicate.kind === "any") {
+        const parts = predicate.of.map((part) => stripEventTiming(describeEventPredicate(part)));
+        const conjunction = predicate.kind === "all" ? "and" : "or";
+        return `Whenever an event matches ${predicate.kind === "all" ? "all" : "any"} of: ${parts.join(` ${conjunction} `)}`;
+    }
+
+    if (predicate.kind === "stepStarted") {
+        const player = predicate.player ? describePlayerPossessive(predicate.player) : "the";
+        const step = describeStep(predicate.step);
+        const stepSuffix = predicate.step === "upkeep" && predicate.player ? "" : " step";
+        return `At the beginning of ${player} ${step}${stepSuffix}`;
+    }
+    const description = describeEventLeaf(predicate);
+    return `Whenever ${description}`;
+}
+
+function stripEventTiming(description: string): string {
+    return description.replace(/^(?:Whenever |At the beginning of )/, "");
+}
+
 export function describeAmount(a: Amount): string {
     return typeof a === "number" ? String(a) : `the number of “${a.name}”`;
 }
@@ -280,7 +502,7 @@ export function describeAbility(a: Ability | undefined): string {
         case "activated":
             return `${a.isManaAbility ? "Mana ability" : "Activated"}${describeTargetSpecs(a.targets)}: ${describeCost(a.cost)} → ${describeEffects(a.effects)}`;
         case "triggered":
-            return `Triggered${describeTargetSpecs(a.targets)}: when ${a.trigger.event} (${a.trigger.scope}) → ${describeEffects(a.effects)}`;
+            return `Triggered${describeTargetSpecs(a.targets)}: ${describeEventPredicate(a.trigger.when)}${a.trigger.interveningIf ? ` if ${describeCondition(a.trigger.interveningIf, {})}` : ""} → ${describeEffects(a.effects)}`;
         case "static":
             return `Static: ${describeTemplate(a.effect)}`;
         default:
@@ -412,7 +634,7 @@ export function describeEvent(state: GameState, e: GameEvent): string {
 
       // Object effects
       case "damageDealt":
-          return `${e.sourceName} deals ${e.amount} damage to ${e.targetName}`;
+          return `${e.sourceLki.chars.name} deals ${e.amount} damage to ${e.targetName}`;
       case "permanentTapped":
           return `${e.cardName} is tapped`;
       case "permanentUntapped":
@@ -426,7 +648,7 @@ export function describeEvent(state: GameState, e: GameEvent): string {
 
       // Spells & Abilities
       case "spellCastSuccess":
-          return `${e.player} casts ${e.cardName}`;
+          return `${e.player} casts ${e.spellLki.chars.name}`;
       case "spellCastStart":
           return `${e.player} starts casting ${e.cardName}`;
       case "spellTargetsSelected":
@@ -439,7 +661,7 @@ export function describeEvent(state: GameState, e: GameEvent): string {
           return `${e.player} starts activating ${e.sourceName}'s ability (${e.description})`;
       case "abilityActivated":
           return (
-              `${e.player} activates ${e.sourceName}'s ability (#${e.abilitySource}): ${e.description}` +
+              `${e.player} activates ${e.abilitySourceLki.chars.name}'s ability (#${e.abilitySourceLki.id}): ${e.description}` +
               (e.targets.length > 0 ? ` targeting ${e.targets.map((t) => describeTarget(state, t)).join(", ")}` : "")
           );
       case "abilityActivateCancelled":
@@ -451,11 +673,11 @@ export function describeEvent(state: GameState, e: GameEvent): string {
 
       // Attacks
       case "attackDeclared":
-          return `${e.player} attacks ${e.targetName} with ${e.cardName} (#${e.object})`;
+          return `${e.player} attacks ${e.targetLki ? `${e.targetLki.chars.name} (#${e.targetLki.id})` : e.targetName} with ${e.attackerLki.chars.name} (#${e.attackerLki.id})`;
       case "attacksCancelled":
           return `${e.player} cancels their attacks`;
       case "blockDeclared":
-          return `${e.player} blocks ${e.attackerName} (#${e.attacker}) with ${e.blockerName} (#${e.blocker})`;
+          return `${e.player} blocks ${e.attackerLki.chars.name} (#${e.attackerLki.id}) with ${e.blockerLki.chars.name} (#${e.blockerLki.id})`;
       case "blocksCancelled":
           return `${e.player} cancels their blocks`;
 

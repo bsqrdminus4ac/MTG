@@ -1,5 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { submitAnswer } from "../../src/engine";
+import { executeEffect, resolvePlayers, type EffectContext, type StepResult } from "../../src/flow/effects";
+import { handleResolutionDecision, runResolution } from "../../src/flow/resolution";
 import type { AbilityOfKind } from "../../src/model/abilities";
 import type { CardDefinition } from "../../src/model/cardDefinition";
 import { snapshotSource } from "../../src/model/characteristics";
@@ -10,8 +12,6 @@ import { moveObject } from "../../src/model/zones";
 import { resolveAmount } from "../../src/rules/conditions";
 import { damageObject, damagePlayer } from "../../src/rules/primitives";
 import { createGame } from "../../src/setup";
-import { executeEffect, resolvePlayers, type EffectContext, type StepResult } from "../../src/flow/effects";
-import { handleResolutionDecision, runResolution } from "../../src/flow/resolution";
 
 const alice = playerId("alice");
 const bob = playerId("bob");
@@ -69,7 +69,7 @@ function putCardsInHand(state: GameState, player: typeof alice, count: number): 
 
 const testAbility: AbilityOfKind<"triggered"> = {
     kind: "triggered",
-    trigger: { event: "lifeChanged", scope: "any" },
+    trigger: { when: { kind: "lifeChanged", player: { kind: "anyPlayer" } } },
     targets: [],
     effects: [],
     triggerableZones: ["battlefield"],
@@ -588,7 +588,7 @@ describe("damage helpers", () => {
       {
         type: "damageDealt",
         source,
-        sourceName: "Grizzly Bears",
+        sourceLki: sourceSnapshot(state, source),
         amount: 3,
         target: { kind: "player", id: bob },
         targetName: "bob",
@@ -610,10 +610,10 @@ describe("damage helpers", () => {
       {
         type: "damageDealt",
         source: source.newId,
-        sourceName: "Grizzly Bears",
+        sourceLki: sourceSnapshot(target.state, source.newId),
         amount: 2,
         target: { kind: "object", id: target.newId },
-        targetName: `Grizzly Bears (#${target.newId})`,
+        targetLki: sourceSnapshot(result.state, target.newId),
         isCombatDamage: false,
       },
     ]);
@@ -641,10 +641,10 @@ describe("damage helpers", () => {
       {
         type: "damageDealt",
         source: source.newId,
-        sourceName: "Grizzly Bears",
+        sourceLki: sourceSnapshot(withLoyalty, source.newId),
         amount: 2,
         target: { kind: "object", id: target.newId },
-        targetName: `Test Planeswalker (#${target.newId})`,
+        targetLki: sourceSnapshot(result.state, target.newId),
         isCombatDamage: false,
       },
     ]);

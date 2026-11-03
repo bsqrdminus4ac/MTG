@@ -1,4 +1,5 @@
-import { COLORS, type Ability, type Effect, type ManaType } from "@mtg/engine";
+import { COLORS, type Ability, type CardEffect, type Condition, type Effect, type ManaType, type Step, type TargetSpec, type Zone } from "@mtg/engine";
+import type { EventPredicate } from "../../../engine/src/model/predicates";
 
 export const tapForMana = (mana: ManaType): Ability => ({
     kind: "activated",
@@ -13,6 +14,26 @@ export const tapForMana = (mana: ManaType): Ability => ({
 export const manaOfAnyColor = (includeColorless?: boolean): ManaType[] => (includeColorless ? [...COLORS, "C"] : [...COLORS]);
 
 export const drawCards = (amount: number): Effect => ({ kind: "draw", count: amount, who: { kind: "player", who: "controller" } });
+
+export const triggered = (a: { when: EventPredicate; effects: CardEffect[]; targets?: TargetSpec[]; triggerableZones?: Zone[]; interveningIf?: Condition }): Ability => ({
+    kind: "triggered",
+    trigger: a.interveningIf !== undefined ? { when: a.when, interveningIf: a.interveningIf } : { when: a.when },
+    effects: a.effects,
+    targets: a.targets ?? [],
+    triggerableZones: a.triggerableZones ?? ["battlefield"],
+});
+
+export const thisEntersTheBattlefield = (): EventPredicate => ({
+    kind: "moved",
+    object: { kind: "isSource" },
+    to: "battlefield",
+});
+
+export const atBeginningOfStep = (which: "your" | "any", step: Step): EventPredicate => ({
+    kind: "stepStarted",
+    step,
+    player: which === "your" ? { kind: "you" } : { kind: "anyPlayer" },
+});
 
 export const discardThenGainLife = (): Ability => ({
     kind: "spell",
