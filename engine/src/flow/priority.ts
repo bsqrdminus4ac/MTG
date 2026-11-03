@@ -25,9 +25,7 @@ export function passPriority(state: GameState, player: PlayerId): ApplyResult {
 
     if (passes < state.turnOrder.length) {
         const holder = nextPlayer(state, player);
-        const result = checkStateBasedActions(state, events);
-        if (!result.ok) return result;
-        return ok(withPriorityDecision({ ...result.state, priority: { holder, consecutivePasses: passes } }), result.events);
+        return grantPriority(state, events, holder, passes);
     }
 
     // Everyone passed in succession: resolve the top of the stack, or end the step.
@@ -35,15 +33,26 @@ export function passPriority(state: GameState, player: PlayerId): ApplyResult {
 }
 
 export function givePriorityToActivePlayer(state: GameState, events: GameEvent[]): ApplyResult {
+    return grantPriority(state, events, state.turn.activePlayer, 0);
+}
+
+export function stabilize(state: GameState, events: readonly GameEvent[], changesMade = false): { result: ApplyResult; changesMade: boolean } {
     const result = checkStateBasedActions(state, []);
-    if (!result.ok) return result;
-    return ok(
-        withPriorityDecision({
-            ...result.state,
-            priority: { holder: state.turn.activePlayer, consecutivePasses: 0 },
-        }),
-        [...events, ...result.events],
-    );
+    if (!result.ok) return { result, changesMade: false };
+    if (result.changesMade) {
+        return stabilize(result.state, [...events, ...result.events], true);
+    }
+
+    // Place triggers on the stack. If any triggers were placed, call stabilize again to check for state-based actions and new triggers.
+    // If any triggers were placed, the priority holder is the active player. If no triggers were placed, the priority holder is the player who had priority before stabilization.
+
+    return { result: ok(result.state, [...events, ...result.events]), changesMade };
+}
+
+export function grantPriority(state: GameState, events: readonly GameEvent[], holder: PlayerId, consecutivePasses: number): ApplyResult {
+    const stabilized = stabilize(state, events);
+    if (!stabilized.result.ok) return stabilized.result;
+    return ok(withPriorityDecision({ ...stabilized.result.state, priority: { holder, consecutivePasses: stabilized.changesMade ? 0 : consecutivePasses } }), stabilized.result.events);
 }
 
 /**
@@ -124,33 +133,33 @@ export function withPriorityDecision(state: GameState): GameState {
 }
 
 function resolveTopOfStack(state: GameState, events: readonly GameEvent[]): ApplyResult {
-  const result = beginResolution(state);
-  if (!result.ok) return result;
-  return ok(result.state, [...events, ...result.events]);
+    const result = beginResolution(state);
+    if (!result.ok) return result;
+    return ok(result.state, [...events, ...result.events]);
 }
 
 export function playLand(state: GameState, player: PlayerId, card: ObjectId): ApplyResult {
-  const priority = state.priority;
-  if (!priority || priority.holder !== player) return fail("You don't have priority");
+    const priority = state.priority;
+    if (!priority || priority.holder !== player) return fail("You don't have priority");
 
-  const obj = state.objects[card];
-  if (!obj || obj.owner !== player || obj.zone !== "hand") return fail("That card isn't in your hand");
-  if (!getCharacteristics(state, card)?.types.includes("Land")) return fail("That card isn't a land");
-  if (!canPlayLand(state, player)) return fail("You can't play a land right now");
+    const obj = state.objects[card];
+    if (!obj || obj.owner !== player || obj.zone !== "hand") return fail("That card isn't in your hand");
+    if (!getCharacteristics(state, card)?.types.includes("Land")) return fail("That card isn't a land");
+    if (!canPlayLand(state, player)) return fail("You can't play a land right now");
 
-  const moved = moveObject(state, card, "battlefield");
-  if (!moved) return fail("That card is gone");
+    const moved = moveObject(state, card, "battlefield");
+    if (!moved) return fail("That card is gone");
 
-  const p = moved.state.players[player];
-  if (!p) return fail("Unknown player");
+    const p = moved.state.players[player];
+    if (!p) return fail("Unknown player");
 
-  // Playing a land is a special action: it doesn't use the stack, and the player keeps priority.
-  const next: GameState = {
-    ...moved.state,
-    players: withEntry(moved.state.players, player, { ...p, landsPlayedThisTurn: p.landsPlayedThisTurn + 1 }),
-    priority: { holder: player, consecutivePasses: 0 },
-  };
-  const result = checkStateBasedActions(next, []);
-  if (!result.ok) return result;
-  return ok(withPriorityDecision(next), [...moved.events, ...result.events, { type: "landPlayed", player, card: moved.newId, cardName: getCardName(result.state, moved.newId) }]);
+    // Playing a land is a special action: it doesn't use the stack, and the player keeps priority.
+    const next: GameState = {
+        ...moved.state,
+        players: withEntry(moved.state.players, player, { ...p, landsPlayedThisTurn: p.landsPlayedThisTurn + 1 }),
+        priority: { holder: player, consecutivePasses: 0 },
+    };
+    const result = checkStateBasedActions(next, []);
+    if (!result.ok) return result;
+    return grantPriority(result.state, [...moved.events, ...result.events, { type: "landPlayed", player, card: moved.newId, cardName: getCardName(result.state, moved.newId) }], player, 0);
 }

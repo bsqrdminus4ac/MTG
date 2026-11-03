@@ -54,17 +54,21 @@ export interface SpellOnStack extends StackEntryBase {
     readonly ability: AbilityOfKind<"spell">;
 }
 
-export interface SourceSnapshot {
+export interface ObjectSnapshot {
     readonly id: ObjectId; // the id at the time (may no longer exist)
     readonly chars: Characteristics; // layered characteristics at that moment (name, colors, power, keywords)
     readonly controller: PlayerId;
     readonly owner: PlayerId;
+    readonly zone: Zone;
+    readonly tapped: boolean;
+    readonly damage: number;
+    readonly counters: Readonly<Record<string, number>>;
 }
 
 export interface AbilityOnStack extends StackEntryBase {
     readonly kind: "ability";
     readonly ability: AbilityOfKind<"activated" | "triggered">; // the ability itself, as plain immutable data
-    readonly sourceSnapshot: SourceSnapshot;
+    readonly sourceSnapshot: ObjectSnapshot;
 }
 export type StackEntry = SpellOnStack | AbilityOnStack;
 
@@ -129,7 +133,7 @@ export type SpellCast = CastProgress & {
 export type AbilityCast = CastProgress & {
     kind: "activated";
     ability: AbilityOfKind<"activated">;
-    sourceSnapshot: SourceSnapshot;
+    sourceSnapshot: ObjectSnapshot;
 };
 
 export type CastingInProgress = SpellCast | AbilityCast;
@@ -144,13 +148,13 @@ export interface ResolutionInProgress {
     frames: readonly Frame[];
     bindings: Bindings;
     legalTargets: readonly (readonly boolean[])[];
-    sourceSnapshot: SourceSnapshot;
+    sourceSnapshot: ObjectSnapshot;
 }
 
 export interface ManaResolutionInProgress {
     player: PlayerId;
     source: ObjectId;
-    sourceSnapshot: SourceSnapshot;
+    sourceSnapshot: ObjectSnapshot;
     frames: readonly Frame[];
     bindings: Bindings;
     abilityDescription: string;

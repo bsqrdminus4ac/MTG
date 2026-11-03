@@ -6,7 +6,7 @@ import type { Effect, EffectTarget, PlayerRef } from "../model/effects";
 import type { GameEvent } from "../model/events";
 import type { PlayerId } from "../model/ids";
 import type { ManaType } from "../model/mana";
-import { getRemainingPlayersInTurnOrder, type Binding, type Bindings, type EvalScope, type Frame, type GameState, type SourceSnapshot, type Target } from "../model/state";
+import { getRemainingPlayersInTurnOrder, type Binding, type Bindings, type EvalScope, type Frame, type GameState, type ObjectSnapshot, type Target } from "../model/state";
 import { drawCardResult } from "../model/zones";
 import { getChoiceBinding, getObjectIdsFromBinding } from "../rules/bindings";
 import { evalCondition, resolveAmount } from "../rules/conditions";
@@ -17,7 +17,7 @@ import { addManaEffect, damageObject, damagePlayer, destroyPermanent, discardCar
 export interface EffectContext extends EvalScope {
     readonly targets: readonly (readonly Target[])[];
     readonly legalTargets: readonly (readonly boolean[])[]; // per target index, computed once when resolution starts
-    readonly sourceSnapshot: SourceSnapshot;
+    readonly sourceSnapshot: ObjectSnapshot;
     readonly sourceDescription: string; // for logging purposes, e.g. "the activated ability of [card name]"
     readonly resumeAs: "stack" | "mana"; // whether the effect is resolving as part of a stack entry or a mana ability
 }

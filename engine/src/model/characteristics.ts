@@ -2,7 +2,7 @@ import { assertNever } from "../core/util";
 import type { Characteristics } from "./cardDefinition";
 import { type Modification, LAYER_ORDER, layerOf } from "./continuous";
 import type { ObjectId } from "./ids";
-import type { GameState, SourceSnapshot } from "./state";
+import type { GameState, ObjectSnapshot } from "./state";
 import type { CardType, Keyword } from "./vocabulary";
 
 export const isPermanentType = (t: CardType): boolean => t !== "Instant" && t !== "Sorcery";
@@ -67,7 +67,7 @@ export function hasCardType(state: GameState, obj: ObjectId, type: CardType): bo
     return chars.types.includes(type);
 }
 
-export function snapshotSource(state: GameState, id: ObjectId): SourceSnapshot | undefined {
+export function snapshotSource(state: GameState, id: ObjectId): ObjectSnapshot | undefined {
     const obj = state.objects[id];
     const chars = getCharacteristics(state, id);
     if (!obj || !chars) return undefined;
@@ -76,5 +76,9 @@ export function snapshotSource(state: GameState, id: ObjectId): SourceSnapshot |
         chars,
         controller: obj.controller,
         owner: obj.owner,
+        zone: obj.zone,
+        tapped: obj.tapped,
+        damage: obj.damage,
+        counters: obj.counters,
     };
 }

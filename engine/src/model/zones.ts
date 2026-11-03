@@ -1,9 +1,9 @@
 import { type ApplyResult, ok } from "../core/result";
 import { assertNever, withEntry, without } from "../core/util";
-import { getCardName } from "./characteristics";
+import { getCardName, snapshotSource } from "./characteristics";
 import type { GameEvent } from "./events";
 import { type ObjectId, type PlayerId, type Timestamp } from "./ids";
-import type { GameObject, GameState } from "./state";
+import type { GameObject, GameState, ObjectSnapshot } from "./state";
 import type { Zone } from "./vocabulary";
 
 function updateZone(state: GameState, owner: PlayerId, zone: Zone, fn: (list: readonly ObjectId[]) => readonly ObjectId[]): GameState {
@@ -42,10 +42,10 @@ export interface MoveResult {
  * Moves an object to another zone. Per CR 400.7 it becomes a brand-new object:
  * new id, fresh timestamp, and no memory of damage, counters, or tapped status.
  */
-export function moveObject(state: GameState, id: ObjectId, to: Zone): MoveResult | null {
+export function moveObject(state: GameState, id: ObjectId, to: Zone, snapshot?: ObjectSnapshot): MoveResult | null {
     const obj = state.objects[id];
     if (!obj) return null;
-
+    const lki = obj.zone === "battlefield" ? snapshot || snapshotSource(state, id) : undefined;
     const n = state.nextId;
     const newId = n as ObjectId;
     const moved: GameObject = {
@@ -81,6 +81,7 @@ export function moveObject(state: GameState, id: ObjectId, to: Zone): MoveResult
                 oldId: id,
                 newId,
                 owner: obj.owner,
+                lki,
             },
         ],
     };

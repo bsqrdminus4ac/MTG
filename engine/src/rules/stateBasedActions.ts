@@ -1,9 +1,9 @@
 import { type ApplyResult, applySequentially, fail, ok } from "../core/result";
 import { withEntry } from "../core/util";
-import { getCharacteristics } from "../model/characteristics";
+import { snapshotSource } from "../model/characteristics";
 import type { GameEvent } from "../model/events";
 import type { ObjectId } from "../model/ids";
-import type { GameState } from "../model/state";
+import type { GameState, ObjectSnapshot } from "../model/state";
 import { moveObject } from "../model/zones";
 
 export function checkStateBasedActions(state: GameState, eventsSoFar: GameEvent[]): ApplyResult {
@@ -72,7 +72,7 @@ function checkPoison(state: GameState): ApplyResult {
     const events: GameEvent[] = [];
     for (const p of Object.values(state.players)) {
         if (p.hasLostTheGame) continue;
-        if (p.counters["poison"] ?? 0 >= 10) {
+        if ((p.counters["poison"] ?? 0) >= 10) {
             currentState = { ...currentState, players: withEntry(currentState.players, p.id, { ...p, hasLostTheGame: true }) };
             events.push({ type: "lostTheGame", player: p.id, cause: "having 10 or more poison counters" });
         }
@@ -101,19 +101,20 @@ function clearTokens(state: GameState): ApplyResult {
 function checkFor0Toughness(state: GameState): ApplyResult {
     let currentState = state;
     const events: GameEvent[] = [];
-    const idsToMove: ObjectId[] = [];
+    const idsToMove: ObjectSnapshot[] = [];
     for (const id of state.battlefield) {
         const obj = state.objects[id];
         if (!obj) return fail(`Unable to find obj ${id}`);
-        const chars = getCharacteristics(state, id);
-        if (!chars) return fail(`Unable to locate characteristics of object #${obj.id}`);
-        if (chars.types.includes("Creature") && (chars.toughness ?? 0) <= 0) {
-            idsToMove.push(obj.id);
+        const snapshot = snapshotSource(state, id);
+        if (!snapshot) return fail(`Unable to locate characteristics of object #${obj.id}`);
+        if (snapshot.chars.types.includes("Creature") && (snapshot.chars.toughness ?? 0) <= 0) {
+            idsToMove.push(snapshot);
         }
     }
-    for (const id of idsToMove) {
-        const result = moveObject(currentState, id, "graveyard");
-        if (!result) return fail(`Unable to move object #${id} to the graveyard`);
+    for (const snapshot of idsToMove) {
+        // TODO: Pass pre-batch state to moveObject so that it can generate the correct LKI for the event.
+        const result = moveObject(currentState, snapshot.id, "graveyard", snapshot);
+        if (!result) return fail(`Unable to move object #${snapshot.id} to the graveyard`);
         currentState = result.state;
         events.push(...result.events);
     }
@@ -123,19 +124,20 @@ function checkFor0Toughness(state: GameState): ApplyResult {
 function checkForLethalDamage(state: GameState): ApplyResult {
     let currentState = state;
     const events: GameEvent[] = [];
-    const idsToMove: ObjectId[] = [];
+    const idsToMove: ObjectSnapshot[] = [];
     for (const id of state.battlefield) {
         const obj = state.objects[id];
         if (!obj) return fail(`Unable to find obj ${id}`);
-        const chars = getCharacteristics(state, obj.id);
-        if (!chars) return fail(`Unable to locate characteristics of object #${obj.id}`);
-        if (chars.types.includes("Creature") && obj.damage >= (chars.toughness ?? 0)) {
-            idsToMove.push(obj.id);
+        const snapshot = snapshotSource(state, id);
+        if (!snapshot) return fail(`Unable to locate characteristics of object #${obj.id}`);
+        if (snapshot.chars.types.includes("Creature") && obj.damage >= (snapshot.chars.toughness ?? 0)) {
+            idsToMove.push(snapshot);
         }
     }
-    for (const id of idsToMove) {
-        const result = moveObject(currentState, id, "graveyard");
-        if (!result) return fail(`Unable to move object #${id} to the graveyard`);
+    for (const snapshot of idsToMove) {
+        // TODO: Pass pre-batch state to moveObject so that it can generate the correct LKI for the event.
+        const result = moveObject(currentState, snapshot.id, "graveyard", snapshot);
+        if (!result) return fail(`Unable to move object #${snapshot.id} to the graveyard`);
         currentState = result.state;
         events.push(...result.events);
     }
@@ -147,19 +149,20 @@ function checkForLethalDamage(state: GameState): ApplyResult {
 function checkFor0Loyalty(state: GameState): ApplyResult {
     let currentState = state;
     const events: GameEvent[] = [];
-    const idsToMove: ObjectId[] = [];
+    const idsToMove: ObjectSnapshot[] = [];
     for (const id of state.battlefield) {
         const obj = state.objects[id];
         if (!obj) return fail(`Unable to find obj ${id}`);
-        const chars = getCharacteristics(state, obj.id);
-        if (!chars) return fail(`Unable to locate characteristics of object #${obj.id}`);
-        if (chars.types.includes("Planeswalker") && (obj.counters["loyalty"] ?? 0) <= 0) {
-            idsToMove.push(obj.id);
+        const snapshot = snapshotSource(state, id);
+        if (!snapshot) return fail(`Unable to locate characteristics of object #${obj.id}`);
+        if (snapshot.chars.types.includes("Planeswalker") && (obj.counters["loyalty"] ?? 0) <= 0) {
+            idsToMove.push(snapshot);
         }
     }
-    for (const id of idsToMove) {
-        const result = moveObject(currentState, id, "graveyard");
-        if (!result) return fail(`Unable to move object #${id} to the graveyard`);
+    for (const snapshot of idsToMove) {
+        // TODO: Pass pre-batch state to moveObject so that it can generate the correct LKI for the event.
+        const result = moveObject(currentState, snapshot.id, "graveyard", snapshot);
+        if (!result) return fail(`Unable to move object #${snapshot.id} to the graveyard`);
         currentState = result.state;
         events.push(...result.events);
     }
@@ -181,7 +184,7 @@ function combinePlusMinusCounters(state: GameState): ApplyResult {
         if (obj.counters["+1/+1"] && obj.counters["-1/-1"] && obj.counters["+1/+1"] > 0 && obj.counters["-1/-1"] > 0) {
             const toRemove = Math.min(obj.counters["+1/+1"], obj.counters["-1/-1"]);
             let counters: Readonly<Record<string, number>> = withEntry(obj.counters, "+1/+1", obj.counters["+1/+1"] - toRemove);
-            counters = withEntry(obj.counters, "-1/-1", obj.counters["-1/-1"] - toRemove);
+            counters = withEntry(counters, "-1/-1", obj.counters["-1/-1"] - toRemove);
             updatedObjects = withEntry(updatedObjects, obj.id, { ...obj, counters });
             changesMade = true;
         }

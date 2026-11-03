@@ -2,10 +2,10 @@ import { describe, expect, test } from "vitest";
 import { applyAction, submitAnswer } from "../engine";
 import type { AbilityOfKind } from "../model/abilities";
 import type { CardDefinition } from "../model/cardDefinition";
-import { getCharacteristics } from "../model/characteristics";
+import { snapshotSource } from "../model/characteristics";
 import { type TargetSpec } from "../model/effects";
 import { cardDefId, playerId, type ObjectId, type StackId } from "../model/ids";
-import type { GameState, SourceSnapshot, Target } from "../model/state";
+import type { GameState, Target } from "../model/state";
 import { moveObject } from "../model/zones";
 import { createGame } from "../setup";
 import { beginResolution } from "./resolution";
@@ -122,9 +122,8 @@ describe("ability resolution", () => {
             ],
         );
         const source = moveObject(initial, initial.players[alice]!.library[0]!, "battlefield")!;
-        const sourceObject = source.state.objects[source.newId]!;
-        const sourceCharacteristics = getCharacteristics(source.state, source.newId);
-        if (!sourceCharacteristics) throw new Error("Expected source characteristics");
+        const sourceSnapshot = snapshotSource(source.state, source.newId);
+        if (!sourceSnapshot) throw new Error("Expected source snapshot");
 
         const ability: AbilityOfKind<"activated"> = {
             kind: "activated",
@@ -134,12 +133,6 @@ describe("ability resolution", () => {
             effects: [{ kind: "gainLife", who: { kind: "player", who: "controller" }, amount: 1 }],
             activateableZones: ["battlefield"],
             timingRestriction: "instantSpeed",
-        };
-        const sourceSnapshot: SourceSnapshot = {
-            id: source.newId,
-            chars: sourceCharacteristics,
-            controller: sourceObject.controller,
-            owner: sourceObject.owner,
         };
         const entryId = source.state.nextId as StackId;
         const sourceLeft = moveObject(source.state, source.newId, "graveyard")!;

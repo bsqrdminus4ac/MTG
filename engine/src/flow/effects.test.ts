@@ -564,6 +564,11 @@ describe("destroy effect", () => {
         oldId: target.newId,
         newId: graveyardId,
         owner: bob,
+        lki: expect.objectContaining({
+            id: target.newId,
+            chars: expect.objectContaining({ name: "Grizzly Bears" }),
+            zone: "battlefield",
+        }),
       },
     ]);
   });

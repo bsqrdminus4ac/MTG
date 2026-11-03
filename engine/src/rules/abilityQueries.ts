@@ -7,7 +7,7 @@ import type { GameObject, GameState } from "../model/state";
 import { canPlayInstantSpeed, canPlaySorcerySpeed } from "./timing";
 
 
-export function findActivatableAbility(state: GameState, player: PlayerId, source: ObjectId, abilityIndex: number): Result<{ obj: GameObject; chars: Characteristics; ability: AbilityOfKind<"activated"> }> {
+export function findActivatableAbility(state: GameState, player: PlayerId, source: ObjectId, abilityIndex: number): Result<{ chars: Characteristics; ability: AbilityOfKind<"activated"> }> {
     const priority = state.priority;
     if (!priority || priority.holder !== player) return badResult("You don't have priority");
     const obj = state.objects[source];
@@ -17,7 +17,7 @@ export function findActivatableAbility(state: GameState, player: PlayerId, sourc
     if (!chars || !ability) return badResult("That object doesn't have that ability");
     if (ability.kind !== "activated") return badResult("That ability isn't an activated ability");
     if (!canActivateAbility(state, player, obj, ability)) return badResult("You can't activate that ability right now");
-    return goodResult({ obj, chars, ability });
+    return goodResult({ chars, ability });
 }
 
 export function canActivateAbility(

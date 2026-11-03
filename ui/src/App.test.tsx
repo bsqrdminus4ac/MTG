@@ -1,7 +1,7 @@
+import { bolt, drake, forest } from "@mtg/definitions";
 import { chooseMany, getCharacteristics, indexChoice, moveObject, orderingDecision, yesNo, type CardDefinition, type DecisionId, type GameState, type StackId } from "@mtg/engine";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
-import { bolt, drake, forest } from "@mtg/definitions";
 import { App, ProgressState } from "./App";
 import { DecisionPanel } from "./components/DecisionPanel";
 import { ObjectCard } from "./components/ObjectCard";
@@ -343,6 +343,10 @@ describe("stack panel", () => {
                         chars: { ...forestCharacteristics, name: "Snapshot Forest" },
                         controller: forestObject.controller,
                         owner: forestObject.owner,
+                        counters: forestObject.counters,
+                        damage: forestObject.damage,
+                        zone: forestObject.zone,
+                        tapped: forestObject.tapped,
                     },
                     bindings: {},
                 },

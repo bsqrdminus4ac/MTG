@@ -4,7 +4,7 @@ import { getCardName, getCharacteristics, hasKeyword } from "../model/characteri
 import type { GameEvent } from "../model/events";
 import type { ObjectId, PlayerId } from "../model/ids";
 import { type ManaType, addMana } from "../model/mana";
-import type { GameState, SourceSnapshot } from "../model/state";
+import type { GameState, ObjectSnapshot } from "../model/state";
 import { moveObject } from "../model/zones";
 
 export function tapPermanent(state: GameState, objId: ObjectId): ApplyResult {
@@ -15,7 +15,7 @@ export function tapPermanent(state: GameState, objId: ObjectId): ApplyResult {
     return ok({ ...state, objects: tappedObj }, [{ type: "permanentTapped", object: objId, cardName: getCardName(state, objId, true) }]);
 }
 
-export function damagePlayer(state: GameState, player: PlayerId, source: SourceSnapshot, amount: number, isCombatDamage: boolean): ApplyResult {
+export function damagePlayer(state: GameState, player: PlayerId, source: ObjectSnapshot, amount: number, isCombatDamage: boolean): ApplyResult {
     const p = state.players[player];
     if (!p) return fail("Invalid player to damage");
     if (amount === 0) return ok(state, []);
@@ -55,7 +55,7 @@ export function discardCard(state: GameState, card: ObjectId, cause?: string): A
     return ok(moveResult.state, [discardEvent, ...moveResult.events]);
 }
 
-export function damageObject(state: GameState, target: ObjectId, source: SourceSnapshot, amount: number, isCombatDamage: boolean): ApplyResult {
+export function damageObject(state: GameState, target: ObjectId, source: ObjectSnapshot, amount: number, isCombatDamage: boolean): ApplyResult {
     const obj = state.objects[target];
     if (!obj) return ok(state, []);
     if (obj.zone !== "battlefield") return ok(state, []);
@@ -66,7 +66,7 @@ export function damageObject(state: GameState, target: ObjectId, source: SourceS
     return ok(state, []);
 }
 
-export function damageCreature(state: GameState, target: ObjectId, source: SourceSnapshot, amount: number, isCombatDamage: boolean): ApplyResult {
+export function damageCreature(state: GameState, target: ObjectId, source: ObjectSnapshot, amount: number, isCombatDamage: boolean): ApplyResult {
     const obj = state.objects[target];
     if (!obj) return ok(state, []);
     if (amount === 0) return ok(state, []);
@@ -75,7 +75,7 @@ export function damageCreature(state: GameState, target: ObjectId, source: Sourc
     ]);
 }
 
-export function damagePlaneswalker(state: GameState, target: ObjectId, source: SourceSnapshot, amount: number, isCombatDamage: boolean): ApplyResult {
+export function damagePlaneswalker(state: GameState, target: ObjectId, source: ObjectSnapshot, amount: number, isCombatDamage: boolean): ApplyResult {
     const obj = state.objects[target];
     if (!obj) return ok(state, []);
     if (amount === 0) return ok(state, []);
@@ -85,7 +85,7 @@ export function damagePlaneswalker(state: GameState, target: ObjectId, source: S
     ]);
 }
 
-export function destroyPermanent(state: GameState, target: ObjectId, source: SourceSnapshot, sourceDescription?: string): ApplyResult {
+export function destroyPermanent(state: GameState, target: ObjectId, source: ObjectSnapshot, sourceDescription?: string): ApplyResult {
     const obj = state.objects[target];
     if (!obj) return ok(state, []);
     if (obj.zone !== "battlefield") return ok(state, []);
@@ -97,13 +97,13 @@ export function destroyPermanent(state: GameState, target: ObjectId, source: Sou
     return ok(result.state, [event, ...result.events]);
 }
 
-export function sacrificePermanent(state: GameState, target: ObjectId, source: SourceSnapshot, sourceDescription?: string): ApplyResult {
+export function sacrificePermanent(state: GameState, target: ObjectId, source: ObjectSnapshot, sourceDescription?: string): ApplyResult {
     const obj = state.objects[target];
     if (!obj) return ok(state, []);
     if (obj.zone !== "battlefield") return ok(state, []);
     if (obj.controller !== source.controller) return ok(state, []); // Object no longer controlled by ability owner
     const targetName = getCardName(state, target);
-    const result = moveObject(state, source.id, "graveyard");
+    const result = moveObject(state, target, "graveyard");
     if (!result) return ok(state, []);
     const event: GameEvent = { type: "permanentSacrificed", object: target, cardName: targetName, sourceName: sourceDescription ?? source.chars.name };
     return ok(result.state, [event, ...result.events]);

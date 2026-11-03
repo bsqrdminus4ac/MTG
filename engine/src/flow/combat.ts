@@ -4,7 +4,7 @@ import { getCardName, hasCardType, hasKeyword, snapshotSource } from "../model/c
 import { chooseMany, chooseOne, nullChoice, objectChoice, orderingDecision, playerChoice, type Choice } from "../model/decisions";
 import type { GameEvent } from "../model/events";
 import type { ObjectId, PlayerId } from "../model/ids";
-import type { AttackableTarget, CombatInfo, CombatInProgress, GameState, SourceSnapshot } from "../model/state";
+import type { AttackableTarget, CombatInfo, CombatInProgress, GameState, ObjectSnapshot } from "../model/state";
 import { openDecision } from "../rules/pending";
 import { damageObject, damagePlayer, tapPermanent } from "../rules/primitives";
 import { givePriorityToActivePlayer } from "./priority";
@@ -400,7 +400,7 @@ export function processCombatDamage(state: GameState, isFirstStrikeStep?: boolea
     if (!state.combat) return fail("No combat in progress to process damage for");
     if (!state.combat.attackers || Object.keys(state.combat.attackers).length === 0) return fail("No attackers have been declared");
 
-    const snapshots = new Map<ObjectId, SourceSnapshot>();
+    const snapshots = new Map<ObjectId, ObjectSnapshot>();
 
     return applySequentially(
         state,
@@ -408,7 +408,7 @@ export function processCombatDamage(state: GameState, isFirstStrikeStep?: boolea
     );
 }
 
-const snap = (state: GameState, snapshots: Map<ObjectId, SourceSnapshot>, id: ObjectId) => {
+const snap = (state: GameState, snapshots: Map<ObjectId, ObjectSnapshot>, id: ObjectId) => {
     let s = snapshots.get(id);
     if (!s) {
         s = snapshotSource(state, id) ?? undefined;
@@ -417,7 +417,7 @@ const snap = (state: GameState, snapshots: Map<ObjectId, SourceSnapshot>, id: Ob
     return s;
 };
 
-function dealCombatDamage(state: GameState, combatInfo: CombatInfo, snapshots: Map<ObjectId, SourceSnapshot>, isFirstStrikeStep?: boolean): ApplyResult {
+function dealCombatDamage(state: GameState, combatInfo: CombatInfo, snapshots: Map<ObjectId, ObjectSnapshot>, isFirstStrikeStep?: boolean): ApplyResult {
     if (!combatInfo.attackTarget || !isStillLegalTarget(state, combatInfo.id, combatInfo.attackTarget)) return ok(state, []);
     const obj = state.objects[combatInfo.id];
     if (!obj) return ok(state, []);
@@ -475,8 +475,8 @@ function dealCombatDamage(state: GameState, combatInfo: CombatInfo, snapshots: M
 
 function dealSingleCombatDamage(
     state: GameState,
-    attacker: SourceSnapshot,
-    blocker: SourceSnapshot | undefined,
+    attacker: ObjectSnapshot,
+    blocker: ObjectSnapshot | undefined,
     attackTarget: AttackableTarget,
     attackerDamageLeft: number,
     hasTrample: boolean,

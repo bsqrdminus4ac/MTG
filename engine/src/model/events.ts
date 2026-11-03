@@ -1,6 +1,6 @@
 import { type ObjectId, type PlayerId, type StackId } from "./ids";
 import type { ManaType } from "./mana";
-import type { AttackableTarget, Target } from "./state";
+import type { AttackableTarget, ObjectSnapshot, Target } from "./state";
 import type { Step, Zone } from "./vocabulary";
 
 type WinLossEvent = Readonly<{ type: "lostTheGame"; player: PlayerId; cause: string }> | Readonly<{ type: "wonTheGame"; player: PlayerId }>;
@@ -16,6 +16,7 @@ type StepEvent =
           oldId: ObjectId;
           newId: ObjectId;
           owner: PlayerId;
+          lki: ObjectSnapshot | undefined;
       }>;
 
 type PlayerEvent =
@@ -49,8 +50,6 @@ type CombatEvent =
     | Readonly<{ type: "attacksCancelled"; player: PlayerId }>
     | Readonly<{ type: "blockDeclared"; player: PlayerId; blocker: ObjectId; blockerName: string; attacker: ObjectId; attackerName: string }>
     | Readonly<{ type: "blocksCancelled"; player: PlayerId }>;
-
-
 
 /**
  * Facts about what just happened. The engine returns these alongside the new state.

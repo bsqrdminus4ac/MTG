@@ -14,7 +14,7 @@ import { getAbilityForSpell, pushStackEntry, type NewStackEntry } from "../rules
 import { getLegalTargets } from "../rules/targeting";
 import { checkCastable } from "./castability";
 import { activateManaAbility, getAllManaSources } from "./manaAbilities";
-import { withPriorityDecision } from "./priority";
+import { grantPriority } from "./priority";
 
 export function beginSpellCast(state: GameState, player: PlayerId, card: ObjectId): ApplyResult {
     const castable = checkCastable(state, player, card);
@@ -114,7 +114,7 @@ export function commitCast(state: GameState): ApplyResult {
                 cardName: getCardName(currentState, moved.newId),
             });
             const stackState = pushStackEntry(moved.state, entry);
-            return ok(withPriorityDecision({ ...stackState.state, casting: null }), out);
+            return grantPriority({ ...stackState.state, casting: null }, out, castingInfo.player, 0);
         }
         case "activated": {
             entry = {
@@ -135,7 +135,7 @@ export function commitCast(state: GameState): ApplyResult {
                 sourceName: entry.sourceSnapshot.chars.name,
             });
             const stackState = pushStackEntry(currentState, entry);
-            return ok(withPriorityDecision({ ...stackState.state, casting: null }), out);
+            return grantPriority({ ...stackState.state, casting: null }, out, castingInfo.player, 0);
         }
         default:
             return assertNever(castingInfo);

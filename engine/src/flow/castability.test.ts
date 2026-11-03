@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { applyAction } from "../engine";
+import { applyAction, submitAnswer } from "../engine";
 import type { AbilityOfKind } from "../model/abilities";
 import type { CardDefinition } from "../model/cardDefinition";
 import { cardDefId, playerId, type ObjectId, type StackId } from "../model/ids";
@@ -367,5 +367,45 @@ describe("castability and activatability options", () => {
             result = applyAction(state, { type: "castSpell", player: alice, card: inHand.id });
         }).not.toThrow();
         expect(result).toMatchObject({ ok: false });
+    });
+
+    test("runs state-based actions after casting and before the opponent receives priority", () => {
+        let state = game([instant], [instant, creature]);
+        const spell = moveDefinition(state, alice, instant, "hand");
+        state = spell.state;
+        const damagedCreature = moveDefinition(state, bob, creature, "battlefield");
+        state = {
+            ...atPrecombatMain(damagedCreature.state),
+            objects: {
+                ...damagedCreature.state.objects,
+                [damagedCreature.id]: {
+                    ...damagedCreature.state.objects[damagedCreature.id]!,
+                    damage: 2,
+                },
+            },
+        };
+
+        const startCast = applyAction(state, { type: "castSpell", player: alice, card: spell.id });
+        if (!startCast.ok || startCast.state.pending?.kind !== "yesNo") {
+            throw new Error("Expected the spell payment decision");
+        }
+        const committed = submitAnswer(startCast.state, {
+            player: alice,
+            decision: startCast.state.pending.id,
+            answer: { kind: "yesNo", value: true },
+        });
+        if (!committed.ok) throw new Error(committed.error);
+
+        expect(committed.state.objects[damagedCreature.id]).toBeUndefined();
+        const creatureMoved = committed.events.find((event) => event.type === "cardMoved" && event.oldId === damagedCreature.id);
+        expect(creatureMoved).toMatchObject({ type: "cardMoved", from: "battlefield" });
+        if (creatureMoved?.type !== "cardMoved") throw new Error("Expected the lethal creature to move");
+        expect(committed.state.players[bob]?.graveyard).toContain(creatureMoved.newId);
+
+        const passed = applyAction(committed.state, { type: "passPriority", player: alice });
+        if (!passed.ok) throw new Error(passed.error);
+        expect(passed.state.priority?.holder).toBe(bob);
+        expect(passed.state.pending).toMatchObject({ kind: "priority", player: bob });
+        expect(passed.state.objects[damagedCreature.id]).toBeUndefined();
     });
 });

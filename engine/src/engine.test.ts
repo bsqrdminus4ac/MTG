@@ -3,7 +3,7 @@ import { applySequentially, fail, ok } from "./core/result";
 import { applyAction, submitAnswer } from "./engine";
 import type { AbilityOfKind } from "./model/abilities";
 import type { CardDefinition } from "./model/cardDefinition";
-import { getCharacteristics } from "./model/characteristics";
+import { getCharacteristics, snapshotSource } from "./model/characteristics";
 import type { ContinuousEffect } from "./model/continuous";
 import { anyTarget, permanentOfType, type TargetFilter } from "./model/effects";
 import { cardDefId, playerId, type StackId, type Timestamp } from "./model/ids";
@@ -196,7 +196,6 @@ describe("spell targeting", () => {
             ability: targetSpellAbility,
             bindings: {},
         };
-        const sourceObject = spell.state.objects[spell.newId]!;
         const abilityEntry: StackEntry = {
             kind: "ability" as const,
             id: 1001 as StackId,
@@ -210,12 +209,7 @@ describe("spell targeting", () => {
                 effects: [],
                 triggerableZones: ["battlefield"],
             },
-            sourceSnapshot: {
-                id: spell.newId,
-                chars: getCharacteristics(spell.state, spell.newId)!,
-                controller: sourceObject.controller,
-                owner: sourceObject.owner,
-            },
+            sourceSnapshot: snapshotSource(spell.state, spell.newId)!,
             bindings: {},
         };
         return {

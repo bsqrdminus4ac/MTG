@@ -1,4 +1,4 @@
-import { fail, ok, type ApplyResult } from "../core/result";
+import { fail, type ApplyResult } from "../core/result";
 import { withEntry } from "../core/util";
 import type { ActivatableAbilityInfo } from "../model/abilities";
 import { snapshotSource } from "../model/characteristics";
@@ -13,7 +13,7 @@ import { payAbilityCosts } from "../rules/costs";
 import { checkStateBasedActions } from "../rules/stateBasedActions";
 import { payManaOptions } from "./casting";
 import { ask, runFrames, stepFromApply, type EffectContext, type StepResult } from "./effects";
-import { withPriorityDecision } from "./priority";
+import { grantPriority } from "./priority";
 
 export function getAllManaSources(state: GameState, player: PlayerId, excludeSource?: ObjectId): ActivatableAbilityInfo[] {
     return getAllActivatableAbilities(state, player, excludeSource).filter(({ ability }) => ability.isManaAbility && ability.effects.some((effect) => effect.kind === "addMana"));
@@ -165,7 +165,7 @@ export function finishManaAbilityResolution(state: GameState, events: readonly G
     const next = { ...state, resolvingMana: null, priority: { holder: resolving.player, consecutivePasses: 0 } };
     const result = checkStateBasedActions(next, [...events, event]);
     if (!result.ok) return result;
-    return ok(withPriorityDecision(result.state), result.events);
+    return grantPriority(result.state, result.events, resolving.player, 0);
 }
 
 const getTopFrame = (state: GameState): Frame | undefined => state.resolvingMana?.frames[state.resolvingMana.frames.length - 1];
