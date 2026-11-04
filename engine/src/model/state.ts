@@ -171,11 +171,10 @@ export interface ManaResolutionInProgress {
 
 export interface PendingTrigger {
     readonly ability: AbilityOfKind<"triggered">;
-    readonly abilityIndex: number;
-    readonly source: ObjectId;
     readonly controlller: PlayerId;
     readonly event: GameEvent;
     readonly lki: ObjectSnapshot;
+    readonly bindings: Bindings;
 }
 
 

@@ -1,12 +1,13 @@
 import { goodResult, isTrue, type Result } from "../core/result";
 import { assertNever } from "../core/util";
 import { snapshotSource } from "../model/characteristics";
-import type { GameEvent } from "../model/events";
+import type { EventOfType, GameEvent } from "../model/events";
 import type { PlayerId } from "../model/ids";
 import {
     compareNumbers,
     isCombinator,
     type EventLeaf,
+    type EventLeaves,
     type EventPredicate,
     type ObjectLeaf,
     type ObjectPredicate,
@@ -103,14 +104,16 @@ function evalStackLeaf(state: GameState, scope: EvalScope, entry: StackEntry, pr
 
 function evalEventLeaf(state: GameState, scope: EvalScope, event: GameEvent, predicate: EventLeaf): Result<boolean> {
     switch (predicate.kind) {
-        case "moved":
+        case "cardMoved": {
+            if (event.type !== "cardMoved") return goodResult(false);
+            const movedObject = moverSnapshot(state, event, predicate);
             return goodResult(
-                event.type === "cardMoved" &&
-                    (!predicate.from || event.from === predicate.from) &&
+                (!predicate.from || event.from === predicate.from) &&
                     (!predicate.to || event.to === predicate.to) &&
-                    (!predicate.object || (event.lki !== undefined && isTrue(evalObjectPredicate(state, scope, event.lki, predicate.object)))),
+                    (!predicate.object || (movedObject !== undefined && isTrue(evalObjectPredicate(state, scope, movedObject, predicate.object)))),
             );
-        case "damaged": {
+        }
+        case "damageDealt": {
             if (event.type !== "damageDealt") return goodResult(false);
             if (predicate.target) {
                 if (event.target.kind === "object" && (!event.targetLki || !isTrue(evalObjectPredicate(state, scope, event.targetLki, predicate.target as ObjectPredicate)))) {
@@ -130,7 +133,7 @@ function evalEventLeaf(state: GameState, scope: EvalScope, event: GameEvent, pre
             return goodResult(event.type === "cardDrawn" && (!predicate.player || isTrue(evalPlayerPredicate(state, scope, event.player, predicate.player))));
         case "spellCast":
             return goodResult(
-                event.type === "spellCastSuccess" &&
+                event.type === "spellCast" &&
                     (!predicate.by || isTrue(evalPlayerPredicate(state, scope, event.player, predicate.by))) &&
                     (!predicate.spell || isTrue(evalObjectPredicate(state, scope, event.spellLki, predicate.spell))),
             );
@@ -146,13 +149,13 @@ function evalEventLeaf(state: GameState, scope: EvalScope, event: GameEvent, pre
                     (!predicate.player || isTrue(evalPlayerPredicate(state, scope, event.player, predicate.player))) &&
                     (!predicate.delta || compareNumbers(event.delta, predicate.delta.op, predicate.delta.value)),
             );
-        case "attacked":
+        case "attackDeclared":
             return goodResult(
                 event.type === "attackDeclared" &&
                     (!predicate.player || isTrue(evalPlayerPredicate(state, scope, event.player, predicate.player))) &&
                     (!predicate.attacker || isTrue(evalObjectPredicate(state, scope, event.attackerLki, predicate.attacker))),
             );
-        case "blocked":
+        case "blockDeclared":
             return goodResult(
                 event.type === "blockDeclared" &&
                     (!predicate.player || isTrue(evalPlayerPredicate(state, scope, event.player, predicate.player))) &&
@@ -161,4 +164,10 @@ function evalEventLeaf(state: GameState, scope: EvalScope, event: GameEvent, pre
         default:
             assertNever(predicate);
     }
+}
+
+function moverSnapshot(state: GameState, event: EventOfType<"cardMoved">, leaf: EventLeaves["cardMoved"]): ObjectSnapshot | undefined {
+    const arriving = leaf.to === "battlefield";
+    const snap = arriving ? event.after : (event.before ?? event.after);
+    return snap ?? snapshotSource(state, event.newId); // may be undefined if the object is gone
 }

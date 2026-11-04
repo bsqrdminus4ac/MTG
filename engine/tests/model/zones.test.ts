@@ -29,8 +29,8 @@ function game() {
     ]);
 }
 
-describe("card movement LKI", () => {
-    test("moving a battlefield creature includes its pre-move characteristics and counters", () => {
+describe("card movement snapshots", () => {
+    test("moving a battlefield creature includes its before snapshot", () => {
         const initial = game();
         const entered = moveObject(initial, initial.players[alice]!.library[0]!, "battlefield")!;
         const before = entered.state.objects[entered.newId]!;
@@ -55,10 +55,30 @@ describe("card movement LKI", () => {
         expect(moved.events[0]).toMatchObject({
             type: "cardMoved",
             from: "battlefield",
-            lki: expectedLki,
+            before: expectedLki,
         });
-        expect(moved.events[0]?.type === "cardMoved" ? moved.events[0].lki?.chars : undefined).toEqual(expectedLki?.chars);
-        expect(moved.events[0]?.type === "cardMoved" ? moved.events[0].lki?.counters : undefined).toEqual({ "+1/+1": 2, charge: 1 });
+        expect(moved.events[0]?.type === "cardMoved" ? moved.events[0].after : undefined).toBeUndefined();
+        expect(moved.events[0]?.type === "cardMoved" ? moved.events[0].before?.chars : undefined).toEqual(expectedLki?.chars);
+        expect(moved.events[0]?.type === "cardMoved" ? moved.events[0].before?.counters : undefined).toEqual({ "+1/+1": 2, charge: 1 });
+    });
+
+    test("moving a card onto the battlefield includes its after snapshot", () => {
+        const initial = game();
+        const entered = moveObject(initial, initial.players[alice]!.library[0]!, "battlefield")!;
+        const event = entered.events[0];
+
+        expect(event).toMatchObject({
+            type: "cardMoved",
+            from: "library",
+            to: "battlefield",
+            after: {
+                id: entered.newId,
+                zone: "battlefield",
+            },
+        });
+        if (event?.type !== "cardMoved") throw new Error("Expected a cardMoved event");
+        expect(event.before).toBeUndefined();
+        expect(event.after).toEqual(snapshotSource(entered.state, entered.newId));
     });
 
     test.each([
@@ -72,6 +92,9 @@ describe("card movement LKI", () => {
         const card = inHand?.newId ?? firstCard;
         const moved = moveObject(state, card, to)!;
 
-        expect(moved.events[0]).toMatchObject({ type: "cardMoved", from, to, lki: undefined });
+        expect(moved.events[0]).toMatchObject({ type: "cardMoved", from, to });
+        if (moved.events[0]?.type !== "cardMoved") throw new Error("Expected a cardMoved event");
+        expect(moved.events[0].before).toBeUndefined();
+        expect(moved.events[0].after).toBeUndefined();
     });
 });

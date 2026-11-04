@@ -45,7 +45,7 @@ export interface MoveResult {
 export function moveObject(state: GameState, id: ObjectId, to: Zone, snapshot?: ObjectSnapshot): MoveResult | null {
     const obj = state.objects[id];
     if (!obj) return null;
-    const lki = obj.zone === "battlefield" ? snapshot || snapshotSource(state, id) : undefined;
+    const before = obj.zone === "battlefield" || obj.zone === "graveyard" ? snapshot || snapshotSource(state, id) : undefined;
     const n = state.nextId;
     const newId = n as ObjectId;
     const moved: GameObject = {
@@ -69,6 +69,7 @@ export function moveObject(state: GameState, id: ObjectId, to: Zone, snapshot?: 
         // Effects tied to the old object stop applying once it leaves.
         continuousEffects: next.continuousEffects.filter((e) => !(e.source === id && e.duration === "whileSourceOnBattlefield") && !(e.affects.kind === "object" && e.affects.id === id)),
     };
+    const after = to === "battlefield" ? snapshotSource(next, newId) : undefined;
 
     return {
         state: next,
@@ -81,7 +82,8 @@ export function moveObject(state: GameState, id: ObjectId, to: Zone, snapshot?: 
                 oldId: id,
                 newId,
                 owner: obj.owner,
-                lki,
+                ...(before !== undefined && { before }),
+                ...(after !== undefined && { after }),
             },
         ],
     };

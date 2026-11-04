@@ -8,6 +8,7 @@ import type { Zone } from "../model/vocabulary";
 import { moveObject } from "../model/zones";
 import { getEntryName } from "../rules/stack";
 import { isTargetLegal } from "../rules/targeting";
+import { detectTriggers } from "../rules/triggers";
 import { ask, runFrames, type EffectContext } from "./effects";
 import { givePriorityToActivePlayer } from "./priority";
 
@@ -70,8 +71,14 @@ export function runResolution(state: GameState): ApplyResult {
     const result = runFrames(currentState, ctx, resolving.frames, resolving.bindings);
     if (!result.ok) return result;
 
-    if (result.waiting) return ask({ ...result.state, resolving: { ...resolving, frames: result.frames, bindings: result.bindings ?? resolving.bindings } }, result.events);
-    return finishResolution(result.state, result.events);
+    if (result.waiting) {
+        currentState = { ...result.state, resolving: { ...resolving, frames: result.frames, bindings: result.bindings ?? resolving.bindings } };
+        const triggerState = detectTriggers(currentState, result.events);
+        if (!triggerState.ok) return triggerState;
+        return ask(triggerState.state, triggerState.events);
+    } else {
+        return finishResolution(result.state, result.events);
+    }
 }
 
 export function handleResolutionDecision(state: GameState, bindAs: string, answer: ResolvedAnswer): ApplyResult {

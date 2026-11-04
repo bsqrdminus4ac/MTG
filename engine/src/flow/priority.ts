@@ -11,6 +11,7 @@ import { getAllActivatableAbilities } from "../rules/abilityQueries";
 import { openDecision } from "../rules/pending";
 import { checkStateBasedActions } from "../rules/stateBasedActions";
 import { canPlayLand } from "../rules/timing";
+import { detectTriggers } from "../rules/triggers";
 import { checkActivatable, checkCastable } from "./castability";
 import { beginResolution } from "./resolution";
 import { advanceStep } from "./turn";
@@ -32,21 +33,26 @@ export function passPriority(state: GameState, player: PlayerId): ApplyResult {
     return state.stack.length > 0 ? resolveTopOfStack(state, events) : advanceStep(state, events);
 }
 
-export function givePriorityToActivePlayer(state: GameState, events: GameEvent[]): ApplyResult {
+export function givePriorityToActivePlayer(state: GameState, events: readonly GameEvent[]): ApplyResult {
     return grantPriority(state, events, state.turn.activePlayer, 0);
 }
 
 export function stabilize(state: GameState, events: readonly GameEvent[], changesMade = false): { result: ApplyResult; changesMade: boolean } {
-    const result = checkStateBasedActions(state, []);
+    const result = checkStateBasedActions(state, [...events]);
     if (!result.ok) return { result, changesMade: false };
     if (result.changesMade) {
-        return stabilize(result.state, [...events, ...result.events], true);
+        return stabilize(result.state, result.events, true);
     }
 
     // Place triggers on the stack. If any triggers were placed, call stabilize again to check for state-based actions and new triggers.
     // If any triggers were placed, the priority holder is the active player. If no triggers were placed, the priority holder is the player who had priority before stabilization.
+    const triggerResult = detectTriggers(result.state, result.events);
+    if (!triggerResult.ok) return { result: triggerResult, changesMade: false };
+    if (triggerResult.changesMade) {
+        return stabilize(triggerResult.state, triggerResult.events, true);
+    }
 
-    return { result: ok(result.state, [...events, ...result.events]), changesMade };
+    return { result: ok(triggerResult.state, triggerResult.events), changesMade };
 }
 
 export function grantPriority(state: GameState, events: readonly GameEvent[], holder: PlayerId, consecutivePasses: number): ApplyResult {

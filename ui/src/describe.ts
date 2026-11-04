@@ -6,8 +6,8 @@ import {
     type Amount,
     type Answer,
     type ChoiceValue,
-    type Condition,
     type Comparison,
+    type Condition,
     type ContinuousEffect,
     type ContinuousEffectTemplate,
     type Cost,
@@ -23,11 +23,8 @@ import {
     type ManaType,
     type Modification,
     type ObjectId,
-    type ObjectLeaf,
     type ObjectPredicate,
-    type PlayerLeaf,
     type PlayerPredicate,
-    type Predicate,
     type StackId,
     type Target,
     type TargetFilter,
@@ -291,13 +288,13 @@ function describePlayerPredicate(predicate: PlayerPredicate): string {
 
 function describeEventLeaf(predicate: EventLeaf): string {
     switch (predicate.kind) {
-        case "moved": {
+        case "cardMoved": {
             const object = predicate.object ? describeObjectPredicate(predicate.object) : "a card";
             const from = predicate.from ? ` from ${predicate.from}` : "";
             const to = predicate.to ? ` to ${predicate.to}` : "";
             return `${object} moves${from}${to}`;
         }
-        case "damaged": {
+        case "damageDealt": {
             const target = predicate.target
                 ? isPlayerPredicate(predicate.target)
                     ? `${describePlayerPredicate(predicate.target)} ${predicate.target.kind === "you" ? "are" : "is"} dealt`
@@ -326,11 +323,11 @@ function describeEventLeaf(predicate: EventLeaf): string {
             const delta = predicate.delta ? ` by a value ${describeDeltaTest(predicate.delta)}` : "";
             return `${player} life total changes${delta}`;
         }
-        case "attacked": {
+        case "attackDeclared": {
             const attacker = predicate.attacker ? ` with ${describeObjectPredicate(predicate.attacker)}` : "";
             return `${describePlayerAction(predicate.player, "attack", "attacks")}${attacker}`;
         }
-        case "blocked": {
+        case "blockDeclared": {
             const blocker = predicate.blocker ? ` with ${describeObjectPredicate(predicate.blocker)}` : "";
             const attacker = predicate.attacker ? `, blocking ${describeObjectPredicate(predicate.attacker)}` : "";
             return `${describePlayerAction(predicate.player, "block", "blocks")}${blocker}${attacker}`;
@@ -647,7 +644,7 @@ export function describeEvent(state: GameState, e: GameEvent): string {
           return e.cause ? `${e.cause} causes ${e.player} to discard ${e.cardName} (#${e.card})` : `${e.player} discards ${e.cardName} (#${e.card})`;
 
       // Spells & Abilities
-      case "spellCastSuccess":
+      case "spellCast":
           return `${e.player} casts ${e.spellLki.chars.name}`;
       case "spellCastStart":
           return `${e.player} starts casting ${e.cardName}`;
@@ -669,7 +666,7 @@ export function describeEvent(state: GameState, e: GameEvent): string {
       case "stackEntryResolved":
           return `${e.entryName} (stack entry #${e.id}) resolves`;
       case "stackEntryFizzles":
-          return `${e.entryName} (stack entry #${e.id}) fizzles due to lack of targets`
+          return `${e.entryName} (stack entry #${e.id}) fizzles due to lack of targets`;
 
       // Attacks
       case "attackDeclared":

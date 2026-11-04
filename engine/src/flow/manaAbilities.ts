@@ -11,6 +11,7 @@ import type { Binding, Frame, GameState, ManaResolutionInProgress } from "../mod
 import { findActivatableAbility, getAllActivatableAbilities } from "../rules/abilityQueries";
 import { payAbilityCosts } from "../rules/costs";
 import { checkStateBasedActions } from "../rules/stateBasedActions";
+import { detectTriggers } from "../rules/triggers";
 import { payManaOptions } from "./casting";
 import { ask, runFrames, stepFromApply, type EffectContext, type StepResult } from "./effects";
 import { grantPriority } from "./priority";
@@ -129,8 +130,14 @@ export function runManaAbilityResolution(state: GameState): StepResult {
     const result = runFrames(currentState, ctx, resolving.frames, resolving.bindings);
     if (!result.ok) return result;
 
-    if (result.waiting) return ask({ ...result.state, resolvingMana: { ...resolving, frames: result.frames, bindings: result.bindings ?? resolving.bindings } }, result.events);
-    return stepFromApply(finishManaAbilityResolution(result.state, result.events));
+    if (result.waiting) {
+        currentState = { ...result.state, resolvingMana: { ...resolving, frames: result.frames, bindings: result.bindings ?? resolving.bindings } };
+        const triggerState = detectTriggers(currentState, result.events);
+        if (!triggerState.ok) return triggerState;
+        return ask(triggerState.state, triggerState.events);
+    } else {
+        return stepFromApply(finishManaAbilityResolution(result.state, result.events));
+    }
 }
 
 export function handleManaAbilityDecision(state: GameState, bindAs: string, answer: ResolvedAnswer): StepResult {

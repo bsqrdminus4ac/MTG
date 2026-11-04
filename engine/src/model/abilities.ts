@@ -2,7 +2,7 @@ import type { ContinuousEffectTemplate } from "./continuous";
 import type { CardEffect, Condition, TargetSpec } from "./effects";
 import type { ObjectId } from "./ids";
 import type { ManaCost } from "./mana";
-import type { EventPredicate } from "./predicates";
+import type { EventLeaves, Predicate, TriggerEvent } from "./predicates";
 import type { Keyword, Zone } from "./vocabulary";
 
 export type Cost = Readonly<{
@@ -26,7 +26,7 @@ export type Ability =
       }>
     | Readonly<{
           kind: "triggered";
-          trigger: { when: EventPredicate; interveningIf?: Condition };
+          trigger: EventTrigger;
           targets: TargetSpec[];
           effects: readonly CardEffect[];
           triggerableZones: readonly Zone[];
@@ -40,3 +40,8 @@ export interface ActivatableAbilityInfo {
     ability: AbilityOfKind<"activated">;
     abilityIndex: number;
 }
+
+// To ensure bindings are consistent, require that predicates use the same event kind throughout for now,
+export type EventTrigger = {
+    [K in TriggerEvent]: Readonly<{ event: K; when: Predicate<EventLeaves[K]>; interveningIf?: Condition }>;
+}[TriggerEvent];

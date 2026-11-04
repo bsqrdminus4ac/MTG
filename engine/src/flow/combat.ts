@@ -419,10 +419,12 @@ export function processCombatDamage(state: GameState, isFirstStrikeStep?: boolea
 
     const snapshots = new Map<ObjectId, ObjectSnapshot>();
 
-    return applySequentially(
+    const combatDoneState = applySequentially(
         state,
         Object.values(state.combat.attackers).map((a) => (currentState: GameState) => dealCombatDamage(currentState, a, snapshots, isFirstStrikeStep)),
     );
+    if (!combatDoneState.ok) return combatDoneState;
+    return givePriorityToActivePlayer(combatDoneState.state, combatDoneState.events);
 }
 
 const snap = (state: GameState, snapshots: Map<ObjectId, ObjectSnapshot>, id: ObjectId) => {

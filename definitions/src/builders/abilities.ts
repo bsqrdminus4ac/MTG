@@ -1,5 +1,20 @@
-import { COLORS, type Ability, type CardEffect, type Condition, type Effect, type ManaType, type Step, type TargetSpec, type Zone } from "@mtg/engine";
-import type { EventPredicate } from "../../../engine/src/model/predicates";
+import {
+    COLORS,
+    type Ability,
+    type BindingRef,
+    type CardEffect,
+    type Condition,
+    type Effect,
+    type EventBindingNames,
+    type EventPredicate,
+    type EventTrigger,
+    type ManaType,
+    type Step,
+    type TargetSpec,
+    type Zone,
+} from "@mtg/engine";
+
+export const fromEvent = <K extends keyof EventBindingNames>(_event: K, name: EventBindingNames[K]): BindingRef => ({ kind: "bound", name });
 
 export const tapForMana = (mana: ManaType): Ability => ({
     kind: "activated",
@@ -15,19 +30,33 @@ export const manaOfAnyColor = (includeColorless?: boolean): ManaType[] => (inclu
 
 export const drawCards = (amount: number): Effect => ({ kind: "draw", count: amount, who: { kind: "player", who: "controller" } });
 
-export const triggered = (a: { when: EventPredicate; effects: CardEffect[]; targets?: TargetSpec[]; triggerableZones?: Zone[]; interveningIf?: Condition }): Ability => ({
+export const triggered = (a: { trigger: EventTrigger; effects: CardEffect[]; targets?: TargetSpec[]; triggerableZones?: Zone[] }): Ability => ({
     kind: "triggered",
-    trigger: a.interveningIf !== undefined ? { when: a.when, interveningIf: a.interveningIf } : { when: a.when },
+    trigger: a.trigger,
     effects: a.effects,
     targets: a.targets ?? [],
     triggerableZones: a.triggerableZones ?? ["battlefield"],
 });
 
-export const thisEntersTheBattlefield = (): EventPredicate => ({
-    kind: "moved",
-    object: { kind: "isSource" },
-    to: "battlefield",
-});
+export const thisEntersTheBattlefield = (interveningIf?: Condition): EventTrigger =>
+    interveningIf
+        ? {
+              event: "cardMoved",
+              when: {
+                  kind: "cardMoved",
+                  object: { kind: "isSource" },
+                  to: "battlefield",
+              },
+              interveningIf,
+          }
+        : {
+              event: "cardMoved",
+              when: {
+                  kind: "cardMoved",
+                  object: { kind: "isSource" },
+                  to: "battlefield",
+              },
+          };
 
 export const atBeginningOfStep = (which: "your" | "any", step: Step): EventPredicate => ({
     kind: "stepStarted",

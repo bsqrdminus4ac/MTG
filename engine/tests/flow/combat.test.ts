@@ -123,7 +123,16 @@ describe("combat damage", () => {
 
         expect(result.ok).toBe(true);
         if (!result.ok) return;
-        expect(result.state.objects[blocker]?.damage).toBe(3);
+        expect(result.state.objects[blocker]).toBeUndefined();
+        const blockerMoved = result.events.find((event) => event.type === "cardMoved" && event.oldId === blocker);
+        expect(blockerMoved).toMatchObject({
+            type: "cardMoved",
+            from: "battlefield",
+            to: "graveyard",
+            before: { id: blocker, damage: 3, zone: "battlefield" },
+        });
+        if (blockerMoved?.type !== "cardMoved") throw new Error("Expected the blocker to die");
+        expect(result.state.players[bob]?.graveyard).toContain(blockerMoved.newId);
         expect(result.state.objects[attacker]?.damage).toBe(2);
         expect(result.state.players[bob]?.life).toBe(20);
         expect(damageSummary(result.events)).toEqual([
@@ -143,7 +152,16 @@ describe("combat damage", () => {
 
         expect(result.ok).toBe(true);
         if (!result.ok) return;
-        expect(result.state.objects[blocker]?.damage).toBe(2);
+        expect(result.state.objects[blocker]).toBeUndefined();
+        const blockerMoved = result.events.find((event) => event.type === "cardMoved" && event.oldId === blocker);
+        expect(blockerMoved).toMatchObject({
+            type: "cardMoved",
+            from: "battlefield",
+            to: "graveyard",
+            before: { id: blocker, damage: 2, zone: "battlefield" },
+        });
+        if (blockerMoved?.type !== "cardMoved") throw new Error("Expected the blocker to die");
+        expect(result.state.players[bob]?.graveyard).toContain(blockerMoved.newId);
         expect(result.state.objects[attacker]?.damage).toBe(2);
         expect(result.state.players[bob]?.life).toBe(17);
         expect(damageSummary(result.events)).toEqual([
@@ -174,8 +192,27 @@ describe("combat damage", () => {
 
         expect(ordered.ok).toBe(true);
         if (!ordered.ok) return;
-        expect(ordered.state.objects[blockers[0]!]?.damage).toBe(3);
-        expect(ordered.state.objects[blockers[1]!]?.damage).toBe(2);
+        const firstBlockerMoved = ordered.events.find((event) => event.type === "cardMoved" && event.oldId === blockers[0]);
+        const secondBlockerMoved = ordered.events.find((event) => event.type === "cardMoved" && event.oldId === blockers[1]);
+        expect(ordered.state.objects[blockers[0]!]).toBeUndefined();
+        expect(ordered.state.objects[blockers[1]!]).toBeUndefined();
+        expect(firstBlockerMoved).toMatchObject({
+            type: "cardMoved",
+            from: "battlefield",
+            to: "graveyard",
+            before: { id: blockers[0], damage: 3, zone: "battlefield" },
+        });
+        expect(secondBlockerMoved).toMatchObject({
+            type: "cardMoved",
+            from: "battlefield",
+            to: "graveyard",
+            before: { id: blockers[1], damage: 2, zone: "battlefield" },
+        });
+        if (firstBlockerMoved?.type !== "cardMoved" || secondBlockerMoved?.type !== "cardMoved") {
+            throw new Error("Expected both blockers to die");
+        }
+        expect(ordered.state.players[bob]?.graveyard).toContain(firstBlockerMoved.newId);
+        expect(ordered.state.players[bob]?.graveyard).toContain(secondBlockerMoved.newId);
         expect(ordered.state.objects[attacker]?.damage).toBe(2);
         expect(damageSummary(ordered.events)).toEqual([
             [{ kind: "object", id: blockers[1] }, 2, true],

@@ -69,7 +69,7 @@ function putCardsInHand(state: GameState, player: typeof alice, count: number): 
 
 const testAbility: AbilityOfKind<"triggered"> = {
     kind: "triggered",
-    trigger: { when: { kind: "lifeChanged", player: { kind: "anyPlayer" } } },
+    trigger: { event: "lifeChanged", when: { kind: "lifeChanged", player: { kind: "anyPlayer" } } },
     targets: [],
     effects: [],
     triggerableZones: ["battlefield"],
@@ -564,11 +564,12 @@ describe("destroy effect", () => {
         oldId: target.newId,
         newId: graveyardId,
         owner: bob,
-        lki: expect.objectContaining({
+        before: expect.objectContaining({
             id: target.newId,
             chars: expect.objectContaining({ name: "Grizzly Bears" }),
             zone: "battlefield",
         }),
+        after: undefined,
       },
     ]);
   });

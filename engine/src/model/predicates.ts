@@ -1,4 +1,5 @@
 import { assertNever } from "../core/util";
+import type { GameEvent } from "./events";
 import type { Color } from "./mana";
 import type { CardType, Keyword, Step, Supertype, Zone } from "./vocabulary";
 
@@ -52,15 +53,38 @@ export type StackLeaf = { kind: "isSpell" } | { kind: "isAbility" } | { kind: "c
 
 export type StackPredicate = Predicate<StackLeaf>;
 
-export type EventLeaf =
-    | Readonly<{ kind: "moved"; from?: Zone; to?: Zone; object?: ObjectPredicate }>
-    | Readonly<{ kind: "damaged"; target?: ObjectPredicate | PlayerPredicate; source?: ObjectPredicate; amount?: NumberTest; isCombatDamage?: boolean }>
-    | Readonly<{ kind: "stepStarted"; step: Step; player?: PlayerPredicate }>
-    | Readonly<{ kind: "spellCast"; by?: PlayerPredicate; spell?: ObjectPredicate }>
-    | Readonly<{ kind: "abilityActivated"; by?: PlayerPredicate; source?: ObjectPredicate }>
-    | Readonly<{ kind: "lifeChanged"; player?: PlayerPredicate; delta?: NumberTest }>
-    | Readonly<{ kind: "attacked"; player?: PlayerPredicate; attacker?: ObjectPredicate }>
-    | Readonly<{ kind: "blocked"; player?: PlayerPredicate; blocker?: ObjectPredicate; attacker?: ObjectPredicate }>
-    | Readonly<{ kind: "cardDrawn"; player?: PlayerPredicate }>;
+export type EventLeaves = {
+    cardMoved: Readonly<{ kind: "cardMoved"; from?: Zone; to?: Zone; object?: ObjectPredicate }>;
+    damageDealt: Readonly<{ kind: "damageDealt"; target?: ObjectPredicate | PlayerPredicate; source?: ObjectPredicate; amount?: NumberTest; isCombatDamage?: boolean }>;
+    stepStarted: Readonly<{ kind: "stepStarted"; step: Step; player?: PlayerPredicate }>;
+    spellCast: Readonly<{ kind: "spellCast"; by?: PlayerPredicate; spell?: ObjectPredicate }>;
+    abilityActivated: Readonly<{ kind: "abilityActivated"; by?: PlayerPredicate; source?: ObjectPredicate }>;
+    lifeChanged: Readonly<{ kind: "lifeChanged"; player?: PlayerPredicate; delta?: NumberTest }>;
+    attackDeclared: Readonly<{ kind: "attackDeclared"; player?: PlayerPredicate; attacker?: ObjectPredicate }>;
+    blockDeclared: Readonly<{ kind: "blockDeclared"; player?: PlayerPredicate; blocker?: ObjectPredicate; attacker?: ObjectPredicate }>;
+    cardDrawn: Readonly<{ kind: "cardDrawn"; player?: PlayerPredicate }>;
+};
 
+export type TriggerEvent = keyof EventLeaves;
+export type TriggerGameEvent = Extract<GameEvent, { type: TriggerEvent }>;
+export type EventLeaf = EventLeaves[TriggerEvent];
 export type EventPredicate = Predicate<EventLeaf>;
+
+// Must list every key of EventLeaves: a missing or extra key is a compile error
+const TRIGGER_EVENT_KEYS: Record<TriggerEvent, true> = {
+    cardMoved: true,
+    damageDealt: true,
+    spellCast: true,
+    lifeChanged: true,
+    stepStarted: true,
+    abilityActivated: true,
+    attackDeclared: true,
+    blockDeclared: true,
+    cardDrawn: true,
+};
+const TRIGGER_EVENTS: ReadonlySet<string> = new Set(Object.keys(TRIGGER_EVENT_KEYS));
+
+export const isTriggerEvent = (event: GameEvent): event is TriggerGameEvent => TRIGGER_EVENTS.has(event.type);
+
+type AssertExtends<T extends U, U> = T;
+type _EventLeafKeysAreGameEvents = AssertExtends<TriggerEvent, GameEvent["type"]>;

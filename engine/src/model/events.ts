@@ -16,7 +16,8 @@ type StepEvent =
           oldId: ObjectId;
           newId: ObjectId;
           owner: PlayerId;
-          lki: ObjectSnapshot | undefined;
+          before?: ObjectSnapshot; // only when `from` is a look-back zone
+          after?: ObjectSnapshot; // only when `to === "battlefield"`
       }>;
 
 type PlayerEvent =
@@ -34,7 +35,7 @@ type ObjectEvent =
     | Readonly<{ type: "permanentSacrificed"; object: ObjectId; cardName: string; sourceName?: string }>;
 
 type StackEvent =
-    | Readonly<{ type: "spellCastSuccess"; player: PlayerId; card: ObjectId; spellLki: ObjectSnapshot; targets: readonly Target[] }>
+    | Readonly<{ type: "spellCast"; player: PlayerId; card: ObjectId; spellLki: ObjectSnapshot; targets: readonly Target[] }>
     | Readonly<{ type: "spellCastStart"; player: PlayerId; card: ObjectId; cardName: string }>
     | Readonly<{ type: "spellTargetsSelected"; player: PlayerId; card: ObjectId; cardName: string }>
     | Readonly<{ type: "spellManaPaid"; player: PlayerId; card: ObjectId; cardName: string }>
@@ -56,3 +57,28 @@ type CombatEvent =
  * They drive the UI log, replays, and (later) triggered abilities.
  */
 export type GameEvent = StepEvent | PlayerEvent | ObjectEvent | StackEvent | CombatEvent | WinLossEvent;
+
+export type EventOfType<K extends GameEvent["type"]> = Extract<GameEvent, { type: K }>;
+
+export type EventBindingNames = {
+    stepStarted: "event.player";
+
+    cardMoved: "event.object" | "event.player";
+    lifeChanged: "event.player" | "event.amount";
+    landPlayed: "event.object";
+    manaAdded: "event.player";
+    cardDiscarded: "event.player" | "event.card";
+
+    damageDealt: "event.amount" | "event.source" | "event.target";
+    permanentTapped: "event.object";
+    permanentUntapped: "event.object";
+    permanentDestroyed: "event.object";
+    permanentSacrificed: "event.object";
+
+    spellCast: "event.player" | "event.card";
+    abilityActivated: "event.player" | "event.source";
+
+    attackDeclared: "event.player" | "event.attacker" | "event.target";
+    blockDeclared: "event.player" | "event.attacker" | "event.blocker";
+};
+

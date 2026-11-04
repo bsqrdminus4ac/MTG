@@ -109,7 +109,7 @@ export function commitCast(state: GameState): ApplyResult {
             const spellLki = snapshotSource(moved.state, moved.newId);
             if (!spellLki) return fail("Unable to snapshot spell on the stack");
             out.push({
-                type: "spellCastSuccess",
+                type: "spellCast",
                 card: moved.newId,
                 player: castingInfo.player,
                 targets: castingInfo.targets.flat(), //TODO: Consider making event layered too

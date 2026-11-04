@@ -80,11 +80,12 @@ describe("state-based action LKI", () => {
             const before = initial.objects[id]!;
             expect(event).toMatchObject({
                 type: "cardMoved",
-                lki: {
+                before: {
                     chars: { power: 2, toughness: 2 },
                     counters: before.counters,
                 },
             });
+            expect(event?.type === "cardMoved" ? event.after : undefined).toBeUndefined();
         }
     });
 });
