@@ -30,6 +30,7 @@ export type Ability =
           targets: TargetSpec[];
           effects: readonly CardEffect[];
           triggerableZones: readonly Zone[];
+          isManaAbility?: boolean; // If a triggered ability caused by a mana ability has no target and itself adds mana, it is also a mana ability
       }>
     | Readonly<{ kind: "static"; effect: ContinuousEffectTemplate }>;
 

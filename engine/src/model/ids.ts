@@ -15,6 +15,8 @@ export type DecisionId = Brand<number, "DecisionId">;
 /** Higher = more recent. Orders continuous effects within a layer (CR 613.7). */
 export type Timestamp = Brand<number, "Timestamp">;
 
+export type TriggerId = Brand<number, "TriggerId">;
+
 export const playerId = (s: string): PlayerId => s as PlayerId;
 export const cardDefId = (s: string): CardDefId => s as CardDefId;
 

@@ -1,8 +1,8 @@
 import { fail, ok, type ApplyResult } from "../core/result";
 import { assertNever } from "../core/util";
 import { getCardName, getCharacteristics, snapshotSource } from "../model/characteristics";
-import { abilityChoice, chooseMany, chooseOne, objectChoice, playerChoice, yesNo, type Choice } from "../model/decisions";
-import { describeAbility, getCardText, type TargetSpec } from "../model/effects";
+import { abilityChoice, chooseMany, chooseOne, yesNo, type Choice } from "../model/decisions";
+import { describeAbility, getCardText } from "../model/effects";
 import type { GameEvent } from "../model/events";
 import { type ObjectId, type PlayerId } from "../model/ids";
 import { canPayMana } from "../model/mana";
@@ -11,7 +11,7 @@ import { moveObject } from "../model/zones";
 import { calculateFinalCost, payAbilityCosts, paySpellCosts } from "../rules/costs";
 import { openDecision } from "../rules/pending";
 import { getAbilityForSpell, pushStackEntry, type NewStackEntry } from "../rules/stack";
-import { getLegalTargets } from "../rules/targeting";
+import { buildTargetOptions, buildTargetPrompt, getLegalTargets } from "../rules/targeting";
 import { checkCastable } from "./castability";
 import { activateManaAbility, getAllManaSources } from "./manaAbilities";
 import { grantPriority } from "./priority";
@@ -70,7 +70,7 @@ export function cancelCast(state: GameState): ApplyResult {
                   type: "abilityActivateCancelled",
                   player: state.casting.player,
                   abilitySource: state.casting.sourceSnapshot.id,
-                  description: describeAbility(state.casting.ability, state.casting.sourceSnapshot.chars.name),
+                  description: describeAbility(state.casting.ability, state.casting.sourceSnapshot.chars.name, true),
                   sourceName: state.casting.sourceSnapshot.chars.name,
               };
     return ok(state.casting.rollback, [...state.casting.events, event]);
@@ -116,7 +116,7 @@ export function commitCast(state: GameState): ApplyResult {
                 spellLki: spellLki,
             });
             const stackState = pushStackEntry(moved.state, entry);
-            return grantPriority({ ...stackState.state, casting: null }, out, castingInfo.player, 0);
+            return grantPriority({ ...stackState, casting: null }, out, castingInfo.player, 0);
         }
         case "activated": {
             entry = {
@@ -133,10 +133,10 @@ export function commitCast(state: GameState): ApplyResult {
                 abilitySourceLki: entry.sourceSnapshot,
                 player: castingInfo.player,
                 targets: castingInfo.targets.flat(), //TODO: Consider making event layered too
-                description: describeAbility(entry.ability, entry.sourceSnapshot.chars.name),
+                description: describeAbility(entry.ability, entry.sourceSnapshot.chars.name, true),
             });
             const stackState = pushStackEntry(currentState, entry);
-            return grantPriority({ ...stackState.state, casting: null }, out, castingInfo.player, 0);
+            return grantPriority({ ...stackState, casting: null }, out, castingInfo.player, 0);
         }
         default:
             return assertNever(castingInfo);
@@ -173,24 +173,15 @@ export function selectTargetOptions(state: GameState): ApplyResult {
     };
     const legalTargetsResult = getLegalTargets(state, scope, nextSpec);
     if (!legalTargetsResult.ok) return fail(legalTargetsResult.error);
-    const legalTargets = legalTargetsResult.value;
 
-    const options: Choice[] = [];
-    for (const target of legalTargets) {
-        if (target.kind === "player") {
-            options.push(playerChoice(target.id, `Target player ${target.id} with ${getCastName(state, casting)}`));
-        } else if (target.kind === "object") {
-            const targetChars = getCharacteristics(state, target.id);
-            if (!targetChars) continue;
-            options.push(objectChoice(target.id, `Target object ${targetChars.name} (#${target.id}) with ${getCastName(state, casting)}`));
-        }
-    }
-    const targetCastName = casting.kind === "spell" ? `spell ${getCastName(state, state.casting)}` : getCastName(state, state.casting);
+    const targetCastName = getCastName(state, state.casting);
+    const options = buildTargetOptions(state, targetCastName, legalTargetsResult.value);
+
     const nextState = openDecision(state, (id) =>
         chooseMany({
             id,
             options: options,
-            prompt: buildTargetPrompt(card, targetCastName, nextSpec),
+            prompt: buildTargetPrompt(targetCastName, nextSpec),
             min: nextSpec.minCount,
             max: nextSpec.maxCount,
             player: player,
@@ -217,20 +208,6 @@ export function applyTargetSelections(state: GameState, targets: Target[]): Appl
         },
     };
     return selectTargetOptions(nextState);
-}
-
-function buildTargetPrompt(card: ObjectId, castName: string, spec: TargetSpec): string {
-    let prompt = "Select ";
-    const targetDesc = spec.description ?? "";
-    if (spec.minCount === 1 && spec.maxCount === 1) {
-        prompt += `the ${targetDesc} target `;
-    } else if (spec.minCount === spec.maxCount) {
-        prompt += `${spec.minCount} ${targetDesc} targets `;
-    } else {
-        prompt += `between ${spec.minCount} and ${spec.maxCount} ${targetDesc} targets `;
-    }
-    prompt += `for ${castName} (#${card})`;
-    return prompt;
 }
 
 export function payManaOptions(state: GameState): ApplyResult {
@@ -341,7 +318,7 @@ export function applyCommitSpellDecision(state: GameState, answer: boolean): App
 }
 
 function getCastName(state: GameState, casting: CastingInProgress): string {
-    if (casting.kind === "spell") return getCardName(state, casting.card);
+    if (casting.kind === "spell") return `spell ${getCardName(state, casting.card, true)}`;
     else if (casting.kind === "activated") return `${casting.sourceSnapshot.chars.name}'s ability`;
     return assertNever(casting);
 }

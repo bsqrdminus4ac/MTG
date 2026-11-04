@@ -2,7 +2,7 @@ import type { DistributiveOmit } from "../core/util";
 import type { AbilityOfKind } from "../model/abilities";
 import type { Characteristics } from "../model/cardDefinition";
 import { getCardName, isPermanentType } from "../model/characteristics";
-import { nextID, type StackId } from "../model/ids";
+import { nextID, type PlayerId, type StackId } from "../model/ids";
 import type { GameState, StackEntry } from "../model/state";
 
 //type StackAbility = AbilityOfKind<"spell" | "activated" | "triggered">;
@@ -22,15 +22,21 @@ export function getAbilityForSpell(chars: Characteristics): AbilityOfKind<"spell
 
 export type NewStackEntry = DistributiveOmit<StackEntry, "id">;
 
-export function pushStackEntry(state: GameState, entry: NewStackEntry): { state: GameState; entry: StackEntry } {
+export function pushStackEntry(state: GameState, entry: NewStackEntry): GameState {
+    return createStackEntry(state, entry, entry.controller);
+}
+
+export function pushTriggerEntry(state: GameState, entry: Extract<NewStackEntry, { kind: "ability" }>): GameState {
+    return createStackEntry(state, entry);
+}
+
+function createStackEntry(state: GameState, entry: NewStackEntry, givePriorityTo?: PlayerId): GameState {
     const [next, id] = nextID<StackId>(state);
     const full = { ...entry, id } as StackEntry;
+    const holder = givePriorityTo || state.priority?.holder || state.turn.activePlayer;
     return {
-        entry: full,
-        state: {
-            ...next,
-            stack: [...next.stack, full],
-            priority: { holder: entry.controller, consecutivePasses: 0 }, // the pass-count reset from before
-        },
+        ...next,
+        stack: [...next.stack, full],
+        priority: { holder, consecutivePasses: 0 }, // the pass-count reset from before
     };
 }

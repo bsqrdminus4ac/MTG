@@ -1,4 +1,4 @@
-import { fail, type ApplyResult } from "../core/result";
+import { fail, ok, type ApplyResult } from "../core/result";
 import { withEntry } from "../core/util";
 import type { ActivatableAbilityInfo } from "../model/abilities";
 import { snapshotSource } from "../model/characteristics";
@@ -10,7 +10,6 @@ import { canPayMana, type ManaCost, type ManaPool } from "../model/mana";
 import type { Binding, Frame, GameState, ManaResolutionInProgress } from "../model/state";
 import { findActivatableAbility, getAllActivatableAbilities } from "../rules/abilityQueries";
 import { payAbilityCosts } from "../rules/costs";
-import { checkStateBasedActions } from "../rules/stateBasedActions";
 import { detectTriggers } from "../rules/triggers";
 import { payManaOptions } from "./casting";
 import { ask, runFrames, stepFromApply, type EffectContext, type StepResult } from "./effects";
@@ -105,7 +104,7 @@ export function activateManaAbility(state: GameState, player: PlayerId, source: 
         sourceSnapshot,
         frames: [{ effects: ability.effects, pc: 0 }],
         bindings: {},
-        abilityDescription: describeAbility(ability, chars.name),
+        abilityDescription: describeAbility(ability, chars.name, true),
     };
 
     return runManaAbilityResolution({ ...payResult.state, resolvingMana: resolving });
@@ -164,14 +163,19 @@ export function finishManaAbilityResolution(state: GameState, events: readonly G
         targets: [],
     };
 
-    if (state.casting) {
-        return payManaOptions({ ...state, resolvingMana: null, casting: { ...state.casting, events: [...state.casting.events, event] } });
+    const next = resolveTriggeredManaAbilities(state, [...events, event]);
+    if (!next.ok) return next;
+
+    if (next.state.casting) {
+        return payManaOptions({ ...next.state, resolvingMana: null, casting: { ...next.state.casting, events: [...next.state.casting.events, event] } });
     }
 
-    const next = { ...state, resolvingMana: null, priority: { holder: resolving.player, consecutivePasses: 0 } };
-    const result = checkStateBasedActions(next, [...events, event]);
-    if (!result.ok) return result;
-    return grantPriority(result.state, result.events, resolving.player, 0);
+    return grantPriority({ ...next.state, resolvingMana: null, priority: { holder: resolving.player, consecutivePasses: 0 } }, events, resolving.player, 0);
+}
+
+function resolveTriggeredManaAbilities(state: GameState, events: readonly GameEvent[]): ApplyResult {
+    // TODO: triggered mana abilities (CR 605.1b) resolve inline instead of going on the stack
+    return ok(state, events);
 }
 
 const getTopFrame = (state: GameState): Frame | undefined => state.resolvingMana?.frames[state.resolvingMana.frames.length - 1];

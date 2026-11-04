@@ -74,7 +74,8 @@ export function createGame(definitions: readonly CardDefinition[], setups: reado
         combat: null,
         resolving: null,
         resolvingMana: null,
-        pendingTriggers: [],
+        pendingTriggers: {},
+        placingTriggers: null,
     };
     return withPriorityDecision(state);
 }

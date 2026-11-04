@@ -43,6 +43,7 @@ type StackEvent =
     | Readonly<{ type: "abilityActivateStart"; player: PlayerId; abilitySource: ObjectId; sourceName: string; description: string }>
     | Readonly<{ type: "abilityActivated"; player: PlayerId; abilitySourceLki: ObjectSnapshot; description: string; targets: readonly Target[] }>
     | Readonly<{ type: "abilityActivateCancelled"; player: PlayerId; abilitySource: ObjectId; sourceName: string; description: string }>
+    | Readonly<{ type: "abilityTriggered"; player: PlayerId; abilitySourceLki: ObjectSnapshot; description: string; targets: readonly Target[] }>
     | Readonly<{ type: "stackEntryResolved"; id: StackId; entryName: string }>
     | Readonly<{ type: "stackEntryFizzles"; id: StackId; entryName: string }>;
 
@@ -77,6 +78,7 @@ export type EventBindingNames = {
 
     spellCast: "event.player" | "event.card";
     abilityActivated: "event.player" | "event.source";
+    abilityTriggered: "event.player" | "event.source";
 
     attackDeclared: "event.player" | "event.attacker" | "event.target";
     blockDeclared: "event.player" | "event.attacker" | "event.blocker";

@@ -14,6 +14,7 @@ import { canPlayLand } from "../rules/timing";
 import { detectTriggers } from "../rules/triggers";
 import { checkActivatable, checkCastable } from "./castability";
 import { beginResolution } from "./resolution";
+import { placePendingTriggers } from "./triggers";
 import { advanceStep } from "./turn";
 
 export function passPriority(state: GameState, player: PlayerId): ApplyResult {
@@ -37,27 +38,31 @@ export function givePriorityToActivePlayer(state: GameState, events: readonly Ga
     return grantPriority(state, events, state.turn.activePlayer, 0);
 }
 
-export function stabilize(state: GameState, events: readonly GameEvent[], changesMade = false): { result: ApplyResult; changesMade: boolean } {
+export function stabilize(state: GameState, events: readonly GameEvent[], checkedEventCount = 0, changesMade = false): { result: ApplyResult; changesMade: boolean } {
     const result = checkStateBasedActions(state, [...events]);
     if (!result.ok) return { result, changesMade: false };
     if (result.changesMade) {
-        return stabilize(result.state, result.events, true);
+        return stabilize(result.state, result.events, checkedEventCount, true);
     }
 
     // Place triggers on the stack. If any triggers were placed, call stabilize again to check for state-based actions and new triggers.
     // If any triggers were placed, the priority holder is the active player. If no triggers were placed, the priority holder is the player who had priority before stabilization.
-    const triggerResult = detectTriggers(result.state, result.events);
+    const triggerResult = detectTriggers(result.state, result.events.slice(checkedEventCount));
     if (!triggerResult.ok) return { result: triggerResult, changesMade: false };
     if (triggerResult.changesMade) {
-        return stabilize(triggerResult.state, triggerResult.events, true);
+        return stabilize(triggerResult.state, triggerResult.events, result.events.length, true); // Could use triggerResult.event.length instead of result.events.length, but only if we continue to assume detectTriggers doesn't add any new events
     }
 
-    return { result: ok(triggerResult.state, triggerResult.events), changesMade };
+    const placedTriggersResult = placePendingTriggers(triggerResult.state, triggerResult.events);
+    if (!placedTriggersResult.ok) return { result: placedTriggersResult, changesMade: false };
+
+    return { result: ok(placedTriggersResult.state, placedTriggersResult.events), changesMade };
 }
 
 export function grantPriority(state: GameState, events: readonly GameEvent[], holder: PlayerId, consecutivePasses: number): ApplyResult {
-    const stabilized = stabilize(state, events);
+    const stabilized = stabilize({ ...state, pending: null }, events); // grantPriority is responsible for clearing the decision that was just made in addition to returning the new one
     if (!stabilized.result.ok) return stabilized.result;
+    if (stabilized.result.state.pending) return stabilized.result; // If a placed trigger needs a decision made, do that before granting priority
     return ok(withPriorityDecision({ ...stabilized.result.state, priority: { holder, consecutivePasses: stabilized.changesMade ? 0 : consecutivePasses } }), stabilized.result.events);
 }
 

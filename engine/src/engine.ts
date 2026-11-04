@@ -15,6 +15,7 @@ import {
 import { handleManaAbilityDecision } from "./flow/manaAbilities";
 import { passPriority, playLand } from "./flow/priority";
 import { handleResolutionDecision } from "./flow/resolution";
+import { applyTriggerOrderingDecision, applyTriggerTargetingDecision } from "./flow/triggers";
 import { finishDiscard } from "./flow/turn";
 import type { Action } from "./model/actions";
 import { resolveChooseAnswer, resolveOrderingAnswer, resolvePriorityAnswer, resolveYesNoAnswer, type Continuation, type ResolvedAnswer, type Submission } from "./model/decisions";
@@ -141,6 +142,12 @@ function resume(state: GameState, then: Continuation, player: PlayerId, answer: 
         case "selectDamageOrder":
             if (answer.kind !== "order") return fail("Expected an ordering decision");
             return applyDamageOrderingDecision(state, then.attacker, answer.order);
+        case "orderTriggers":
+            if (answer.kind !== "order") return fail("Expected an ordering decision");
+            return applyTriggerOrderingDecision(state, then.player, answer.order);
+        case "selectTriggerTargets":
+            if (answer.kind !== "choose") return fail("expected a selection");
+            return applyTriggerTargetingDecision(state, answer.chosen);
         default:
             return assertNever(then); // narrows to never once every continuation kind has a case
     }

@@ -1,6 +1,6 @@
 import { badResult, goodResult, type Result } from "../core/result";
 import type { Action } from "./actions";
-import type { DecisionId, ObjectId, PlayerId, StackId } from "./ids";
+import type { DecisionId, ObjectId, PlayerId, StackId, TriggerId } from "./ids";
 import type { ManaType } from "./mana";
 
 /**
@@ -23,6 +23,7 @@ export type ChoiceValue =
     | Readonly<{ kind: "player"; id: PlayerId }>
     | Readonly<{ kind: "index"; index: number }> // e.g. which mode of a modal spell
     | Readonly<{ kind: "ability"; id: ObjectId; index: number }>
+    | Readonly<{ kind: "trigger"; id: TriggerId }>
     | Readonly<{ kind: "stackEntry"; id: StackId }>
     | Readonly<{ kind: "mana"; mana: ManaType }>
     | Readonly<{ kind: "null" }>;
@@ -62,6 +63,11 @@ export const abilityChoice = (id: ObjectId, abilityIndex: number, label: string)
     label,
     value: { kind: "ability", id, index: abilityIndex },
 });
+export const triggerChoice = (id: TriggerId, source: ObjectId, label: string): Choice => ({
+    id: `object:${source}#${id}`,
+    label,
+    value: { kind: "trigger", id },
+});
 export const manaChoice = (mana: ManaType, label: string): Choice => ({
     id: `mana:${mana}`,
     label,
@@ -94,6 +100,8 @@ export type Continuation = Readonly<
     | { kind: "selectDamageOrder"; attacker: ObjectId }
     | { kind: "resolveEffect"; bindAs: string }
     | { kind: "resolveManaEffect"; bindAs: string }
+    | { kind: "orderTriggers"; player: PlayerId }
+    | { kind: "selectTriggerTargets" }
 >;
 
 interface DecisionBase {

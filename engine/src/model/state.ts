@@ -4,7 +4,7 @@ import type { ContinuousEffect } from "./continuous";
 import type { ChoiceValue, Decision } from "./decisions";
 import type { Effect } from "./effects";
 import type { GameEvent } from "./events";
-import type { CardDefId, ObjectId, PlayerId, StackId, Timestamp } from "./ids";
+import type { CardDefId, ObjectId, PlayerId, StackId, Timestamp, TriggerId } from "./ids";
 import type { ManaCost, ManaPool } from "./mana";
 import type { Step, Zone } from "./vocabulary";
 
@@ -170,11 +170,22 @@ export interface ManaResolutionInProgress {
 }
 
 export interface PendingTrigger {
+    readonly id: TriggerId;
     readonly ability: AbilityOfKind<"triggered">;
     readonly controlller: PlayerId;
     readonly event: GameEvent;
     readonly lki: ObjectSnapshot;
     readonly bindings: Bindings;
+}
+
+export interface PlacingTriggersInProgress {
+    readonly queue: readonly PendingTrigger[]; // not yet placed, in placement order (APNAP, then each player's chosen order)
+    readonly currentTrigger?: {
+        // only while an ability with several target specs is mid-selection
+        trigger: PendingTrigger;
+        targets: readonly (readonly Target[])[];
+        targetSpecsSelected: readonly boolean[];
+    };
 }
 
 
@@ -204,5 +215,6 @@ export interface GameState {
     readonly resolving: ResolutionInProgress | null;
     readonly resolvingMana: ManaResolutionInProgress | null;
 
-    readonly pendingTriggers: readonly PendingTrigger[];
+    readonly pendingTriggers: Readonly<Partial<Record<PlayerId, PendingTrigger[]>>>;
+    readonly placingTriggers: PlacingTriggersInProgress | null;
 }

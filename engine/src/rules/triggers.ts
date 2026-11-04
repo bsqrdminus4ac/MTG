@@ -1,42 +1,51 @@
 import { isTrue, ok, type ApplyResult } from "../core/result";
 import { snapshotSource } from "../model/characteristics";
 import type { ChoiceValue } from "../model/decisions";
+import { describeAbility } from "../model/effects";
 import type { GameEvent } from "../model/events";
+import { nextID, type PlayerId, type TriggerId } from "../model/ids";
 import { isTriggerEvent, type TriggerEvent, type TriggerGameEvent } from "../model/predicates";
 import type { Bindings, EvalScope, GameState, ObjectSnapshot, PendingTrigger, Target } from "../model/state";
 import { evalCondition } from "./conditions";
 import { evalEventPredicate } from "./predicates";
 
+export function describeTrigger(state: GameState, trigger: PendingTrigger): string {
+    const abilityDesc = describeAbility(trigger.ability, trigger.lki.chars.name);
+    return `(#${trigger.id}) Triggered ability of ${trigger.lki.chars.name}` + (abilityDesc.length > 0 ? ` : ${abilityDesc}` : "");
+}
 
 export function detectTriggers(state: GameState, events: readonly GameEvent[]): ApplyResult {
     const watchers = liveWatchers(state);
-    const pendingTriggers: PendingTrigger[] = [];
+    const pendingTriggers: Partial<Record<PlayerId, PendingTrigger[]>> = state.pendingTriggers;
+    let currentState = state;
+    let triggerAdded = false;
     for (const event of events) {
         if (!isTriggerEvent(event)) continue;
-       const candidates = [
-        ...(watchers[event.type] ?? []).filter(w => !(event.type === "cardMoved" && event.after?.id === w.id)),
-        ...moverWatchers(event)
-       ];
+        const candidates = [...(watchers[event.type] ?? []).filter((w) => !(event.type === "cardMoved" && event.after?.id === w.id)), ...moverWatchers(event)];
 
-       for (const watcher of candidates) {
+        for (const watcher of candidates) {
             for (const ability of watcher.chars.abilities) {
                 if (ability.kind !== "triggered") continue;
                 if (!ability.triggerableZones.includes(watcher.zone)) continue;
                 if (ability.trigger.event !== event.type) continue;
+                if (ability.isManaAbility) continue; // TODO: triggered mana abilities (CR 605.1b) resolve inline, see finishManaAbilityResolution
                 const bindings = eventBindings(event);
                 const scope: EvalScope = {
                     bindings,
                     source: watcher.id,
                     controller: watcher.controller,
                 };
-                if (!isTrue(evalEventPredicate(state, scope, event, ability.trigger.when))) continue;
-                if (ability.trigger.interveningIf && !isTrue(evalCondition(state, scope, ability.trigger.interveningIf))) continue;
-                pendingTriggers.push({ ability, controlller: watcher.controller, event, lki: watcher, bindings });
+                if (!isTrue(evalEventPredicate(currentState, scope, event, ability.trigger.when))) continue;
+                if (ability.trigger.interveningIf && !isTrue(evalCondition(currentState, scope, ability.trigger.interveningIf))) continue;
+                let triggerId: TriggerId;
+                [currentState, triggerId] = nextID<TriggerId>(currentState);
+                (pendingTriggers[watcher.controller] ??= []).push({ id: triggerId, ability, controlller: watcher.controller, event, lki: watcher, bindings });
+                triggerAdded = true;
             }
         }
     }
-    if (pendingTriggers.length === 0) return ok(state, events);
-    return ok({...state, pendingTriggers: [...state.pendingTriggers, ...pendingTriggers]}, events, true);
+    if (!triggerAdded) return ok(currentState, events);
+    return ok({ ...currentState, pendingTriggers }, events, true);
 }
 
 function liveWatchers(state: GameState): Partial<Record<TriggerEvent, ObjectSnapshot[]>> {
@@ -46,6 +55,7 @@ function liveWatchers(state: GameState): Partial<Record<TriggerEvent, ObjectSnap
         if (!snap) continue;
         for (const ability of snap.chars.abilities) {
             if (ability.kind !== "triggered") continue;
+            if (ability.isManaAbility) continue; // TODO: triggered mana abilities (CR 605.1b) resolve inline, see finishManaAbilityResolution
             if (!ability.triggerableZones.includes(obj.zone)) continue;
             (watchers[ability.trigger.event] ??= []).push(snap);
         }

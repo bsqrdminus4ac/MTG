@@ -1,6 +1,7 @@
-import { type Result, goodResult } from "../core/result";
+import { goodResult, type Result } from "../core/result";
 import { assertNever } from "../core/util";
-import { hasKeyword, snapshotSource } from "../model/characteristics";
+import { getCharacteristics, hasKeyword, snapshotSource } from "../model/characteristics";
+import { objectChoice, playerChoice, type Choice } from "../model/decisions";
 import type { TargetFilter, TargetSpec } from "../model/effects";
 import type { EvalScope, GameState, Target } from "../model/state";
 import { evalObjectPredicate, evalPlayerPredicate, evalStackPredicate } from "./predicates";
@@ -116,4 +117,31 @@ function collectTargets(state: GameState, scope: EvalScope, filter: TargetFilter
         default:
             return assertNever(filter);
     }
+}
+export function buildTargetPrompt(sourceName: string, spec: TargetSpec): string {
+    let prompt = "Select ";
+    const targetDesc = spec.description ?? "";
+    if (spec.minCount === 1 && spec.maxCount === 1) {
+        prompt += `the ${targetDesc} target `;
+    } else if (spec.minCount === spec.maxCount) {
+        prompt += `${spec.minCount} ${targetDesc} targets `;
+    } else {
+        prompt += `between ${spec.minCount} and ${spec.maxCount} ${targetDesc} targets `;
+    }
+    prompt += `for ${sourceName}`;
+    return prompt;
+}
+
+export function buildTargetOptions(state: GameState, sourceName: string, legalTargets: readonly Target[]): Choice[] {
+    const options: Choice[] = [];
+    for (const target of legalTargets) {
+        if (target.kind === "player") {
+            options.push(playerChoice(target.id, `Target player ${target.id} with ${sourceName}`));
+        } else if (target.kind === "object") {
+            const targetChars = getCharacteristics(state, target.id);
+            if (!targetChars) continue;
+            options.push(objectChoice(target.id, `Target object ${targetChars.name} (#${target.id}) with ${sourceName}`));
+        }
+    }
+    return options;
 }

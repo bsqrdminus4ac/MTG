@@ -535,6 +535,8 @@ export function describeChoiceValue(state: GameState, v: ChoiceValue): string {
           return `option ${v.index}`;
       case "ability":
           return `activate ability ${v.index + 1} of ${nameOf(state, v.id)} (#${v.id})`;
+      case "trigger":
+          return `triggered ability #${v.id}`;
       case "stackEntry":
           return nameOfStackEntry(state, v.id, true);
       case "mana":
@@ -663,6 +665,11 @@ export function describeEvent(state: GameState, e: GameEvent): string {
           );
       case "abilityActivateCancelled":
           return `${e.player} cancels activation of ${e.sourceName}'s ability (${e.description})`;
+      case "abilityTriggered":
+          return (
+              `${e.player}'s ${e.abilitySourceLki.chars.name}'s ability triggers (${e.description})` +
+              (e.targets.length > 0 ? ` targeting ${e.targets.map((t) => describeTarget(state, t)).join(", ")}` : "")
+          );
       case "stackEntryResolved":
           return `${e.entryName} (stack entry #${e.id}) resolves`;
       case "stackEntryFizzles":
