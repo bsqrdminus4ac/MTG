@@ -1,5 +1,6 @@
 import { fail, ok, type ApplyResult } from "../core/result";
 import { chooseMany, orderingDecision, triggerChoice, type Choice } from "../model/decisions";
+import { describeAbility } from "../model/effects";
 import type { GameEvent } from "../model/events";
 import type { PlayerId } from "../model/ids";
 import { getRemainingPlayersInTurnOrder, type EvalScope, type GameState, type PendingTrigger, type Target } from "../model/state";
@@ -7,10 +8,13 @@ import { openDecision } from "../rules/pending";
 import { pushTriggerEntry } from "../rules/stack";
 import { buildTargetOptions, buildTargetPrompt, getLegalTargets } from "../rules/targeting";
 import { describeTrigger } from "../rules/triggers";
+import { givePriorityToActivePlayer } from "./priority";
 
 export function placePendingTriggers(state: GameState, events: readonly GameEvent[]): ApplyResult {
     let currentState: GameState = { ...state, placingTriggers: null };
-    if (Object.keys(currentState.pendingTriggers).length === 0) return ok(currentState, events);
+    if (Object.keys(currentState.pendingTriggers).length === 0) {
+        return currentState.pending ? givePriorityToActivePlayer({ ...currentState, pending: null }, events) : ok(currentState, events);
+    }
     const playerOrder = getRemainingPlayersInTurnOrder(currentState);
     for (const player of playerOrder) {
         const triggersToPlace = currentState.pendingTriggers[player];
@@ -41,7 +45,7 @@ export function placePendingTriggers(state: GameState, events: readonly GameEven
             );
         }
     }
-    return ok(currentState, events);
+    return givePriorityToActivePlayer(currentState, events);
 }
 
 export function applyTriggerOrderingDecision(state: GameState, player: PlayerId, order: readonly number[]): ApplyResult {
@@ -84,7 +88,7 @@ export function selectTargetOptions(state: GameState, events: readonly GameEvent
             type: "abilityTriggered",
             player: currentTriggerInfo.trigger.controlller,
             abilitySourceLki: currentTriggerInfo.trigger.lki,
-            description: triggerDesc,
+            description: describeAbility(currentTriggerInfo.trigger.ability, currentTriggerInfo.trigger.lki.chars.name),
             targets: currentTriggerInfo.targets.flat(),
         };
         return selectTargetOptions(currentState, [...events, triggerEvent]); // Move on to next trigger in placingTriggers queue
@@ -99,15 +103,20 @@ export function selectTargetOptions(state: GameState, events: readonly GameEvent
         const legalTargetsResult = getLegalTargets(currentState, scope, nextSpec);
         if (!legalTargetsResult.ok) return fail(legalTargetsResult.error);
 
-        if (legalTargetsResult.value.length === 0 && nextSpec.minCount > 0) {
-            // No legal targets, drop trigger without adding it to stack
-            // Current code means that if spec 1 has a valid target but spec 2 doesn't,
-            // the player will have to choose the first target before the trigger gets dropped. Probably fine for now.
-            currentState = { ...currentState, placingTriggers: { queue: currentState.placingTriggers!.queue } }; // Remove currentTrigger from placingTriggers
-            return selectTargetOptions(currentState, events); // Move on to next trigger in placingTriggers queue
+        if (legalTargetsResult.value.length === 0) {
+            if (nextSpec.minCount > 0) {
+                // No legal targets, drop trigger without adding it to stack
+                // Current code means that if spec 1 has a valid target but spec 2 doesn't,
+                // the player will have to choose the first target before the trigger gets dropped. Probably fine for now.
+                currentState = { ...currentState, placingTriggers: { queue: currentState.placingTriggers!.queue } }; // Remove currentTrigger from placingTriggers
+                return selectTargetOptions(currentState, events); // Move on to next trigger in placingTriggers queue
+            } else {
+                // If no targets is valid, save an empty target list for this spec and move on to the next one
+                return applyTriggerTargetSelections(currentState, []);
+            }
         }
 
-        const options = buildTargetOptions(currentState, currentTriggerInfo.trigger.lki.chars.name, legalTargetsResult.value);
+        const options = buildTargetOptions(currentState, `${currentTriggerInfo.trigger.lki.chars.name}'s ability`, legalTargetsResult.value);
         const nextState = openDecision(currentState, (id) =>
             chooseMany({
                 id,

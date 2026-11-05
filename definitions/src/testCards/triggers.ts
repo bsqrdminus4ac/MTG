@@ -46,4 +46,43 @@ export const reclamation: CardDefinition = noncreatureArtifact({
     ],
 });
 
-export const TRIGGER_TEST_CARDS: readonly CardDefinition[] = [visionarySprite, reclamation];
+export const cask: CardDefinition = creature({
+    name: "Unstable Cask",
+    cost: { generic: 1, pips: [] },
+    power: 0,
+    toughness: 1,
+    abilities: [
+        triggered({
+            trigger: { event: "cardMoved", when: { kind: "cardMoved", from: "battlefield", to: "graveyard", object: { kind: "isSource" } } },
+            effects: [
+                {
+                    kind: "damage",
+                    amount: 1,
+                    to: { kind: "target", spec: 0 },
+                    description: "When <this> dies, it deals 1 damage to up to one target creature and 2 damage to up to one target player.",
+                },
+                { kind: "damage", amount: 2, to: { kind: "target", spec: 1 } },
+            ],
+            targets: [
+                {
+                    minCount: 0,
+                    maxCount: 1,
+                    filter: {
+                        kind: "object",
+                        filter: {
+                            kind: "all",
+                            of: [
+                                { kind: "hasType", type: "Creature" },
+                                { kind: "inZone", zone: "battlefield" },
+                            ],
+                        },
+                    },
+                    description: "creatures",
+                },
+                { minCount: 0, maxCount: 1, filter: { kind: "player", filter: { kind: "anyPlayer" } }, description: "players" },
+            ],
+        }),
+    ],
+});
+
+export const TRIGGER_TEST_CARDS: readonly CardDefinition[] = [visionarySprite, reclamation, cask];

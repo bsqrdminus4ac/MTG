@@ -11,12 +11,12 @@ import { evalEventPredicate } from "./predicates";
 
 export function describeTrigger(state: GameState, trigger: PendingTrigger): string {
     const abilityDesc = describeAbility(trigger.ability, trigger.lki.chars.name);
-    return `(#${trigger.id}) Triggered ability of ${trigger.lki.chars.name}` + (abilityDesc.length > 0 ? ` : ${abilityDesc}` : "");
+    return `Triggered ability of ${trigger.lki.chars.name}` + (abilityDesc.length > 0 ? `: ${abilityDesc}` : "");
 }
 
 export function detectTriggers(state: GameState, events: readonly GameEvent[]): ApplyResult {
     const watchers = liveWatchers(state);
-    const pendingTriggers: Partial<Record<PlayerId, PendingTrigger[]>> = state.pendingTriggers;
+    const pendingTriggers: Partial<Record<PlayerId, PendingTrigger[]>> = { ...state.pendingTriggers };
     let currentState = state;
     let triggerAdded = false;
     for (const event of events) {
@@ -39,7 +39,8 @@ export function detectTriggers(state: GameState, events: readonly GameEvent[]): 
                 if (ability.trigger.interveningIf && !isTrue(evalCondition(currentState, scope, ability.trigger.interveningIf))) continue;
                 let triggerId: TriggerId;
                 [currentState, triggerId] = nextID<TriggerId>(currentState);
-                (pendingTriggers[watcher.controller] ??= []).push({ id: triggerId, ability, controlller: watcher.controller, event, lki: watcher, bindings });
+                const newTrigger: PendingTrigger = { id: triggerId, ability, controlller: watcher.controller, event, lki: watcher, bindings };
+                pendingTriggers[watcher.controller] = pendingTriggers[watcher.controller] ? [...pendingTriggers[watcher.controller]!, newTrigger] : [newTrigger];
                 triggerAdded = true;
             }
         }

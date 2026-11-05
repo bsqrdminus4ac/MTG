@@ -9,4 +9,4 @@ const shySprite = creature({
     abilities: [{ kind: "keyword", keyword: "hexproof" }],
 });
 
-export const TARGETING_TEST_CARDS: CardDefinition[] = [];
+export const TARGETING_TEST_CARDS: CardDefinition[] = [shySprite];

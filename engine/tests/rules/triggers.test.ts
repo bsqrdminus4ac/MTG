@@ -120,6 +120,7 @@ describe("detectTriggers", () => {
         const entering = detectTriggers(entered.state, entered.events);
         expect(entering.ok).toBe(true);
         if (!entering.ok) return;
+        expect(entered.state.pendingTriggers[alice]).toBeUndefined();
         expect(entering.state.pendingTriggers[alice]).toHaveLength(1);
         expect(entering.state.pendingTriggers[alice]?.[0]?.event).toEqual(entered.events[0]);
         expect(entered.events[0]?.type === "cardMoved" ? entered.events[0].after : undefined).toEqual(entering.state.pendingTriggers[alice]?.[0]?.lki);
@@ -129,8 +130,7 @@ describe("detectTriggers", () => {
         const leaving = detectTriggers(died.state, died.events);
         expect(leaving.ok).toBe(true);
         if (!leaving.ok) return;
-        expect(leaving.state.pendingTriggers[alice]).toHaveLength(1);
-        expect(leaving.state.pendingTriggers[alice]?.[0]?.event).toEqual(entered.events[0]);
+        expect(leaving.state.pendingTriggers[alice]).toBeUndefined();
     });
 
     test("detects a creature's dies trigger from its last-known information", () => {
@@ -430,6 +430,9 @@ describe("trigger placement", () => {
         expect(triggerEntry?.kind).toBe("ability");
         if (triggerEntry?.kind !== "ability") return;
         expect(triggerEntry.targets).toEqual([[{ kind: "player", id: bob }]]);
+        expect(placed.state.placingTriggers).toBeNull();
+        expect(placed.state.pending).toMatchObject({ kind: "priority", player: alice });
+        expect(placed.state.pending?.id).not.toBe(targeting.state.pending.id);
     });
 
     test("does not put a targeted trigger on the stack when there is no legal target", () => {

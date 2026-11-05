@@ -1,12 +1,14 @@
 import { bolt, drake, forest } from "@mtg/definitions";
 import { chooseMany, getCharacteristics, indexChoice, moveObject, orderingDecision, yesNo, type CardDefinition, type DecisionId, type GameState, type StackId } from "@mtg/engine";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { StrictMode } from "react";
+import { act, fireEvent, render, renderHook, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 import { App, ProgressState } from "./App";
 import { DecisionPanel } from "./components/DecisionPanel";
 import { ObjectCard } from "./components/ObjectCard";
 import { StackPanel } from "./components/StackPanel";
 import { ALICE, BOB, newDemoGame } from "./demo";
+import { useGame } from "./useGame";
 
 function must<T>(value: T | null | undefined): T {
     if (value === null || value === undefined) throw new Error("expected a value");
@@ -72,6 +74,34 @@ describe("new game", () => {
         fireEvent.click(screen.getByRole("button", { name: "New game" }));
 
         expect(screen.getByText("New game: activation test scenario")).toBeTruthy();
+    });
+
+    test("starts the selected triggered ability test scenario", () => {
+        render(<App />);
+        fireEvent.change(screen.getByLabelText("New game type"), { target: { value: "triggers" } });
+        fireEvent.click(screen.getByRole("button", { name: "New game" }));
+
+        expect(screen.getByText("New game: triggered ability test scenario")).toBeTruthy();
+    });
+});
+
+describe("decision submission", () => {
+    test("ignores a duplicate answer submitted for a decision that has already advanced", () => {
+        const { result } = renderHook(() => useGame(), { wrapper: StrictMode });
+        const initialDecision = result.current.state.pending;
+        if (initialDecision?.kind !== "priority") throw new Error("Expected an opening priority decision");
+        const pass = initialDecision.options.find((option) => option.action.type === "passPriority");
+        if (!pass) throw new Error("Expected a pass priority option");
+        const answer = { kind: "priority" as const, option: pass.id };
+
+        act(() => {
+            result.current.submit(answer, initialDecision.id);
+            result.current.submit(answer, initialDecision.id);
+        });
+
+        expect(result.current.state.pending).toMatchObject({ kind: "priority", player: BOB });
+        expect(result.current.error).toBeNull();
+        expect(result.current.history.submissions).toHaveLength(1);
     });
 });
 

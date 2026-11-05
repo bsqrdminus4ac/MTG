@@ -36,6 +36,7 @@ export function App() {
   const game = useGame();
   const [newGameType, setNewGameType] = useState<GameType>("demo");
   const { state } = game;
+  const pendingDecisionId = state.pending?.id;
   const problems = useMemo(() => findProblems(state), [state]);
   const { turn } = state;
 
@@ -76,10 +77,14 @@ export function App() {
           <select
             id="new-game-type"
             value={newGameType}
-            onChange={(event) => setNewGameType(event.currentTarget.value === "activation" ? "activation" : "demo")}
+            onChange={(event) => {
+              const value = event.currentTarget.value;
+              setNewGameType(value === "activation" || value === "triggers" ? value : "demo");
+            }}
           >
             <option value="demo">Demo game</option>
             <option value="activation">Activation test</option>
+            <option value="triggers">Triggered ability test</option>
           </select>
           <button type="button" onClick={() => game.reset(newGameType)}>
             New game
@@ -123,7 +128,13 @@ export function App() {
           })}
         </div>
         <aside className="side">
-          <DecisionPanel state={state} error={game.error} onSubmit={game.submit} />
+          <DecisionPanel
+            state={state}
+            error={game.error}
+            onSubmit={(answer) => {
+              if (pendingDecisionId !== undefined) game.submit(answer, pendingDecisionId);
+            }}
+          />
           <StackPanel state={state} />
           <EventLog log={game.log} />
         </aside>

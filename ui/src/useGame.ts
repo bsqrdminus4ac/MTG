@@ -1,6 +1,6 @@
-import { submitAnswer, type Answer, type GameEvent, type GameState, type PlayerId, type Submission } from "@mtg/engine";
+import { submitAnswer, type Answer, type DecisionId, type GameEvent, type GameState, type PlayerId, type Submission } from "@mtg/engine";
 import { useCallback, useState } from "react";
-import { activationTestGame, newDemoGame } from "./demo";
+import { activationTestGame, newDemoGame, triggeredAbilityTestGame } from "./demo";
 import { describeAnswer, describeEvent } from "./describe";
 
 export interface LogEntry {
@@ -36,11 +36,19 @@ function appendLog(log: readonly LogEntry[], drafts: readonly Draft[]): readonly
     return [...log, ...added].slice(-MAX_LOG);
 }
 
-export type GameType = "demo" | "activation";
+export type GameType = "demo" | "activation" | "triggers";
 
 function freshModel(gameType: GameType = "demo"): Model {
-    const startingState = gameType === "activation" ? activationTestGame() : newDemoGame();
-    const startDescription = gameType === "activation" ? "New game: activation test scenario" : "New game: alice vs bob, 7 cards each (decks are not shuffled)";
+    const startingState = gameType === "activation"
+        ? activationTestGame()
+        : gameType === "triggers"
+            ? triggeredAbilityTestGame()
+            : newDemoGame();
+    const startDescription = gameType === "activation"
+        ? "New game: activation test scenario"
+        : gameType === "triggers"
+            ? "New game: triggered ability test scenario"
+            : "New game: alice vs bob, 7 cards each (decks are not shuffled)";
     return {
         state: startingState,
         log: appendLog([], [{ kind: "event", text: startDescription }]),
@@ -193,7 +201,9 @@ function toggleForcePass(model: Model, player: PlayerId): Model {
 
 export function useGame() {
     const [model, setModel] = useState<Model>(freshModel);
-    const submitAnswerAction = useCallback((answer: Answer) => setModel((m) => submit(m, answer)), []);
+    const submitAnswerAction = useCallback((answer: Answer, decisionId: DecisionId) => setModel((m) =>
+        m.state.pending?.id === decisionId ? submit(m, answer) : m,
+    ), []);
     const autoPass = useCallback(() => setModel((m) => runAutoPass(m)), []);
     const forcePassAction = useCallback((player: PlayerId) => setModel((m) => toggleForcePass(m, player)), []);
     const reset = useCallback((gameType: GameType = "demo") => setModel(freshModel(gameType)), []);

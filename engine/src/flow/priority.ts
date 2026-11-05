@@ -47,13 +47,15 @@ export function stabilize(state: GameState, events: readonly GameEvent[], checke
 
     // Place triggers on the stack. If any triggers were placed, call stabilize again to check for state-based actions and new triggers.
     // If any triggers were placed, the priority holder is the active player. If no triggers were placed, the priority holder is the player who had priority before stabilization.
-    const triggerResult = detectTriggers(result.state, result.events.slice(checkedEventCount));
+    const [checkedEvents, uncheckedEvents] = [result.events.slice(0, checkedEventCount), result.events.slice(checkedEventCount)];
+    const triggerResult = detectTriggers(result.state, uncheckedEvents);
     if (!triggerResult.ok) return { result: triggerResult, changesMade: false };
+    const allEvents = [...checkedEvents, ...triggerResult.events];
     if (triggerResult.changesMade) {
-        return stabilize(triggerResult.state, triggerResult.events, result.events.length, true); // Could use triggerResult.event.length instead of result.events.length, but only if we continue to assume detectTriggers doesn't add any new events
+        return stabilize(triggerResult.state, allEvents, checkedEventCount + uncheckedEvents.length, true); // Could use triggerResult.event.length instead of result.events.length, but only if we continue to assume detectTriggers doesn't add any new events
     }
 
-    const placedTriggersResult = placePendingTriggers(triggerResult.state, triggerResult.events);
+    const placedTriggersResult = placePendingTriggers(triggerResult.state, allEvents);
     if (!placedTriggersResult.ok) return { result: placedTriggersResult, changesMade: false };
 
     return { result: ok(placedTriggersResult.state, placedTriggersResult.events), changesMade };

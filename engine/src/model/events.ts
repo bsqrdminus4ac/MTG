@@ -45,7 +45,7 @@ type StackEvent =
     | Readonly<{ type: "abilityActivateCancelled"; player: PlayerId; abilitySource: ObjectId; sourceName: string; description: string }>
     | Readonly<{ type: "abilityTriggered"; player: PlayerId; abilitySourceLki: ObjectSnapshot; description: string; targets: readonly Target[] }>
     | Readonly<{ type: "stackEntryResolved"; id: StackId; entryName: string }>
-    | Readonly<{ type: "stackEntryFizzles"; id: StackId; entryName: string }>;
+    | Readonly<{ type: "stackEntryFizzles"; id: StackId; entryName: string; reason: "lackOfTargets" | "interveningIf" }>;
 
 type CombatEvent =
     | Readonly<{ type: "attackDeclared"; player: PlayerId; attackerLki: ObjectSnapshot; target: AttackableTarget; targetLki?: ObjectSnapshot; targetName?: string }>

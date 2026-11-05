@@ -633,7 +633,7 @@ export function describeEvent(state: GameState, e: GameEvent): string {
 
       // Object effects
       case "damageDealt":
-          return `${e.sourceLki.chars.name} deals ${e.amount} damage to ${e.targetName}`;
+          return `${e.sourceLki.chars.name} deals ${e.amount} damage to ${e.targetLki ? `${e.targetLki.chars.name} (#${e.target.id})` : e.targetName}`;
       case "permanentTapped":
           return `${e.cardName} is tapped`;
       case "permanentUntapped":

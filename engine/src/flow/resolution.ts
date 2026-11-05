@@ -1,11 +1,12 @@
-import { fail, type ApplyResult } from "../core/result";
+import { fail, isTrue, type ApplyResult } from "../core/result";
 import { withEntry } from "../core/util";
 import { getCharacteristics, isPermanentType, snapshotSource } from "../model/characteristics";
 import type { ResolvedAnswer } from "../model/decisions";
 import type { GameEvent } from "../model/events";
-import type { Binding, Frame, GameState, ResolutionInProgress } from "../model/state";
+import type { Binding, EvalScope, Frame, GameState, ResolutionInProgress } from "../model/state";
 import type { Zone } from "../model/vocabulary";
 import { moveObject } from "../model/zones";
+import { evalCondition } from "../rules/conditions";
 import { getEntryName } from "../rules/stack";
 import { isTargetLegal } from "../rules/targeting";
 import { detectTriggers } from "../rules/triggers";
@@ -17,7 +18,7 @@ export function beginResolution(state: GameState): ApplyResult {
     if (!entry) return fail("The stack is empty");
 
     const next: GameState = { ...state, stack: state.stack.slice(0, -1) };
-
+    let fizzleReason: false | "lackOfTargets" | "interveningIf" = false;
     const targetSpecs = entry.ability.targets;
     const legalTargets = entry.targets.map((spec, i) =>
         spec.map((t) => {
@@ -30,13 +31,25 @@ export function beginResolution(state: GameState): ApplyResult {
 
     if (legalTargets.some((spec) => spec.length > 0) && !legalTargets.some((spec) => spec.includes(true))) {
         // There was at least one target specified, but no targets were legal - entry fizzles
+        fizzleReason = "lackOfTargets";
+    } else if (entry.kind === "ability" && entry.ability.kind === "triggered" && entry.ability.trigger.interveningIf) {
+        const scope: EvalScope = {
+            source: entry.source,
+            controller: entry.controller,
+            bindings: entry.bindings,
+        };
+        // Intervening if clause no longer valid - entry fizzles
+        if (!isTrue(evalCondition(state, scope, entry.ability.trigger.interveningIf))) fizzleReason = "interveningIf";
+    }
+
+    if (fizzleReason) {
         const entryName: string = getEntryName(next, entry);
         if (entry.kind === "spell") {
             const moved = moveObject(next, entry.source, "graveyard");
             if (!moved) return fail("Unable to move fizzled spell to its owner's graveyard");
-            return givePriorityToActivePlayer(moved.state, [{ type: "stackEntryFizzles", id: entry.id, entryName }, ...moved.events]);
+            return givePriorityToActivePlayer(moved.state, [{ type: "stackEntryFizzles", id: entry.id, entryName, reason: fizzleReason }, ...moved.events]);
         } else {
-            return givePriorityToActivePlayer(next, [{ type: "stackEntryFizzles", id: entry.id, entryName }]);
+            return givePriorityToActivePlayer(next, [{ type: "stackEntryFizzles", id: entry.id, entryName, reason: fizzleReason }]);
         }
     }
 
@@ -46,7 +59,7 @@ export function beginResolution(state: GameState): ApplyResult {
         entry,
         frames: [{ effects: entry.ability.effects, pc: 0 }],
         legalTargets: legalTargets,
-        bindings: {},
+        bindings: entry.bindings,
         sourceSnapshot,
     };
     return runResolution({ ...next, resolving });
