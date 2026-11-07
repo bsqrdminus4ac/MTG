@@ -4,12 +4,12 @@ import {
     type Ability,
     type Action,
     type Amount,
+    type AppliedEffect,
     type Answer,
     type ChoiceValue,
     type Comparison,
     type Condition,
     type ContinuousEffect,
-    type ContinuousEffectTemplate,
     type Cost,
     type Decision,
     type Effect,
@@ -25,6 +25,7 @@ import {
     type ObjectId,
     type ObjectPredicate,
     type PlayerPredicate,
+    type StaticEffect,
     type StackId,
     type Target,
     type TargetFilter,
@@ -80,25 +81,49 @@ export function describeModification(m: Modification): string {
       return `${signed(m.power)}/${signed(m.toughness)}`;
     case "setPT":
       return `base ${m.power}/${m.toughness}`;
-    case "addKeyword":
-      return `gains ${m.keyword}`;
-    case "addType":
-      return `becomes ${m.type}`;
+    case "setTypes":
+      return `becomes ${m.types.join(" and ")}`;
+    case "addTypes":
+      return `also becomes ${m.types.join(" and ")}`;
+    case "addSubtypes":
+      return `gains ${m.types.length === 1 ? "subtype" : "subtypes"} ${m.types.join(" and ")}`;
     case "setColors":
       return `becomes ${m.colors.length > 0 ? m.colors.join("") : "colorless"}`;
+    case "addColors":
+      return `gains ${m.colors.join("")} color${m.colors.length === 1 ? "" : "s"}`;
+    case "addKeywords":
+      return `gains ${m.keywords.join(" and ")}`;
+    case "removeKeywords":
+      return `loses ${m.keywords.join(" and ")}`;
+    case "switchPT":
+      return "switches power and toughness";
     default:
       return unreachable(m);
   }
 }
 
-function describeTemplate(t: ContinuousEffectTemplate): string {
-  const who = t.affects.kind === "self" ? "this" : "all creatures";
-  return `${who}: ${describeModification(t.modification)} (${t.duration})`;
+function describeModifications(modifications: readonly Modification[]): string {
+  return modifications.map(describeModification).join(", ");
+}
+
+function describeStaticEffect(effect: StaticEffect): string {
+  if (effect.description) return effect.description;
+  const who = effect.affects.kind === "self" ? "this object" : describeObjectPredicate(effect.affects.filter);
+  return `${who}: ${describeModifications(effect.modifications)}`;
+}
+
+function describeAppliedEffect(effect: AppliedEffect): string {
+  const who = effect.affects.kind === "matching"
+    ? describeObjectPredicate(effect.affects.filter)
+    : describeEffectTarget(effect.affects);
+  return `${who}: ${describeModifications(effect.modifications)} (${effect.duration})`;
 }
 
 export function describeContinuousEffect(state: GameState, e: ContinuousEffect): string {
-  const who = e.affects.kind === "object" ? nameOf(state, e.affects.id) : "all creatures";
-  return `${describeModification(e.modification)} on ${who} — from ${nameOf(state, e.source)} (timestamp ${e.timestamp}, ${e.duration})`;
+  const who = e.affects.kind === "objects"
+    ? e.affects.ids.map((id) => nameOf(state, id)).join(", ")
+    : describeObjectPredicate(e.affects.filter);
+  return `${describeModifications(e.modifications)} on ${who} — from ${nameOf(state, e.source)} (timestamp ${e.timestamp}, ${e.duration})`;
 }
 
 function describeEffectTarget(t: EffectTarget, bindings: Readonly<Record<string, string>> = {}): string {
@@ -147,7 +172,7 @@ function expandEffect(e: Effect, bindings: Readonly<Record<string, string>>): st
           return `add ${describeAmountWithBindings(e.amount, bindings)}× ${mana}`;
       }
       case "applyContinuousEffect":
-          return `apply ${describeTemplate(e.template)}`;
+          return `apply ${describeAppliedEffect(e.template)}`;
       case "choose":
           return describeEffectChoice(e);
       case "discard":
@@ -501,7 +526,9 @@ export function describeAbility(a: Ability | undefined): string {
         case "triggered":
             return `Triggered${describeTargetSpecs(a.targets)}: ${describeEventPredicate(a.trigger.when)}${a.trigger.interveningIf ? ` if ${describeCondition(a.trigger.interveningIf, {})}` : ""} → ${describeEffects(a.effects)}`;
         case "static":
-            return `Static: ${describeTemplate(a.effect)}`;
+            return `Static: ${describeStaticEffect(a.effect)}`;
+        case "applied":
+            return `Applied: ${describeAppliedEffect(a.effect)}`;
         default:
             return unreachable(a);
     }

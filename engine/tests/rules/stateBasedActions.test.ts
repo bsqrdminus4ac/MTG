@@ -38,7 +38,17 @@ function game(lordFirst: boolean): GameState {
     const creatureOnBattlefield = moveObject(lordOnBattlefield.state, lordOnBattlefield.state.players[alice]!.library[0]!, "battlefield")!;
     const [effectState, effect] = makeContinuousEffect(creatureOnBattlefield.state, {
         source: lordOnBattlefield.newId,
-        affects: { kind: "allCreatures" },
+        controller: alice,
+        affects: {
+            kind: "matching",
+            filter: {
+                kind: "all",
+                of: [
+                    { kind: "inZone", zone: "battlefield" },
+                    { kind: "hasType", type: "Creature" },
+                ],
+            },
+        },
         modification: { kind: "modifyPT", power: 1, toughness: 1 },
         duration: "whileSourceOnBattlefield",
     });

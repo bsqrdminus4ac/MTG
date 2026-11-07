@@ -1,8 +1,8 @@
-import { bolt, forest, grove, skeins } from "@mtg/definitions";
+import { bolt, forest, gloriousAnthem, grove, skeins, wingSplicer } from "@mtg/definitions";
 import { type GameState, type ObjectId } from "@mtg/engine";
 import { describe, expect, test } from "vitest";
 import { ALICE, newDemoGame } from "./demo";
-import { describeAbility, describeCardText, describeEffect, describeEffects, describeEventPredicate, describeManaCost, describePool, findProblems } from "./describe";
+import { describeAbility, describeCardText, describeEffect, describeEffects, describeEventPredicate, describeManaCost, describeModification, describePool, findProblems } from "./describe";
 
 describe("text describers", () => {
     test("mana costs", () => {
@@ -32,6 +32,39 @@ describe("text describers", () => {
         ).toEqual(["Healing Light gains life."]);
         expect(describeAbility(forest.abilities[0]!)).toBe("Mana ability: {T} → add 1× {G}");
         expect(describeAbility(bolt.abilities[0]!)).toBe("Spell targeting 1 player or object: deal 3 damage to target 1");
+    });
+
+    test("modifications", () => {
+        expect(describeModification({ kind: "setTypes", types: ["Artifact", "Creature"] })).toBe("becomes Artifact and Creature");
+        expect(describeModification({ kind: "addTypes", types: ["Artifact"] })).toBe("also becomes Artifact");
+        expect(describeModification({ kind: "addSubtypes", types: ["Elf", "Druid"] })).toBe("gains subtypes Elf and Druid");
+        expect(describeModification({ kind: "addColors", colors: ["U", "R"] })).toBe("gains UR colors");
+        expect(describeModification({ kind: "addKeywords", keywords: ["flying", "trample"] })).toBe("gains flying and trample");
+        expect(describeModification({ kind: "removeKeywords", keywords: ["flying"] })).toBe("loses flying");
+        expect(describeModification({ kind: "switchPT" })).toBe("switches power and toughness");
+    });
+
+    test("static abilities describe their affected objects and all modifications", () => {
+        expect(describeAbility(gloriousAnthem.abilities[0])).toBe(
+            "Static: an object that is in battlefield and is a creature and is controlled by you: +1/+1",
+        );
+        expect(describeAbility(wingSplicer.abilities[0])).toBe(
+            "Static: an object that is in battlefield and is a creature and is controlled by you and does not match this object: gains flying",
+        );
+        expect(
+            describeAbility({
+                kind: "static",
+                activeZones: ["battlefield"],
+                effect: {
+                    affects: { kind: "self" },
+                    modifications: [
+                        { kind: "modifyPT", power: 1, toughness: 1 },
+                        { kind: "addKeywords", keywords: ["vigilance"] },
+                    ],
+                    description: "This creature gets +1/+1 and has vigilance.",
+                },
+            }),
+        ).toBe("Static: This creature gets +1/+1 and has vigilance.");
     });
 
     test("describes event predicates for triggered abilities", () => {

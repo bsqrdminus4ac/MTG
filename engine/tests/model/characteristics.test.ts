@@ -75,13 +75,15 @@ describe("getCharacteristics", () => {
         const entered = enterBattlefield(initial, initial.players[alice]!.library[0]!);
         const [firstState, firstEffect] = makeContinuousEffect(entered.state, {
             source: entered.newId,
-            affects: { kind: "object", id: entered.newId },
+            controller: alice,
+            affects: { kind: "objects", ids: [entered.newId] },
             modification: { kind: "modifyPT", power: 1, toughness: 2 },
             duration: "permanent",
         });
         const [secondState, secondEffect] = makeContinuousEffect(firstState, {
             source: entered.newId,
-            affects: { kind: "object", id: entered.newId },
+            controller: alice,
+            affects: { kind: "objects", ids: [entered.newId] },
             modification: { kind: "modifyPT", power: 2, toughness: 1 },
             duration: "permanent",
         });
@@ -95,13 +97,15 @@ describe("getCharacteristics", () => {
         const entered = enterBattlefield(initial, initial.players[alice]!.library[0]!);
         const [modifiedState, modifyEffect] = makeContinuousEffect(entered.state, {
             source: entered.newId,
-            affects: { kind: "object", id: entered.newId },
+            controller: alice,
+            affects: { kind: "objects", ids: [entered.newId] },
             modification: { kind: "modifyPT", power: 1, toughness: 2 },
             duration: "permanent",
         });
         const [setState, earlierSetEffect] = makeContinuousEffect(modifiedState, {
             source: entered.newId,
-            affects: { kind: "object", id: entered.newId },
+            controller: alice,
+            affects: { kind: "objects", ids: [entered.newId] },
             modification: { kind: "setPT", power: 4, toughness: 5 },
             duration: "permanent",
         });
@@ -110,7 +114,8 @@ describe("getCharacteristics", () => {
 
         const [laterSetState, laterSetEffect] = makeContinuousEffect(earlierSet, {
             source: entered.newId,
-            affects: { kind: "object", id: entered.newId },
+            controller: alice,
+            affects: { kind: "objects", ids: [entered.newId] },
             modification: { kind: "setPT", power: 7, toughness: 8 },
             duration: "permanent",
         });
@@ -127,8 +132,9 @@ describe("getCharacteristics", () => {
         const entered = enterBattlefield(initial, initial.players[alice]!.library[0]!);
         const [effectState, effect] = makeContinuousEffect(entered.state, {
             source: entered.newId,
-            affects: { kind: "object", id: entered.newId },
-            modification: { kind: "addKeyword", keyword: "trample" },
+            controller: alice,
+            affects: { kind: "objects", ids: [entered.newId] },
+            modification: { kind: "addKeywords", keywords: ["trample"] },
             duration: "permanent",
         });
         const state = { ...effectState, continuousEffects: [effect] };
@@ -150,7 +156,17 @@ describe("getCharacteristics", () => {
         const libraryCreature = artifactOnBattlefield.state.players[alice]!.library[0]!;
         const [effectState, effect] = makeContinuousEffect(artifactOnBattlefield.state, {
             source: creatureOnBattlefield.newId,
-            affects: { kind: "allCreatures" },
+            controller: alice,
+            affects: {
+                kind: "matching",
+                filter: {
+                    kind: "all",
+                    of: [
+                        { kind: "inZone", zone: "battlefield" },
+                        { kind: "hasType", type: "Creature" },
+                    ],
+                },
+            },
             modification: { kind: "modifyPT", power: 1, toughness: 1 },
             duration: "permanent",
         });
@@ -167,13 +183,24 @@ describe("getCharacteristics", () => {
         const target = enterBattlefield(source.state, source.state.players[alice]!.library[0]!);
         const [targetEffectState, targetEffect] = makeContinuousEffect(target.state, {
             source: target.newId,
-            affects: { kind: "object", id: source.newId },
+            controller: alice,
+            affects: { kind: "objects", ids: [source.newId] },
             modification: { kind: "modifyPT", power: 2, toughness: 2 },
             duration: "permanent",
         });
         const [sourceEffectState, sourceEffect] = makeContinuousEffect(targetEffectState, {
             source: source.newId,
-            affects: { kind: "allCreatures" },
+            controller: alice,
+            affects: {
+                kind: "matching",
+                filter: {
+                    kind: "all",
+                    of: [
+                        { kind: "inZone", zone: "battlefield" },
+                        { kind: "hasType", type: "Creature" },
+                    ],
+                },
+            },
             modification: { kind: "modifyPT", power: 1, toughness: 1 },
             duration: "whileSourceOnBattlefield",
         });

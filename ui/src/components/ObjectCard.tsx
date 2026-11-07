@@ -27,9 +27,7 @@ export function ObjectCard({ state, id, tag }: ObjectCardProps) {
   const counters = Object.entries(obj.counters);
   const isCreature = chars?.types.includes("Creature") ?? false;
   const cardText = chars?.abilities.flatMap((ability) => describeCardText(ability, objectName)) ?? [];
-  const effects = state.continuousEffects.filter((e) =>
-    e.affects.kind === "object" ? e.affects.id === id : obj.zone === "battlefield" && isCreature,
-  );
+  const effects = state.continuousEffects.filter((e) => (e.affects.kind === "objects" ? e.affects.ids.includes(id) : obj.zone === "battlefield" && isCreature));
 
   const items: BulletItem[] = [
     ["Object ID", `#${id}`],

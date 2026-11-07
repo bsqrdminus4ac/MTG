@@ -1,52 +1,88 @@
-import { assertNever } from "../core/util";
-import type { EffectId, ObjectId, Timestamp } from "./ids";
+import type { EffectTarget } from "./effects";
+import type { EffectId, ObjectId, PlayerId, Timestamp } from "./ids";
 import type { Color } from "./mana";
+import type { ObjectPredicate } from "./predicates";
 import type { CardType, Keyword } from "./vocabulary";
 
-export type Layer = "copy" | "control" | "text" | "type" | "color" | "ability" | "characteristicDefining" | "setPT" | "modifyPT" | "switchPT";
+export type Layer =
+    | "copy" // Layer 1: Copy effect and face down cards
+    | "control" // Layer 2: Control-changing effects
+    | "text" // Layer 3: Text-changing effects
+    | "type" // Layer 4: Type, supertype, and subtype changes
+    | "color" // Layer 5: Color changes
+    | "ability" // Layer 6: Ability granting and removal, plus rules like "can't block"
+    | "characteristicDefining" // Layer 7a: */* abilities and others defined by the card
+    | "setPT" // Layer 7b: Effects that set power/toughness to a specific value
+    | "modifyPT" // Layer 7c: Effects that modify power/toughness, including +1/+1 counters
+    | "switchPT"; // Layer 7d: Effects that swap power/toughness
 
 /** Application order. Within a layer, effects apply in timestamp order. */
 export const LAYER_ORDER: readonly Layer[] = ["copy", "control", "text", "type", "color", "ability", "characteristicDefining", "setPT", "modifyPT", "switchPT"];
 
 export type Modification =
-    | Readonly<{ kind: "modifyPT"; power: number; toughness: number }>
-    | Readonly<{ kind: "setPT"; power: number; toughness: number }>
-    | Readonly<{ kind: "addKeyword"; keyword: Keyword }>
-    | Readonly<{ kind: "addType"; type: CardType }>
-    | Readonly<{ kind: "setColors"; colors: readonly Color[] }>;
+    // Layer 1
 
-export function layerOf(m: Modification): Layer {
-    switch (m.kind) {
-        case "modifyPT":
-            return "modifyPT";
-        case "setPT":
-            return "setPT";
-        case "addKeyword":
-            return "ability";
-        case "addType":
-            return "type";
-        case "setColors":
-            return "color";
-        default:
-            return assertNever(m);
-    }
-}
+    // Layer 2
+
+    // Layer 3
+
+    // Layer 4
+    | Readonly<{ kind: "setTypes"; types: CardType[] }>
+    | Readonly<{ kind: "addTypes"; types: CardType[] }>
+    | Readonly<{ kind: "addSubtypes"; types: string[] }>
+    // Layer 5
+    | Readonly<{ kind: "setColors"; colors: readonly Color[] }>
+    | Readonly<{ kind: "addColors"; colors: readonly Color[] }>
+    // Layer 6
+    | Readonly<{ kind: "addKeywords"; keywords: Keyword[] }>
+    | Readonly<{ kind: "removeKeywords"; keywords: Keyword[] }>
+    // Layer 7a
+
+    // Layer 7b
+    | Readonly<{ kind: "setPT"; power: number; toughness: number }>
+    // Layer 7c
+    | Readonly<{ kind: "modifyPT"; power: number; toughness: number }>
+    // Layer 7d
+    | Readonly<{ kind: "switchPT" }>;
+
+export const LAYER_OF: Record<Modification["kind"], Layer> = {
+    setTypes: "type",
+    addTypes: "type",
+    addSubtypes: "type",
+    setColors: "color",
+    addColors: "color",
+    addKeywords: "ability",
+    removeKeywords: "ability",
+    setPT: "setPT",
+    modifyPT: "modifyPT",
+    switchPT: "switchPT",
+};
 
 export type Duration = "untilEndOfTurn" | "whileSourceOnBattlefield" | "permanent";
 
-/** Written on a card, before it's tied to a specific source object. */
-export interface ContinuousEffectTemplate {
-    readonly affects: Readonly<{ kind: "self" }> | Readonly<{ kind: "allCreatures" }>;
-    readonly modification: Modification;
+export type ObjectMatch = Readonly<{ kind: "matching"; filter: ObjectPredicate }>;
+export type AffectedSet = Readonly<{ kind: "self" }> | ObjectMatch;
+
+export interface StaticEffect {
+    readonly affects: AffectedSet;
+    readonly modifications: Modification[];
+    readonly description?: string;
+}
+
+export interface AppliedEffect {
+    readonly affects: EffectTarget | ObjectMatch;
+    readonly modifications: Modification[];
     readonly duration: Duration;
+    readonly description?: string;
 }
 
 /** A live effect in the game, tied to its source and a timestamp. */
 export interface ContinuousEffect {
     readonly id: EffectId;
     readonly source: ObjectId;
+    readonly controller: PlayerId;
     readonly timestamp: Timestamp;
-    readonly affects: Readonly<{ kind: "object"; id: ObjectId }> | Readonly<{ kind: "allCreatures" }>;
-    readonly modification: Modification;
+    readonly affects: Readonly<{ kind: "objects"; ids: ObjectId[] }> | ObjectMatch;
+    readonly modifications: Modification[];
     readonly duration: Duration;
 }

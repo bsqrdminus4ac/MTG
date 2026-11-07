@@ -1,4 +1,4 @@
-import type { ContinuousEffectTemplate } from "./continuous";
+import type { AppliedEffect } from "./continuous";
 import type { ManaType } from "./mana";
 import type { Comparison, ObjectPredicate, PlayerPredicate, Predicate, StackPredicate } from "./predicates";
 import type { Binding } from "./state";
@@ -59,7 +59,7 @@ type PrimitiveEffect =
     | Readonly<{ kind: "destroy"; target: EffectTarget }>
     | Readonly<{ kind: "addMana"; mana: { kind: "mana"; type: ManaType } | BindingRef; amount: Amount }>
     | Readonly<{ kind: "discard"; cards: BindingRef }>
-    | Readonly<{ kind: "applyContinuousEffect"; template: ContinuousEffectTemplate }>;
+    | Readonly<{ kind: "applyContinuousEffect"; template: AppliedEffect }>;
 
 // Internal, not for card authors
 type InternalEffect = Readonly<{ kind: "setBinding"; bindAs: string; value: Binding }>;

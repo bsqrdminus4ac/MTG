@@ -36,7 +36,8 @@ describe("card movement snapshots", () => {
         const before = entered.state.objects[entered.newId]!;
         const [effectState, effect] = makeContinuousEffect(entered.state, {
             source: entered.newId,
-            affects: { kind: "object", id: entered.newId },
+            controller: alice,
+            affects: { kind: "objects", ids: [entered.newId] },
             modification: { kind: "modifyPT", power: 1, toughness: 1 },
             duration: "whileSourceOnBattlefield",
         });

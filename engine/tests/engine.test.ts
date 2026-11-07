@@ -125,7 +125,8 @@ describe("layers", () => {
     const { state, newId } = moveObject(g, top, "battlefield")!;
     const [nextState, buff] = makeContinuousEffect(state, {
         source: newId,
-        affects: { kind: "object", id: newId },
+        controller: alice,
+        affects: { kind: "objects", ids: [newId] },
         modification: { kind: "modifyPT", power: 1, toughness: 1 },
         duration: "untilEndOfTurn",
     });

@@ -1,4 +1,4 @@
-import type { ContinuousEffectTemplate } from "./continuous";
+import type { AppliedEffect, StaticEffect } from "./continuous";
 import type { CardEffect, Condition, TargetSpec } from "./effects";
 import type { ObjectId } from "./ids";
 import type { ManaCost } from "./mana";
@@ -32,7 +32,8 @@ export type Ability =
           triggerableZones: readonly Zone[];
           isManaAbility?: boolean; // If a triggered ability caused by a mana ability has no target and itself adds mana, it is also a mana ability
       }>
-    | Readonly<{ kind: "static"; effect: ContinuousEffectTemplate }>;
+    | Readonly<{ kind: "static"; effect: StaticEffect; activeZones: readonly Zone[] }>
+    | Readonly<{ kind: "applied"; effect: AppliedEffect }>;
 
 export type AbilityOfKind<K extends Ability["kind"]> = Extract<Ability, { kind: K }>;
 

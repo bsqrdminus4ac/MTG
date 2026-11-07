@@ -1,6 +1,8 @@
 import {
     COLORS,
+    YOU,
     type Ability,
+    type AppliedEffect,
     type BindingRef,
     type CardEffect,
     type Condition,
@@ -8,7 +10,10 @@ import {
     type EventBindingNames,
     type EventPredicate,
     type EventTrigger,
+    type Keyword,
     type ManaType,
+    type ObjectPredicate,
+    type StaticEffect,
     type Step,
     type TargetSpec,
     type Zone,
@@ -37,6 +42,14 @@ export const triggered = (a: { trigger: EventTrigger; effects: CardEffect[]; tar
     targets: a.targets ?? [],
     triggerableZones: a.triggerableZones ?? ["battlefield"],
 });
+
+export const staticAbility = (effect: StaticEffect, activeZones?: Zone[]): Ability => ({
+    kind: "static",
+    effect,
+    activeZones: activeZones ?? ["battlefield"],
+});
+
+export const appliedAbility = (effect: AppliedEffect): Ability => ({ kind: "applied", effect });
 
 export const thisEntersTheBattlefield = (interveningIf?: Condition): EventTrigger =>
     interveningIf
@@ -79,7 +92,7 @@ export const discardThenGainLife = (): Ability => ({
             description: "Target player discards any number of cards.",
         },
         { kind: "discard", cards: { kind: "bound", name: "cardsToDiscard" } },
-        { kind: "gainLife", who: { kind: "player", who: "controller" }, amount: { kind: "bound", name: "cardsToDiscard" }, description: "You gain 1 life for each card discarded this way." },
+        { kind: "gainLife", who: YOU, amount: { kind: "bound", name: "cardsToDiscard" }, description: "You gain 1 life for each card discarded this way." },
     ],
 });
 
@@ -107,3 +120,12 @@ export const eachPlayerDiscards = (amount: number): Ability => ({
         },
     ],
 });
+
+export const anthem = (filter: ObjectPredicate, power: number, toughness: number, description?: string) =>
+    staticAbility({ ...{ affects: { kind: "matching", filter }, modifications: [{ kind: "modifyPT", power, toughness }] }, ...(description !== undefined && { description }) });
+
+export const grantKeyword = (filter: ObjectPredicate, keywords: Keyword[], description?: string) =>
+    staticAbility({ ...{ affects: { kind: "matching", filter }, modifications: [{ kind: "addKeywords", keywords }] }, ...(description !== undefined && { description }) });
+
+export const thisGets = (power: number, toughness: number, description?: string) =>
+    staticAbility({ ...{ affects: { kind: "self" }, modifications: [{ kind: "modifyPT", power, toughness }] }, ...(description !== undefined && { description }) });

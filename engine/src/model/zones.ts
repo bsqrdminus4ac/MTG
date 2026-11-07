@@ -67,7 +67,7 @@ export function moveObject(state: GameState, id: ObjectId, to: Zone, snapshot?: 
         nextId: n + 1,
         objects: withEntry(without(next.objects, id), newId, moved),
         // Effects tied to the old object stop applying once it leaves.
-        continuousEffects: next.continuousEffects.filter((e) => !(e.source === id && e.duration === "whileSourceOnBattlefield") && !(e.affects.kind === "object" && e.affects.id === id)),
+        continuousEffects: next.continuousEffects.filter((e) => !(e.source === id && e.duration === "whileSourceOnBattlefield") && !(e.affects.kind === "objects" && e.affects.ids.includes(id))),
     };
     const after = to === "battlefield" ? snapshotSource(next, newId) : undefined;
 

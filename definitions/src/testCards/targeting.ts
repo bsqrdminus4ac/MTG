@@ -1,7 +1,7 @@
 import type { CardDefinition } from "@mtg/engine";
 import { creature } from "../builders/defineCard";
 
-const shySprite = creature({
+export const shySprite = creature({
     name: "Shy Sprite",
     cost: { generic: 0, pips: ["G"] },
     power: 1,

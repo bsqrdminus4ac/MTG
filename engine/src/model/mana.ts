@@ -4,7 +4,30 @@ export const COLORS = ["W", "U", "B", "R", "G"] as const;
 export type Color = (typeof COLORS)[number];
 
 /** Mana that can sit in a pool. "C" is colorless. */
-export type ManaType = Color | "C";
+export const MANA_TYPES = [...COLORS, "C"] as const;
+export type ManaType = (typeof MANA_TYPES)[number];
+export function isManaType(ch: string): ch is ManaType {
+    return (MANA_TYPES as readonly string[]).includes(ch.toUpperCase());
+}
+
+export const parseCost = (c: string): ManaCost => {
+    const match = /^(\d*)([A-Za-z]*)$/i.exec(c);
+    if (!match) throw new Error(`Bad format: ${c}`);
+    const n = match[1];
+    const generic = n ? parseInt(n, 10) : 0;
+    const colors = match[2];
+    if (!colors) return { generic, pips: [] };
+    const counts = Object.fromEntries(MANA_TYPES.map((l) => [l, 0])) as Record<ManaType, number>;
+    for (const color of colors) {
+        if (isManaType(color)) counts[color] = (counts[color] ?? 0) + 1;
+    }
+    const pips: ManaType[] = [];
+    for (const type of MANA_TYPES) {
+        pips.push(...Array(counts[type]).fill(type));
+    }
+
+    return { generic, pips };
+};
 
 /** Hybrid, Phyrexian, X and snow costs are intentionally left out for now. */
 export interface ManaCost {
@@ -12,7 +35,7 @@ export interface ManaCost {
     readonly pips: readonly ManaType[];
 }
 
-export const colorIdentity = (cost: ManaCost): Color[] => cost.pips.flatMap((c) => (c === "C" ? [] : c));
+export const colorIdentity = (cost: ManaCost): Color[] => [...new Set(cost.pips.flatMap((c) => (c === "C" ? [] : c)))];
 
 
 export type ManaPool = Readonly<Record<ManaType, number>>;

@@ -49,7 +49,8 @@ describe("evalPredicate", () => {
 
         const [effectState, colorEffect] = makeContinuousEffect(moved.state, {
             source: moved.newId,
-            affects: { kind: "object", id: moved.newId },
+            controller: alice,
+            affects: { kind: "objects", ids: [moved.newId] },
             modification: { kind: "setColors", colors: ["B"] },
             duration: "permanent",
         });

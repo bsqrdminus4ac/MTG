@@ -1,6 +1,7 @@
 import { assertNever } from "../core/util";
+import type { Ability } from "./abilities";
 import type { Characteristics } from "./cardDefinition";
-import { type Modification, LAYER_ORDER, layerOf } from "./continuous";
+import { type Modification, LAYER_OF, LAYER_ORDER } from "./continuous";
 import type { ObjectId } from "./ids";
 import type { GameState, ObjectSnapshot } from "./state";
 import type { CardType, Keyword } from "./vocabulary";
@@ -13,12 +14,18 @@ function applyModification(c: Characteristics, m: Modification): Characteristics
             return c.power === null || c.toughness === null ? c : { ...c, power: c.power + m.power, toughness: c.toughness + m.toughness };
         case "setPT":
             return { ...c, power: m.power, toughness: m.toughness };
-        case "addKeyword":
-            return { ...c, abilities: [...c.abilities, { kind: "keyword", keyword: m.keyword }] };
-        case "addType":
-            return c.types.includes(m.type) ? c : { ...c, types: [...c.types, m.type] };
+        case "addKeywords":
+            return { ...c, abilities: [...c.abilities, ...m.keywords.map<Ability>((keyword) => ({ kind: "keyword", keyword }))] };
+        case "addTypes":
+            return { ...c, types: [...new Set([...c.types, ...m.types])] };
         case "setColors":
             return { ...c, colors: m.colors };
+        case "addColors":
+        case "addSubtypes":
+        case "removeKeywords":
+        case "setTypes":
+        case "switchPT":
+            return c;
         default:
             return assertNever(m);
     }
@@ -40,10 +47,16 @@ export function getCharacteristics(state: GameState, id: ObjectId): Characterist
     const { id: _definitionId, ...printed } = def;
     let current: Characteristics = printed;
 
-    const ordered = [...state.continuousEffects].sort((a, b) => LAYER_ORDER.indexOf(layerOf(a.modification)) - LAYER_ORDER.indexOf(layerOf(b.modification)) || a.timestamp - b.timestamp);
+    const ordered = state.continuousEffects
+        .flatMap((effect) => effect.modifications.map((modification) => ({ effect, modification })))
+        .sort((a, b) =>
+            LAYER_ORDER.indexOf(LAYER_OF[a.modification.kind]) -
+                LAYER_ORDER.indexOf(LAYER_OF[b.modification.kind]) ||
+            a.effect.timestamp - b.effect.timestamp,
+        );
 
     for (const effect of ordered) {
-        const applies = effect.affects.kind === "object" ? effect.affects.id === id : obj.zone === "battlefield" && current.types.includes("Creature");
+        const applies = effect.effect.affects.kind === "objects" ? effect.effect.affects.ids.includes(id) : obj.zone === "battlefield" && current.types.includes("Creature");
         if (applies) current = applyModification(current, effect.modification);
     }
     return current;
