@@ -1,11 +1,11 @@
 import { describe, expect, test } from "vitest";
 import type { CardDefinition } from "../../src/model/cardDefinition";
-import type { ContinuousEffect } from "../../src/model/continuous";
-import { cardDefId, playerId, type Timestamp } from "../../src/model/ids";
+import { cardDefId, playerId } from "../../src/model/ids";
 import type { GameState } from "../../src/model/state";
 import { moveObject } from "../../src/model/zones";
 import { createGame } from "../../src/setup";
 import { checkStateBasedActions } from "../../src/rules/stateBasedActions";
+import { makeContinuousEffect } from "../helpers";
 
 const alice = playerId("alice");
 const bob = playerId("bob");
@@ -36,15 +36,14 @@ function game(lordFirst: boolean): GameState {
     ]);
     const lordOnBattlefield = moveObject(initial, initial.players[alice]!.library[0]!, "battlefield")!;
     const creatureOnBattlefield = moveObject(lordOnBattlefield.state, lordOnBattlefield.state.players[alice]!.library[0]!, "battlefield")!;
-    const effect: ContinuousEffect = {
+    const [effectState, effect] = makeContinuousEffect(creatureOnBattlefield.state, {
         source: lordOnBattlefield.newId,
-        timestamp: creatureOnBattlefield.state.nextId as Timestamp,
         affects: { kind: "allCreatures" },
         modification: { kind: "modifyPT", power: 1, toughness: 1 },
         duration: "whileSourceOnBattlefield",
-    };
+    });
     const state: GameState = {
-        ...creatureOnBattlefield.state,
+        ...effectState,
         battlefield: lordFirst
             ? [lordOnBattlefield.newId, creatureOnBattlefield.newId]
             : [creatureOnBattlefield.newId, lordOnBattlefield.newId],

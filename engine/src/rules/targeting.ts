@@ -3,8 +3,9 @@ import { assertNever } from "../core/util";
 import { getCharacteristics, hasKeyword, snapshotSource } from "../model/characteristics";
 import { objectChoice, playerChoice, type Choice } from "../model/decisions";
 import type { TargetFilter, TargetSpec } from "../model/effects";
+import { evalObjectPredicate } from "../model/objectPredicates";
 import type { EvalScope, GameState, Target } from "../model/state";
-import { evalObjectPredicate, evalPlayerPredicate, evalStackPredicate } from "./predicates";
+import { evalPlayerPredicate, evalStackPredicate } from "./predicates";
 
 export function canBeTargetedBy(state: GameState, scope: EvalScope, target: Target): boolean {
     if (target.kind === "object") {
@@ -43,7 +44,7 @@ function matchesFilter(state: GameState, scope: EvalScope, target: Target, filte
             if (target.kind !== "object") return goodResult(false);
             const lki = snapshotSource(state, target.id);
             if (!lki) return goodResult(false);
-            return evalObjectPredicate(state, scope, lki, filter.filter);
+            return evalObjectPredicate(scope, lki, filter.filter);
         default:
             return assertNever(filter);
     }
@@ -99,7 +100,7 @@ function collectTargets(state: GameState, scope: EvalScope, filter: TargetFilter
             for (const obj of Object.values(state.objects)) {
                 const lki = snapshotSource(state, obj.id);
                 if (!lki) continue;
-                const matches = evalObjectPredicate(state, scope, lki, filter.filter);
+                const matches = evalObjectPredicate(scope, lki, filter.filter);
                 if (!matches.ok) return matches;
                 if (matches.value) targets.push({ kind: "object", id: obj.id });
             }

@@ -1,13 +1,13 @@
 import { describe, expect, test } from "vitest";
 import type { CardDefinition } from "../../src/model/cardDefinition";
 import { snapshotSource } from "../../src/model/characteristics";
-import type { ContinuousEffect } from "../../src/model/continuous";
-import { cardDefId, playerId, type Timestamp } from "../../src/model/ids";
+import { cardDefId, playerId } from "../../src/model/ids";
+import { evalObjectPredicate } from "../../src/model/objectPredicates";
 import type { ObjectPredicate } from "../../src/model/predicates";
 import type { GameState } from "../../src/model/state";
 import { moveObject } from "../../src/model/zones";
-import { evalObjectPredicate } from "../../src/rules/predicates";
 import { createGame } from "../../src/setup";
+import { makeContinuousEffect } from "../helpers";
 
 const alice = playerId("alice");
 const bear: CardDefinition = {
@@ -45,22 +45,21 @@ describe("evalPredicate", () => {
         };
         const scope = { bindings: {}, controller: alice, source: moved.newId };
         const snap = snapshotSource(moved.state, moved.newId)!;
-        expect(evalObjectPredicate(moved.state, scope, snap, nonblackCreature)).toEqual({ ok: true, value: true });
+        expect(evalObjectPredicate(scope, snap, nonblackCreature)).toEqual({ ok: true, value: true });
 
-        const colorEffect: ContinuousEffect = {
+        const [effectState, colorEffect] = makeContinuousEffect(moved.state, {
             source: moved.newId,
-            timestamp: moved.state.nextId as Timestamp,
             affects: { kind: "object", id: moved.newId },
             modification: { kind: "setColors", colors: ["B"] },
             duration: "permanent",
-        };
+        });
         const blackState: GameState = {
-            ...moved.state,
-            continuousEffects: [...moved.state.continuousEffects, colorEffect],
+            ...effectState,
+            continuousEffects: [...effectState.continuousEffects, colorEffect],
         };
         const blackSnap = snapshotSource(blackState, moved.newId)!;
 
         expect(blackSnap.chars.colors).toEqual(["B"]);
-        expect(evalObjectPredicate(blackState, scope, blackSnap, nonblackCreature)).toEqual({ ok: true, value: false });
+        expect(evalObjectPredicate(scope, blackSnap, nonblackCreature)).toEqual({ ok: true, value: false });
     });
 });

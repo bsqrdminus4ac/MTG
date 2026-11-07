@@ -4,13 +4,13 @@ import { applyAction, submitAnswer } from "../src/engine";
 import type { AbilityOfKind } from "../src/model/abilities";
 import type { CardDefinition } from "../src/model/cardDefinition";
 import { getCharacteristics, snapshotSource } from "../src/model/characteristics";
-import type { ContinuousEffect } from "../src/model/continuous";
 import { anyTarget, permanentOfType, type TargetFilter } from "../src/model/effects";
-import { cardDefId, playerId, type StackId, type Timestamp } from "../src/model/ids";
+import { cardDefId, playerId, type StackId } from "../src/model/ids";
 import type { GameState, StackEntry, Target } from "../src/model/state";
 import { drawCard, moveObject } from "../src/model/zones";
 import { getLegalTargets } from "../src/rules/targeting";
 import { createGame } from "../src/setup";
+import { makeContinuousEffect } from "./helpers";
 
 const alice = playerId("alice");
 const bob = playerId("bob");
@@ -123,16 +123,15 @@ describe("layers", () => {
     const g = newGame();
     const top = g.players[alice]!.library.at(-1)!;
     const { state, newId } = moveObject(g, top, "battlefield")!;
-    const buff: ContinuousEffect = {
-      source: newId,
-      timestamp: state.nextId as Timestamp,
-      affects: { kind: "object", id: newId },
-      modification: { kind: "modifyPT", power: 1, toughness: 1 },
-      duration: "untilEndOfTurn",
-    };
-    const buffed = { ...state, continuousEffects: [buff] };
+    const [nextState, buff] = makeContinuousEffect(state, {
+        source: newId,
+        affects: { kind: "object", id: newId },
+        modification: { kind: "modifyPT", power: 1, toughness: 1 },
+        duration: "untilEndOfTurn",
+    });
+    const buffed = { ...nextState, continuousEffects: [buff] };
     expect(getCharacteristics(buffed, newId)).toMatchObject({ power: 3, toughness: 3 });
-    expect(getCharacteristics(state, newId)).toMatchObject({ power: 2, toughness: 2 });
+    expect(getCharacteristics(nextState, newId)).toMatchObject({ power: 2, toughness: 2 });
   });
 });
 

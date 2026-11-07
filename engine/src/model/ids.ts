@@ -16,6 +16,7 @@ export type DecisionId = Brand<number, "DecisionId">;
 export type Timestamp = Brand<number, "Timestamp">;
 
 export type TriggerId = Brand<number, "TriggerId">;
+export type EffectId = Brand<number, "EffectId">;
 
 export const playerId = (s: string): PlayerId => s as PlayerId;
 export const cardDefId = (s: string): CardDefId => s as CardDefId;

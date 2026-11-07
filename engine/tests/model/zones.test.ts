@@ -1,10 +1,10 @@
 import { describe, expect, test } from "vitest";
 import type { CardDefinition } from "../../src/model/cardDefinition";
 import { snapshotSource } from "../../src/model/characteristics";
-import { cardDefId, playerId, type Timestamp } from "../../src/model/ids";
-import type { ContinuousEffect } from "../../src/model/continuous";
+import { cardDefId, playerId } from "../../src/model/ids";
 import { moveObject } from "../../src/model/zones";
 import { createGame } from "../../src/setup";
+import { makeContinuousEffect } from "../helpers";
 
 const alice = playerId("alice");
 const bob = playerId("bob");
@@ -34,17 +34,16 @@ describe("card movement snapshots", () => {
         const initial = game();
         const entered = moveObject(initial, initial.players[alice]!.library[0]!, "battlefield")!;
         const before = entered.state.objects[entered.newId]!;
-        const effect: ContinuousEffect = {
+        const [effectState, effect] = makeContinuousEffect(entered.state, {
             source: entered.newId,
-            timestamp: entered.state.nextId as Timestamp,
             affects: { kind: "object", id: entered.newId },
             modification: { kind: "modifyPT", power: 1, toughness: 1 },
             duration: "whileSourceOnBattlefield",
-        };
+        });
         const battlefield = {
-            ...entered.state,
+            ...effectState,
             objects: {
-                ...entered.state.objects,
+                ...effectState.objects,
                 [entered.newId]: { ...before, counters: { "+1/+1": 2, charge: 1 } },
             },
             continuousEffects: [effect],

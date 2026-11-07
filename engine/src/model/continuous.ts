@@ -1,5 +1,5 @@
 import { assertNever } from "../core/util";
-import type { ObjectId, Timestamp } from "./ids";
+import type { EffectId, ObjectId, Timestamp } from "./ids";
 import type { Color } from "./mana";
 import type { CardType, Keyword } from "./vocabulary";
 
@@ -43,6 +43,7 @@ export interface ContinuousEffectTemplate {
 
 /** A live effect in the game, tied to its source and a timestamp. */
 export interface ContinuousEffect {
+    readonly id: EffectId;
     readonly source: ObjectId;
     readonly timestamp: Timestamp;
     readonly affects: Readonly<{ kind: "object"; id: ObjectId }> | Readonly<{ kind: "allCreatures" }>;

@@ -1,3 +1,4 @@
+import { goodResult, type Result } from "../core/result";
 import { assertNever } from "../core/util";
 import type { GameEvent } from "./events";
 import type { Color } from "./mana";
@@ -8,6 +9,26 @@ export type Predicate<T extends { kind: string }> = T | Combinator<T>;
 export const isCombinator = <T extends { kind: string }>(p: Predicate<T>): p is Combinator<T> => p.kind === "not" || p.kind === "all" || p.kind === "any";
 
 export type Comparison = ">" | ">=" | "==" | "<" | "<=" | "!=";
+
+export function evalPredicate<T extends { kind: string }>(predicate: Predicate<T>, evalFunc: (leaf: T) => Result<boolean>): Result<boolean> {
+    if (!isCombinator(predicate)) return evalFunc(predicate);
+    switch (predicate.kind) {
+        case "not":
+            const inner = evalPredicate(predicate.of, evalFunc);
+            return inner.ok ? goodResult(!inner.value) : inner;
+        case "all":
+        case "any": {
+            const values: boolean[] = [];
+            for (const sub of predicate.of) {
+                // evaluate every one; no short-circuit (see below)
+                const v = evalPredicate(sub, evalFunc);
+                if (!v.ok) return v;
+                values.push(v.value);
+            }
+            return goodResult(predicate.kind === "all" ? values.every(Boolean) : values.some(Boolean));
+        }
+    }
+}
 
 type NumberTest = { op: Comparison; value: number };
 
