@@ -1,15 +1,17 @@
 import { applySequentially, fail, goodResult, type ApplyResult, type Failure, type Result } from "../core/result";
 import { assertNever, withEntry } from "../core/util";
 import { getCardName } from "../model/characteristics";
+import type { ObjectMatch } from "../model/continuous";
 import { chooseMany, manaChoice, objectChoice, yesNo, type Continuation } from "../model/decisions";
 import type { Effect, EffectTarget, PlayerRef } from "../model/effects";
 import type { GameEvent } from "../model/events";
-import type { PlayerId } from "../model/ids";
+import type { ObjectId, PlayerId } from "../model/ids";
 import type { ManaType } from "../model/mana";
 import { getRemainingPlayersInTurnOrder, type Binding, type Bindings, type EvalScope, type Frame, type GameState, type ObjectSnapshot, type Target } from "../model/state";
 import { drawCardResult } from "../model/zones";
 import { getChoiceBinding, getObjectIdsFromBinding } from "../rules/bindings";
 import { evalCondition, resolveAmount } from "../rules/conditions";
+import { addContinuousEffect } from "../rules/continuousEffects";
 import { openDecision } from "../rules/pending";
 import { addManaEffect, damageObject, damagePlayer, destroyPermanent, discardCard, gainLife, loseLife } from "../rules/primitives";
 
@@ -195,9 +197,20 @@ export function executeEffect(state: GameState, ctx: EffectContext, effect: Effe
                 ),
             );
         }
+        case "applyContinuousEffect": {
+            let affects: Readonly<{ kind: "objects"; ids: ObjectId[] }> | ObjectMatch;
+            if (effect.template.affects.kind !== "matching") {
+                const targets = resolveEffectTargets(currentState, ctx, effect.template.affects);
+                if (!targets.ok) return targets;
+                affects = { kind: "objects", ids: targets.value.flatMap((t) => (t.kind === "object" ? t.id : [])) };
+            } else {
+                affects = effect.template.affects;
+            }
+            return stepFromApply(addContinuousEffect(currentState, ctx, { ...effect.template, affects }));
+        }
         //#endregion
         default:
-            return fail(`Resolving effects of kind ${effect.kind} is not implemented yet`);
+            return assertNever(effect);
     }
 }
 

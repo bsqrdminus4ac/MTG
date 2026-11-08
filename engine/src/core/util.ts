@@ -20,3 +20,14 @@ export function keysOf<T extends object>(obj: T): (keyof T)[] {
 }
 
 export type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
+
+/** Splits an array into ones that meet the condition and ones that don't meet the condition */
+export function partition<T>(array: readonly T[], condition: (element: T) => boolean): [T[], T[]] {
+    return array.reduce<[T[], T[]]>(
+        (acc, element) => {
+            acc[condition(element) ? 0 : 1].push(element);
+            return acc;
+        },
+        [[], []],
+    );
+}

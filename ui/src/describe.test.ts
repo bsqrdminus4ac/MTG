@@ -2,7 +2,7 @@ import { bolt, forest, gloriousAnthem, grove, skeins, wingSplicer } from "@mtg/d
 import { type GameState, type ObjectId } from "@mtg/engine";
 import { describe, expect, test } from "vitest";
 import { ALICE, newDemoGame } from "./demo";
-import { describeAbility, describeCardText, describeEffect, describeEffects, describeEventPredicate, describeManaCost, describeModification, describePool, findProblems } from "./describe";
+import { describeAbility, describeCardText, describeEffect, describeEffects, describeEvent, describeEventPredicate, describeManaCost, describeModification, describePool, findProblems } from "./describe";
 
 describe("text describers", () => {
     test("mana costs", () => {
@@ -173,6 +173,27 @@ describe("text describers", () => {
                 of: { kind: "spellCast", by: { kind: "you" } },
             }),
         ).toBe("Whenever an event does not match: you cast a spell");
+    });
+
+    test("describes continuous effect creation and expiration events", () => {
+        const state = newDemoGame();
+        expect(
+            describeEvent(state, {
+                type: "continuousEffectCreated",
+                modType: "locked",
+                sourceName: "Giant Growth",
+                duration: "untilEndOfTurn",
+                description: "Target creature gets +3/+3.",
+            }),
+        ).toBe("Continuous effect from Giant Growth created (locked; until end of turn): Target creature gets +3/+3.");
+        expect(
+            describeEvent(state, {
+                type: "continuousEffectExpired",
+                sourceName: undefined,
+                duration: "whileSourceOnBattlefield",
+                description: undefined,
+            }),
+        ).toBe("Continuous effect expired (while its source remains on the battlefield)");
     });
 
     test("target descriptions use custom text or fall back to the filter kind", () => {

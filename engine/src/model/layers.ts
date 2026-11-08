@@ -5,8 +5,7 @@ import type { Characteristics } from "./cardDefinition";
 import { LAYER_OF, LAYER_ORDER, type Layer, type Modification, type ObjectMatch } from "./continuous";
 import type { Brand, EffectId, ObjectId, PlayerId, Timestamp } from "./ids";
 import { evalObjectPredicate } from "./objectPredicates";
-import type { EvalScope, GameState, ObjectSnapshot } from "./state";
-import type { Zone } from "./vocabulary";
+import { getAllObjectsInZone, type EvalScope, type GameState, type ObjectSnapshot } from "./state";
 
 type EffectKey = Brand<string, "EffectKey">;
 const storedKey = (id: EffectId) => `s:${id}` as EffectKey;
@@ -37,6 +36,25 @@ export function getCachedCharacteristics(state: GameState) {
         byEffects.set(state.continuousEffects, result);
     }
     return result;
+}
+
+export function getMatchingObjects(state: GameState, currentChars: Map<ObjectId, Characteristics>, scope: EvalScope, match: ObjectMatch): ReadonlySet<ObjectId> {
+    const zonesToCheck = match.zones ?? ["battlefield"];
+    const filter = match.filter;
+    return new Set(
+        zonesToCheck.flatMap((zone) =>
+            getAllObjectsInZone(state, zone).filter((objId) => {
+                const chars = currentChars.get(objId);
+                const obj = state.objects[objId];
+                if (!obj || !chars) return false;
+                const snapshot: ObjectSnapshot = {
+                    ...obj,
+                    chars,
+                };
+                return isTrue(evalObjectPredicate(scope, snapshot, filter));
+            }),
+        ),
+    );
 }
 
 function computeCharacteristics(state: GameState): Map<ObjectId, Characteristics> {
@@ -118,44 +136,16 @@ function getAffectedObjects(state: GameState, currentChars: Map<ObjectId, Charac
         case "objects":
             return new Set(effect.affects.ids);
         case "matching":
-            const zonesToCheck = effect.affects.zones ?? ["battlefield"];
-            const filter = effect.affects.filter;
-            return new Set(
-                zonesToCheck.flatMap((zone) =>
-                    getAllObjectsInZone(state, zone).filter((objId) => {
-                        const chars = currentChars.get(objId);
-                        const obj = state.objects[objId];
-                        if (!obj || !chars) return false;
-                        const scope: EvalScope = {
-                            controller: effect.controller,
-                            source: effect.source,
-                            bindings: {},
-                        };
-                        const snapshot: ObjectSnapshot = {
-                            ...obj,
-                            chars,
-                        };
-                        return isTrue(evalObjectPredicate(scope, snapshot, filter));
-                    }),
-                ),
+            return getMatchingObjects(
+                state,
+                currentChars,
+                {
+                    controller: effect.controller,
+                    source: effect.source,
+                    bindings: {},
+                },
+                effect.affects,
             );
-    }
-}
-
-function getAllObjectsInZone(state: GameState, zone: Zone): readonly ObjectId[] {
-    switch (zone) {
-        case "battlefield":
-            return state.battlefield;
-        case "graveyard":
-            return Object.values(state.players).flatMap((p) => p.graveyard);
-        case "hand":
-            return Object.values(state.players).flatMap((p) => p.hand);
-        case "exile":
-            return state.exile;
-        case "library":
-            return Object.values(state.players).flatMap((p) => p.library);
-        case "stack":
-            return state.stack.flatMap((entry) => (entry.kind === "spell" ? entry.source : []));
     }
 }
 

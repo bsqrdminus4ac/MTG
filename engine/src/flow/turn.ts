@@ -7,6 +7,7 @@ import { emptyPool } from "../model/mana";
 import { type GameState, nextPlayer } from "../model/state";
 import { STEPS, type Step } from "../model/vocabulary";
 import { drawCardResult, moveObject } from "../model/zones";
+import { expireEffects } from "../rules/continuousEffects";
 import { openDecision } from "../rules/pending";
 import { beginCombat, beginDeclareBlockers, processCombatDamage } from "./combat";
 import { givePriorityToActivePlayer } from "./priority";
@@ -79,39 +80,38 @@ export function advanceStep(state: GameState, events: readonly GameEvent[]): App
 
 const stepGrantsPriority = (step: Step): boolean => step !== "untap" && step !== "cleanup";
 
-
 function handExcess(state: GameState): number {
-  return (state.players[state.turn.activePlayer]?.hand.length ?? 0) - MAX_HAND_SIZE;
+    return (state.players[state.turn.activePlayer]?.hand.length ?? 0) - MAX_HAND_SIZE;
 }
 
 function askDiscard(state: GameState, count: number): GameState {
-  const player = state.turn.activePlayer;
-  const hand = state.players[player]?.hand ?? [];
-  const options = hand.map((id) => objectChoice(id, getCharacteristics(state, id)?.name ?? "Unknown card"));
-  return openDecision({ ...state, priority: null }, (id) =>
-    chooseMany({
-      id,
-      player,
-      prompt: `Discard ${count} card${count === 1 ? "" : "s"} to get down to ${MAX_HAND_SIZE}`,
-      options,
-      min: count,
-      max: count,
-      then: { kind: "discardToHandSize" },
-    }),
-  );
+    const player = state.turn.activePlayer;
+    const hand = state.players[player]?.hand ?? [];
+    const options = hand.map((id) => objectChoice(id, getCharacteristics(state, id)?.name ?? "Unknown card"));
+    return openDecision({ ...state, priority: null }, (id) =>
+        chooseMany({
+            id,
+            player,
+            prompt: `Discard ${count} card${count === 1 ? "" : "s"} to get down to ${MAX_HAND_SIZE}`,
+            options,
+            min: count,
+            max: count,
+            then: { kind: "discardToHandSize" },
+        }),
+    );
 }
 
 export function finishDiscard(state: GameState, chosen: readonly Choice[]): ApplyResult {
-  let next: GameState = { ...state, pending: null };
-  const out: GameEvent[] = [];
-  for (const choice of chosen) {
-    if (choice.value.kind !== "object") return fail("Unexpected choice");
-    const moved = moveObject(next, choice.value.id, "graveyard");
-    if (!moved) return fail("That card is gone");
-    next = moved.state;
-    out.push(...moved.events);
-  }
-  return advanceStep(next, out); // we paused in cleanup, so this moves on to the next turn
+    let next: GameState = { ...state, pending: null };
+    const out: GameEvent[] = [];
+    for (const choice of chosen) {
+        if (choice.value.kind !== "object") return fail("Unexpected choice");
+        const moved = moveObject(next, choice.value.id, "graveyard");
+        if (!moved) return fail("That card is gone");
+        next = moved.state;
+        out.push(...moved.events);
+    }
+    return advanceStep(next, out); // we paused in cleanup, so this moves on to the next turn
 }
 
 export function onEnterStep(state: GameState, step: Step, newTurn: boolean): ApplyResult {
@@ -153,13 +153,15 @@ export function onEnterStep(state: GameState, step: Step, newTurn: boolean): App
                 const o = objects[id];
                 if (o) objects = withEntry(objects, id, { ...o, damage: 0 });
             }
+            const result = expireEffects(next, "untilEndOfTurn");
+            if (!result.ok) return result;
+
             return ok(
                 {
-                    ...next,
+                    ...result.state,
                     objects,
-                    continuousEffects: next.continuousEffects.filter((e) => e.duration !== "untilEndOfTurn"),
                 },
-                out,
+                result.events,
             );
         }
         default:

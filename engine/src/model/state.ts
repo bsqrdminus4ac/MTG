@@ -38,7 +38,6 @@ export interface PlayerState {
     readonly hasLostTheGame?: boolean;
 }
 
-
 export type Binding = readonly ChoiceValue[] | boolean | number;
 export type Bindings = Readonly<Record<string, Binding>>;
 export interface EvalScope {
@@ -188,7 +187,6 @@ export interface PlacingTriggersInProgress {
     };
 }
 
-
 export interface GameState {
     readonly definitions: Readonly<Record<CardDefId, CardDefinition>>;
     readonly objects: Readonly<Record<ObjectId, GameObject>>;
@@ -217,4 +215,21 @@ export interface GameState {
 
     readonly pendingTriggers: Readonly<Partial<Record<PlayerId, PendingTrigger[]>>>;
     readonly placingTriggers: PlacingTriggersInProgress | null;
+}
+
+export function getAllObjectsInZone(state: GameState, zone: Zone): readonly ObjectId[] {
+    switch (zone) {
+        case "battlefield":
+            return state.battlefield;
+        case "graveyard":
+            return Object.values(state.players).flatMap((p) => p.graveyard);
+        case "hand":
+            return Object.values(state.players).flatMap((p) => p.hand);
+        case "exile":
+            return state.exile;
+        case "library":
+            return Object.values(state.players).flatMap((p) => p.library);
+        case "stack":
+            return state.stack.flatMap((entry) => (entry.kind === "spell" ? entry.source : []));
+    }
 }

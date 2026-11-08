@@ -1,17 +1,18 @@
 import { describe, expect, test } from "vitest";
 import { submitAnswer } from "../../src/engine";
 import { executeEffect, resolvePlayers, type EffectContext, type StepResult } from "../../src/flow/effects";
-import { handleResolutionDecision, runResolution } from "../../src/flow/resolution";
+import { beginResolution, handleResolutionDecision, runResolution } from "../../src/flow/resolution";
 import type { AbilityOfKind } from "../../src/model/abilities";
 import type { CardDefinition } from "../../src/model/cardDefinition";
-import { snapshotObject } from "../../src/model/characteristics";
+import { getCharacteristics, snapshotObject } from "../../src/model/characteristics";
 import { mayDo, type Amount, type Effect } from "../../src/model/effects";
-import { cardDefId, playerId, type CardDefId, type ObjectId, type StackId } from "../../src/model/ids";
+import { cardDefId, nextID, playerId, type CardDefId, type ObjectId, type StackId } from "../../src/model/ids";
 import type { GameState, Target } from "../../src/model/state";
 import { moveObject } from "../../src/model/zones";
 import { resolveAmount } from "../../src/rules/conditions";
 import { damageObject, damagePlayer } from "../../src/rules/primitives";
 import { createGame } from "../../src/setup";
+import { onEnterStep } from "../../src/flow/turn";
 
 const alice = playerId("alice");
 const bob = playerId("bob");
@@ -174,6 +175,289 @@ function complete(result: StepResult) {
     if (result.waiting) throw new Error("Expected the effect to complete");
     return result;
 }
+
+const creatureTarget = {
+    filter: {
+        kind: "object" as const,
+        filter: {
+            kind: "all" as const,
+            of: [
+                { kind: "inZone" as const, zone: "battlefield" as const },
+                { kind: "hasType" as const, type: "Creature" as const },
+            ],
+        },
+    },
+    minCount: 1,
+    maxCount: 1,
+};
+
+function targetedContinuousSpell(
+    id: string,
+    name: string,
+    modifications: Extract<Effect, { kind: "applyContinuousEffect" }>["template"]["modifications"],
+): CardDefinition {
+    const ability: AbilityOfKind<"spell"> = {
+        kind: "spell",
+        targets: [creatureTarget],
+        effects: [
+            {
+                kind: "applyContinuousEffect",
+                template: {
+                    affects: { kind: "target", spec: 0 },
+                    modifications,
+                    duration: "untilEndOfTurn",
+                },
+            },
+        ],
+    };
+    return {
+        id: cardDefId(id),
+        name,
+        manaCost: { generic: 0, pips: [] },
+        colors: [],
+        supertypes: [],
+        types: ["Instant"],
+        subtypes: [],
+        power: null,
+        toughness: null,
+        abilities: [ability],
+    };
+}
+
+function untargetedContinuousSpell(
+    id: string,
+    name: string,
+    modifications: Extract<Effect, { kind: "applyContinuousEffect" }>["template"]["modifications"],
+): CardDefinition {
+    const ability: AbilityOfKind<"spell"> = {
+        kind: "spell",
+        targets: [],
+        effects: [
+            {
+                kind: "applyContinuousEffect",
+                template: {
+                    affects: {
+                        kind: "matching",
+                        filter: {
+                            kind: "all",
+                            of: [
+                                { kind: "inZone", zone: "battlefield" },
+                                { kind: "hasType", type: "Creature" },
+                                { kind: "controlledBy", who: "you" },
+                            ],
+                        },
+                    },
+                    modifications,
+                    duration: "untilEndOfTurn",
+                },
+            },
+        ],
+    };
+    return {
+        id: cardDefId(id),
+        name,
+        manaCost: { generic: 0, pips: [] },
+        colors: [],
+        supertypes: [],
+        types: ["Instant"],
+        subtypes: [],
+        power: null,
+        toughness: null,
+        abilities: [ability],
+    };
+}
+
+function moveDefinitionToBattlefield(state: GameState, definitionId: CardDefId) {
+    const card = state.players[alice]?.library.find((id) => state.objects[id]?.definitionId === definitionId);
+    if (card === undefined) throw new Error(`Expected ${definitionId} in Alice's library`);
+    const moved = moveObject(state, card, "battlefield");
+    if (!moved) throw new Error("Expected the card to move to the battlefield");
+    return moved;
+}
+
+function moveSpellToStack(state: GameState, definition: CardDefinition, targets: readonly (readonly Target[])[]): GameState {
+    const card = state.players[alice]?.library.find((id) => state.objects[id]?.definitionId === definition.id);
+    if (card === undefined) throw new Error(`Expected ${definition.id} in Alice's library`);
+    const moved = moveObject(state, card, "stack");
+    if (!moved) throw new Error("Expected the spell to move to the stack");
+    const [nextState, id] = nextID<StackId>(moved.state);
+    const ability = definition.abilities[0];
+    if (ability?.kind !== "spell") throw new Error("Expected a spell ability");
+    return {
+        ...nextState,
+        stack: [...nextState.stack, { kind: "spell", id, controller: alice, source: moved.newId, targets, ability, bindings: {} }],
+        priority: null,
+    };
+}
+
+function resolveSpell(state: GameState, definition: CardDefinition, targets: readonly (readonly Target[])[] = []) {
+    const result = beginResolution(moveSpellToStack(state, definition, targets));
+    if (!result.ok) throw new Error(result.error);
+    return result;
+}
+
+function cleanup(state: GameState): GameState {
+    const result = onEnterStep(state, "cleanup", false);
+    if (!result.ok) throw new Error(result.error);
+    return result.state;
+}
+
+describe("resolved continuous effects", () => {
+    test("a +3/+3 instant lasts through the turn and expires with marked damage at cleanup", () => {
+        const growth = targetedContinuousSpell("growth", "Growth", [{ kind: "modifyPT", power: 3, toughness: 3 }]);
+        const state = newGame([bear, growth], [bear.id, growth.id]);
+        const creature = moveDefinitionToBattlefield(state, bear.id);
+        const target = creature.newId;
+        const damaged = damageObject(creature.state, target, snapshotObject(creature.state, target)!, 1, false);
+        expect(damaged.ok).toBe(true);
+        if (!damaged.ok) return;
+
+        const result = resolveSpell(damaged.state, growth, [[{ kind: "object", id: target }]]);
+
+        expect(result.ok).toBe(true);
+        if (!result.ok) return;
+        expect(getCharacteristics(result.state, target)).toMatchObject({ power: 5, toughness: 5 });
+        expect(result.state.objects[target]?.damage).toBe(1);
+        expect(result.state.continuousEffects).toHaveLength(1);
+
+        const afterCleanup = cleanup(result.state);
+        expect(afterCleanup.objects[target]?.damage).toBe(0);
+        expect(afterCleanup.continuousEffects).toHaveLength(0);
+        expect(getCharacteristics(afterCleanup, target)).toMatchObject({ power: 2, toughness: 2 });
+    });
+
+    test("a creature survives damage while its temporary toughness bonus is active and survives cleanup", () => {
+        const toughness = targetedContinuousSpell("toughness", "Toughness", [{ kind: "modifyPT", power: 0, toughness: 1 }]);
+        const state = newGame([bear, toughness], [bear.id, toughness.id]);
+        const creature = moveDefinitionToBattlefield(state, bear.id);
+        const target = creature.newId;
+        const damaged = damageObject(creature.state, target, snapshotObject(creature.state, target)!, 2, false);
+        expect(damaged.ok).toBe(true);
+        if (!damaged.ok) return;
+
+        const result = resolveSpell(damaged.state, toughness, [[{ kind: "object", id: target }]]);
+
+        expect(result.ok).toBe(true);
+        if (!result.ok) return;
+        expect(result.state.battlefield).toContain(target);
+        expect(getCharacteristics(result.state, target)).toMatchObject({ power: 2, toughness: 3 });
+        expect(result.state.objects[target]?.damage).toBe(2);
+
+        const afterCleanup = cleanup(result.state);
+        expect(afterCleanup.battlefield).toContain(target);
+        expect(afterCleanup.objects[target]?.damage).toBe(0);
+        expect(afterCleanup.continuousEffects).toHaveLength(0);
+        expect(getCharacteristics(afterCleanup, target)).toMatchObject({ power: 2, toughness: 2 });
+    });
+
+    test("a targeted instant creates no effect when its target leaves before resolution", () => {
+        const growth = targetedContinuousSpell("growth", "Growth", [{ kind: "modifyPT", power: 3, toughness: 3 }]);
+        const state = newGame([bear, growth], [bear.id, growth.id]);
+        const creature = moveDefinitionToBattlefield(state, bear.id);
+        const target = creature.newId;
+        const spell = moveSpellToStack(creature.state, growth, [[{ kind: "object", id: target }]]);
+        const left = moveObject(spell, target, "graveyard");
+        if (!left) throw new Error("Expected the target to leave the battlefield");
+
+        const result = beginResolution(left.state);
+
+        expect(result.ok).toBe(true);
+        if (!result.ok) return;
+        expect(result.events).toContainEqual(expect.objectContaining({ type: "stackEntryFizzles", reason: "lackOfTargets" }));
+        expect(result.state.continuousEffects).toHaveLength(0);
+    });
+
+    test("a matching continuous effect does not affect creatures that enter afterward", () => {
+        const anthem = untargetedContinuousSpell("anthem", "Anthem", [{ kind: "modifyPT", power: 1, toughness: 1 }]);
+        const state = newGame([bear, anthem], [bear.id, anthem.id, bear.id]);
+        const first = moveDefinitionToBattlefield(state, bear.id);
+
+        const result = resolveSpell(first.state, anthem);
+
+        expect(result.ok).toBe(true);
+        if (!result.ok) return;
+        expect(getCharacteristics(result.state, first.newId)).toMatchObject({ power: 3, toughness: 3 });
+        const later = moveDefinitionToBattlefield(result.state, bear.id);
+        expect(getCharacteristics(later.state, later.newId)).toMatchObject({ power: 2, toughness: 2 });
+    });
+
+    test("a creature that leaves and returns does not keep its old continuous effect", () => {
+        const growth = targetedContinuousSpell("growth", "Growth", [{ kind: "modifyPT", power: 1, toughness: 1 }]);
+        const state = newGame([bear, growth], [bear.id, bear.id, growth.id, growth.id]);
+        const creature = moveDefinitionToBattlefield(state, bear.id);
+        const otherCreature = moveDefinitionToBattlefield(creature.state, bear.id);
+        const result = resolveSpell(otherCreature.state, growth, [[{ kind: "object", id: creature.newId }]]);
+        expect(result.ok).toBe(true);
+        if (!result.ok) return;
+        const otherResult = resolveSpell(result.state, growth, [[{ kind: "object", id: otherCreature.newId }]]);
+        expect(otherResult.ok).toBe(true);
+        if (!otherResult.ok) return;
+
+        const left = moveObject(otherResult.state, creature.newId, "graveyard");
+        if (!left) throw new Error("Expected the creature to leave the battlefield");
+        expect(left.state.continuousEffects).toHaveLength(1);
+        expect(getCharacteristics(left.state, otherCreature.newId)).toMatchObject({ power: 3, toughness: 3 });
+        const returned = moveObject(left.state, left.newId, "battlefield");
+        if (!returned) throw new Error("Expected the creature to return to the battlefield");
+        expect(returned.newId).not.toBe(creature.newId);
+        expect(getCharacteristics(returned.state, returned.newId)).toMatchObject({ power: 2, toughness: 2 });
+        expect(getCharacteristics(returned.state, otherCreature.newId)).toMatchObject({ power: 3, toughness: 3 });
+    });
+
+    test("a later resolved set-PT effect is ordered after an existing anthem", () => {
+        const anthem: CardDefinition = {
+            id: cardDefId("set-anthem"),
+            name: "Set Anthem",
+            manaCost: { generic: 0, pips: [] },
+            colors: [],
+            supertypes: [],
+            types: ["Enchantment"],
+            subtypes: [],
+            power: null,
+            toughness: null,
+            abilities: [
+                {
+                    kind: "static",
+                    activeZones: ["battlefield"],
+                    effect: {
+                        affects: { kind: "matching", filter: { kind: "hasType", type: "Creature" } },
+                        modifications: [{ kind: "setPT", power: 4, toughness: 4 }],
+                    },
+                },
+            ],
+        };
+        const setFive = targetedContinuousSpell("set-five", "Set Five", [{ kind: "setPT", power: 5, toughness: 5 }]);
+        const state = newGame([bear, anthem, setFive], [bear.id, anthem.id, setFive.id]);
+        const creature = moveDefinitionToBattlefield(state, bear.id);
+        const anthemOnBattlefield = moveDefinitionToBattlefield(creature.state, anthem.id);
+
+        const result = resolveSpell(anthemOnBattlefield.state, setFive, [[{ kind: "object", id: creature.newId }]]);
+
+        expect(result.ok).toBe(true);
+        if (!result.ok) return;
+        expect(result.state.continuousEffects[0]?.timestamp).toBeGreaterThan(anthemOnBattlefield.state.objects[anthemOnBattlefield.newId]!.timestamp);
+        expect(getCharacteristics(result.state, creature.newId)).toMatchObject({ power: 5, toughness: 5 });
+    });
+
+    test("two resolved instants apply in resolution order", () => {
+        const setThree = targetedContinuousSpell("set-three", "Set Three", [{ kind: "setPT", power: 3, toughness: 3 }]);
+        const addTwo = targetedContinuousSpell("add-two", "Add Two", [{ kind: "modifyPT", power: 2, toughness: 2 }]);
+        const state = newGame([bear, setThree, addTwo], [bear.id, setThree.id, addTwo.id]);
+        const creature = moveDefinitionToBattlefield(state, bear.id);
+        const targets: readonly (readonly Target[])[] = [[{ kind: "object", id: creature.newId }]];
+
+        const first = resolveSpell(creature.state, setThree, targets);
+        expect(first.ok).toBe(true);
+        if (!first.ok) return;
+        const second = resolveSpell(first.state, addTwo, targets);
+
+        expect(second.ok).toBe(true);
+        if (!second.ok) return;
+        expect(second.state.continuousEffects).toHaveLength(2);
+        expect(second.state.continuousEffects[1]?.timestamp).toBeGreaterThan(second.state.continuousEffects[0]!.timestamp);
+        expect(getCharacteristics(second.state, creature.newId)).toMatchObject({ power: 5, toughness: 5 });
+    });
+});
 
 describe("control-flow effects", () => {
     test("resolves nested if and forEach effects before continuing", () => {

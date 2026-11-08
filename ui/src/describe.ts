@@ -12,6 +12,7 @@ import {
     type ContinuousEffect,
     type Cost,
     type Decision,
+    type Duration,
     type Effect,
     type EffectTarget,
     type EventLeaf,
@@ -117,6 +118,19 @@ function describeAppliedEffect(effect: AppliedEffect): string {
     ? describeObjectPredicate(effect.affects.filter)
     : describeEffectTarget(effect.affects);
   return `${who}: ${describeModifications(effect.modifications)} (${effect.duration})`;
+}
+
+function describeDuration(duration: Duration): string {
+  switch (duration) {
+    case "untilEndOfTurn":
+      return "until end of turn";
+    case "whileSourceOnBattlefield":
+      return "while its source remains on the battlefield";
+    case "permanent":
+      return "permanently";
+    default:
+      return unreachable(duration);
+  }
 }
 
 export function describeContinuousEffect(state: GameState, e: ContinuousEffect): string {
@@ -669,6 +683,10 @@ export function describeEvent(state: GameState, e: GameEvent): string {
           return `${e.cardName} (#${e.object}) is sacrificed${e.sourceName ? ` by ${e.sourceName}` : ""}`;
       case "cardDiscarded":
           return e.cause ? `${e.cause} causes ${e.player} to discard ${e.cardName} (#${e.card})` : `${e.player} discards ${e.cardName} (#${e.card})`;
+      case "continuousEffectCreated":
+          return `Continuous effect${e.sourceName ? ` from ${e.sourceName}` : ""} created (${e.modType}; ${describeDuration(e.duration)})${e.description ? `: ${e.description}` : ""}`;
+      case "continuousEffectExpired":
+          return `Continuous effect${e.sourceName ? ` from ${e.sourceName}` : ""} expired (${describeDuration(e.duration)})${e.description ? `: ${e.description}` : ""}`;
 
       // Spells & Abilities
       case "spellCast":

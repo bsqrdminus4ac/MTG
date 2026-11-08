@@ -1,8 +1,9 @@
 import { type ApplyResult, ok } from "../core/result";
 import { assertNever, withEntry, without } from "../core/util";
 import { getCardName, snapshotObject } from "./characteristics";
+import type { ContinuousEffect } from "./continuous";
 import type { GameEvent } from "./events";
-import { type ObjectId, type PlayerId, type Timestamp } from "./ids";
+import { nextID, type ObjectId, type PlayerId, type Timestamp } from "./ids";
 import type { GameObject, GameState, ObjectSnapshot } from "./state";
 import type { Zone } from "./vocabulary";
 
@@ -46,28 +47,33 @@ export function moveObject(state: GameState, id: ObjectId, to: Zone, snapshot?: 
     const obj = state.objects[id];
     if (!obj) return null;
     const before = obj.zone === "battlefield" || obj.zone === "graveyard" ? snapshot || snapshotObject(state, id) : undefined;
-    const n = state.nextId;
-    const newId = n as ObjectId;
+    const [objectState, newId] = nextID<ObjectId>(state);
+    const [timeState, timestamp] = nextID<Timestamp>(objectState);
+    let next = timeState;
     const moved: GameObject = {
         ...obj,
         id: newId,
         zone: to,
         controller: obj.owner,
-        timestamp: n as Timestamp,
+        timestamp,
         tapped: false,
         damage: 0,
         counters: {},
-        turnEnteredZone: state.turn.number,
+        turnEnteredZone: next.turn.number,
     };
+    const events: GameEvent[] = [];
 
-    let next = updateZone(state, obj.owner, obj.zone, (list) => list.filter((x) => x !== id));
+    next = updateZone(next, obj.owner, obj.zone, (list) => list.filter((x) => x !== id));
     next = updateZone(next, obj.owner, to, (list) => [...list, newId]);
+    
+    const effectResult = handleContinuousEffectsOnMove(next, id, obj.zone);
+    if (!effectResult.ok) return null;
+    next = effectResult.state;
+    events.push(...effectResult.events);
+
     next = {
         ...next,
-        nextId: n + 1,
         objects: withEntry(without(next.objects, id), newId, moved),
-        // Effects tied to the old object stop applying once it leaves.
-        continuousEffects: next.continuousEffects.filter((e) => !(e.source === id && e.duration === "whileSourceOnBattlefield") && !(e.affects.kind === "objects" && e.affects.ids.includes(id))),
     };
     const after = to === "battlefield" ? snapshotObject(next, newId) : undefined;
 
@@ -85,8 +91,37 @@ export function moveObject(state: GameState, id: ObjectId, to: Zone, snapshot?: 
                 ...(before !== undefined && { before }),
                 ...(after !== undefined && { after }),
             },
+            ...events,
         ],
     };
+}
+
+function handleContinuousEffectsOnMove(state: GameState, oldId: ObjectId, from: Zone): ApplyResult {
+    if (from === "battlefield") {
+        const expired: ContinuousEffect[] = [];
+        const remaining: ContinuousEffect[] = [];
+        for (const effect of state.continuousEffects) {
+            if (effect.source === oldId && effect.duration === "whileSourceOnBattlefield") {
+                expired.push(effect);
+                continue;
+            }
+            if (effect.affects.kind === "objects" && effect.affects.ids.includes(oldId)) {
+                const updatedAffects = effect.affects.ids.filter((id) => id !== oldId);
+                if (updatedAffects.length === 0) {
+                    expired.push(effect);
+                } else {
+                    remaining.push({ ...effect, affects: { ...effect.affects, ids: updatedAffects } });
+                }
+            } else {
+                remaining.push(effect);
+            }
+        }
+        return ok(
+            { ...state, continuousEffects: remaining },
+            expired.map((e) => ({ type: "continuousEffectExpired", sourceName: e.sourceName, description: e.description, duration: e.duration })),
+        );
+    }
+    return ok(state, []);
 }
 
 export function drawCardResult(state: GameState, player: PlayerId): ApplyResult {
