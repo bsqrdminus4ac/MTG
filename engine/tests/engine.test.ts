@@ -3,7 +3,7 @@ import { applySequentially, fail, ok } from "../src/core/result";
 import { applyAction, submitAnswer } from "../src/engine";
 import type { AbilityOfKind } from "../src/model/abilities";
 import type { CardDefinition } from "../src/model/cardDefinition";
-import { getCharacteristics, snapshotSource } from "../src/model/characteristics";
+import { getCharacteristics, snapshotObject } from "../src/model/characteristics";
 import { anyTarget, permanentOfType, type TargetFilter } from "../src/model/effects";
 import { cardDefId, playerId, type StackId } from "../src/model/ids";
 import type { GameState, StackEntry, Target } from "../src/model/state";
@@ -209,7 +209,7 @@ describe("spell targeting", () => {
                 effects: [],
                 triggerableZones: ["battlefield"],
             },
-            sourceSnapshot: snapshotSource(spell.state, spell.newId)!,
+            sourceSnapshot: snapshotObject(spell.state, spell.newId)!,
             bindings: {},
         };
         return {

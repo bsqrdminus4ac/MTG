@@ -1,6 +1,6 @@
 import { goodResult, type Result } from "../core/result";
 import { assertNever } from "../core/util";
-import { getCharacteristics, hasKeyword, snapshotSource } from "../model/characteristics";
+import { getCharacteristics, hasKeyword, snapshotObject } from "../model/characteristics";
 import { objectChoice, playerChoice, type Choice } from "../model/decisions";
 import type { TargetFilter, TargetSpec } from "../model/effects";
 import { evalObjectPredicate } from "../model/objectPredicates";
@@ -42,7 +42,7 @@ function matchesFilter(state: GameState, scope: EvalScope, target: Target, filte
             return evalStackPredicate(state, scope, entry, filter.filter);
         case "object":
             if (target.kind !== "object") return goodResult(false);
-            const lki = snapshotSource(state, target.id);
+            const lki = snapshotObject(state, target.id);
             if (!lki) return goodResult(false);
             return evalObjectPredicate(scope, lki, filter.filter);
         default:
@@ -98,7 +98,7 @@ function collectTargets(state: GameState, scope: EvalScope, filter: TargetFilter
         case "object": {
             const targets: Target[] = [];
             for (const obj of Object.values(state.objects)) {
-                const lki = snapshotSource(state, obj.id);
+                const lki = snapshotObject(state, obj.id);
                 if (!lki) continue;
                 const matches = evalObjectPredicate(scope, lki, filter.filter);
                 if (!matches.ok) return matches;

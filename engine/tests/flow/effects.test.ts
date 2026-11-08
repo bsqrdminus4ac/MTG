@@ -4,7 +4,7 @@ import { executeEffect, resolvePlayers, type EffectContext, type StepResult } fr
 import { handleResolutionDecision, runResolution } from "../../src/flow/resolution";
 import type { AbilityOfKind } from "../../src/model/abilities";
 import type { CardDefinition } from "../../src/model/cardDefinition";
-import { snapshotSource } from "../../src/model/characteristics";
+import { snapshotObject } from "../../src/model/characteristics";
 import { mayDo, type Amount, type Effect } from "../../src/model/effects";
 import { cardDefId, playerId, type CardDefId, type ObjectId, type StackId } from "../../src/model/ids";
 import type { GameState, Target } from "../../src/model/state";
@@ -76,14 +76,14 @@ const testAbility: AbilityOfKind<"triggered"> = {
 };
 
 function sourceSnapshot(state: GameState, source: ObjectId) {
-    const snapshot = snapshotSource(state, source);
+    const snapshot = snapshotObject(state, source);
     if (!snapshot) throw new Error("Expected the ability source to exist");
     return snapshot;
 }
 
 function resolvingState(state: GameState, effects: Effect[], targets: readonly (readonly Target[])[] = []): GameState {
     const source = state.players[alice]!.library.at(-1)!;
-    const sourceSnapshot = snapshotSource(state, source)!;
+    const sourceSnapshot = snapshotObject(state, source)!;
     return {
         ...state,
         priority: null,

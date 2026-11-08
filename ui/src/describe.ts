@@ -4,8 +4,8 @@ import {
     type Ability,
     type Action,
     type Amount,
-    type AppliedEffect,
     type Answer,
+    type AppliedEffect,
     type ChoiceValue,
     type Comparison,
     type Condition,
@@ -25,8 +25,8 @@ import {
     type ObjectId,
     type ObjectPredicate,
     type PlayerPredicate,
-    type StaticEffect,
     type StackId,
+    type StaticEffect,
     type Target,
     type TargetFilter,
     type TargetSpec,
@@ -527,8 +527,6 @@ export function describeAbility(a: Ability | undefined): string {
             return `Triggered${describeTargetSpecs(a.targets)}: ${describeEventPredicate(a.trigger.when)}${a.trigger.interveningIf ? ` if ${describeCondition(a.trigger.interveningIf, {})}` : ""} → ${describeEffects(a.effects)}`;
         case "static":
             return `Static: ${describeStaticEffect(a.effect)}`;
-        case "applied":
-            return `Applied: ${describeAppliedEffect(a.effect)}`;
         default:
             return unreachable(a);
     }

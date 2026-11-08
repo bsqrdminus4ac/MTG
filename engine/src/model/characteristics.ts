@@ -1,65 +1,19 @@
-import { assertNever } from "../core/util";
-import type { Ability } from "./abilities";
 import type { Characteristics } from "./cardDefinition";
-import { type Modification, LAYER_OF, LAYER_ORDER } from "./continuous";
 import type { ObjectId } from "./ids";
+import { getCachedCharacteristics } from "./layers";
 import type { GameState, ObjectSnapshot } from "./state";
 import type { CardType, Keyword } from "./vocabulary";
 
 export const isPermanentType = (t: CardType): boolean => t !== "Instant" && t !== "Sorcery";
 
-function applyModification(c: Characteristics, m: Modification): Characteristics {
-    switch (m.kind) {
-        case "modifyPT":
-            return c.power === null || c.toughness === null ? c : { ...c, power: c.power + m.power, toughness: c.toughness + m.toughness };
-        case "setPT":
-            return { ...c, power: m.power, toughness: m.toughness };
-        case "addKeywords":
-            return { ...c, abilities: [...c.abilities, ...m.keywords.map<Ability>((keyword) => ({ kind: "keyword", keyword }))] };
-        case "addTypes":
-            return { ...c, types: [...new Set([...c.types, ...m.types])] };
-        case "setColors":
-            return { ...c, colors: m.colors };
-        case "addColors":
-        case "addSubtypes":
-        case "removeKeywords":
-        case "setTypes":
-        case "switchPT":
-            return c;
-        default:
-            return assertNever(m);
-    }
-}
-
 /**
  * The object's current characteristics: its card's printed values with every applicable
  * continuous effect applied in layer order, then timestamp order.
  *
- * Simplifications to revisit: no dependency ordering inside a layer (CR 613.8), and
- * "allCreatures" is checked against the in-progress characteristics.
+ * Simplifications to revisit: no dependency ordering inside a layer (CR 613.8)
  */
 export function getCharacteristics(state: GameState, id: ObjectId): Characteristics | null {
-    const obj = state.objects[id];
-    if (!obj) return null;
-    const def = state.definitions[obj.definitionId];
-    if (!def) return null;
-
-    const { id: _definitionId, ...printed } = def;
-    let current: Characteristics = printed;
-
-    const ordered = state.continuousEffects
-        .flatMap((effect) => effect.modifications.map((modification) => ({ effect, modification })))
-        .sort((a, b) =>
-            LAYER_ORDER.indexOf(LAYER_OF[a.modification.kind]) -
-                LAYER_ORDER.indexOf(LAYER_OF[b.modification.kind]) ||
-            a.effect.timestamp - b.effect.timestamp,
-        );
-
-    for (const effect of ordered) {
-        const applies = effect.effect.affects.kind === "objects" ? effect.effect.affects.ids.includes(id) : obj.zone === "battlefield" && current.types.includes("Creature");
-        if (applies) current = applyModification(current, effect.modification);
-    }
-    return current;
+    return getCachedCharacteristics(state).get(id) ?? null;
 }
 
 export function getCardName(state: GameState, id: ObjectId, withId?: boolean): string {
@@ -80,7 +34,7 @@ export function hasCardType(state: GameState, obj: ObjectId, type: CardType): bo
     return chars.types.includes(type);
 }
 
-export function snapshotSource(state: GameState, id: ObjectId): ObjectSnapshot | undefined {
+export function snapshotObject(state: GameState, id: ObjectId): ObjectSnapshot | undefined {
     const obj = state.objects[id];
     const chars = getCharacteristics(state, id);
     if (!obj || !chars) return undefined;

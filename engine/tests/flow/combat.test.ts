@@ -1,23 +1,18 @@
 import { describe, expect, test } from "vitest";
 import { submitAnswer } from "../../src/engine";
+import { processCombatDamage, startCombatDamage } from "../../src/flow/combat";
 import type { CardDefinition } from "../../src/model/cardDefinition";
-import { snapshotSource } from "../../src/model/characteristics";
+import { snapshotObject } from "../../src/model/characteristics";
 import type { GameEvent } from "../../src/model/events";
 import { cardDefId, playerId, type ObjectId } from "../../src/model/ids";
 import type { GameState } from "../../src/model/state";
 import { moveObject } from "../../src/model/zones";
 import { createGame } from "../../src/setup";
-import { processCombatDamage, startCombatDamage } from "../../src/flow/combat";
 
 const alice = playerId("alice");
 const bob = playerId("bob");
 
-const creature = (
-    id: string,
-    power: number,
-    toughness: number,
-    abilities: CardDefinition["abilities"] = [],
-): CardDefinition => ({
+const creature = (id: string, power: number, toughness: number, abilities: CardDefinition["abilities"] = []): CardDefinition => ({
     id: cardDefId(id),
     name: id,
     manaCost: { generic: 0, pips: [] },
@@ -37,9 +32,7 @@ function mustMoveToBattlefield(state: GameState, id: ObjectId) {
 }
 
 function damageSummary(events: readonly GameEvent[]) {
-    return events
-        .filter((event): event is Extract<GameEvent, { type: "damageDealt" }> => event.type === "damageDealt")
-        .map((event) => [event.target, event.amount, event.isCombatDamage] as const);
+    return events.filter((event): event is Extract<GameEvent, { type: "damageDealt" }> => event.type === "damageDealt").map((event) => [event.target, event.amount, event.isCombatDamage] as const);
 }
 
 function combatState(
@@ -103,7 +96,7 @@ describe("combat damage", () => {
             {
                 type: "damageDealt",
                 source: attacker,
-                sourceLki: snapshotSource(state, attacker),
+                sourceLki: snapshotObject(state, attacker),
                 amount: 3,
                 target: { kind: "player", id: bob },
                 targetName: "bob",
@@ -113,10 +106,7 @@ describe("combat damage", () => {
     });
 
     test("a blocked attacker without trample damages its blocker but not the player", () => {
-        const { state, attacker, blockers } = combatState(
-            creature("attacker", 3, 4),
-            [creature("blocker", 2, 2)],
-        );
+        const { state, attacker, blockers } = combatState(creature("attacker", 3, 4), [creature("blocker", 2, 2)]);
         const blocker = blockers[0]!;
 
         const result = processCombatDamage(state);
@@ -142,10 +132,7 @@ describe("combat damage", () => {
     });
 
     test("a trampling attacker assigns lethal damage to its blocker and excess to the player", () => {
-        const { state, attacker, blockers } = combatState(
-            creature("trampler", 5, 5, [{ kind: "keyword", keyword: "trample" }]),
-            [creature("blocker", 2, 2)],
-        );
+        const { state, attacker, blockers } = combatState(creature("trampler", 5, 5, [{ kind: "keyword", keyword: "trample" }]), [creature("blocker", 2, 2)]);
         const blocker = blockers[0]!;
 
         const result = processCombatDamage(state);
@@ -172,10 +159,7 @@ describe("combat damage", () => {
     });
 
     test("an attacker orders damage to multiple blockers and assigns remaining damage to the last", () => {
-        const { state, attacker, blockers } = combatState(creature("attacker", 5, 5), [
-            creature("first-blocker", 1, 2),
-            creature("second-blocker", 1, 2),
-        ]);
+        const { state, attacker, blockers } = combatState(creature("attacker", 5, 5), [creature("first-blocker", 1, 2), creature("second-blocker", 1, 2)]);
         const result = startCombatDamage(state);
 
         expect(result.ok).toBe(true);

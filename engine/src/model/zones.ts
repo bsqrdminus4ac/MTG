@@ -1,6 +1,6 @@
 import { type ApplyResult, ok } from "../core/result";
 import { assertNever, withEntry, without } from "../core/util";
-import { getCardName, snapshotSource } from "./characteristics";
+import { getCardName, snapshotObject } from "./characteristics";
 import type { GameEvent } from "./events";
 import { type ObjectId, type PlayerId, type Timestamp } from "./ids";
 import type { GameObject, GameState, ObjectSnapshot } from "./state";
@@ -45,7 +45,7 @@ export interface MoveResult {
 export function moveObject(state: GameState, id: ObjectId, to: Zone, snapshot?: ObjectSnapshot): MoveResult | null {
     const obj = state.objects[id];
     if (!obj) return null;
-    const before = obj.zone === "battlefield" || obj.zone === "graveyard" ? snapshot || snapshotSource(state, id) : undefined;
+    const before = obj.zone === "battlefield" || obj.zone === "graveyard" ? snapshot || snapshotObject(state, id) : undefined;
     const n = state.nextId;
     const newId = n as ObjectId;
     const moved: GameObject = {
@@ -69,7 +69,7 @@ export function moveObject(state: GameState, id: ObjectId, to: Zone, snapshot?: 
         // Effects tied to the old object stop applying once it leaves.
         continuousEffects: next.continuousEffects.filter((e) => !(e.source === id && e.duration === "whileSourceOnBattlefield") && !(e.affects.kind === "objects" && e.affects.ids.includes(id))),
     };
-    const after = to === "battlefield" ? snapshotSource(next, newId) : undefined;
+    const after = to === "battlefield" ? snapshotObject(next, newId) : undefined;
 
     return {
         state: next,

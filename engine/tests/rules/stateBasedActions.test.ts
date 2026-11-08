@@ -3,8 +3,8 @@ import type { CardDefinition } from "../../src/model/cardDefinition";
 import { cardDefId, playerId } from "../../src/model/ids";
 import type { GameState } from "../../src/model/state";
 import { moveObject } from "../../src/model/zones";
-import { createGame } from "../../src/setup";
 import { checkStateBasedActions } from "../../src/rules/stateBasedActions";
+import { createGame } from "../../src/setup";
 import { makeContinuousEffect } from "../helpers";
 
 const alice = playerId("alice");
@@ -30,10 +30,13 @@ const creature: CardDefinition = {
 };
 
 function game(lordFirst: boolean): GameState {
-    const initial = createGame([lord, creature], [
-        { id: alice, deck: [lord.id, creature.id] },
-        { id: bob, deck: [] },
-    ]);
+    const initial = createGame(
+        [lord, creature],
+        [
+            { id: alice, deck: [lord.id, creature.id] },
+            { id: bob, deck: [] },
+        ],
+    );
     const lordOnBattlefield = moveObject(initial, initial.players[alice]!.library[0]!, "battlefield")!;
     const creatureOnBattlefield = moveObject(lordOnBattlefield.state, lordOnBattlefield.state.players[alice]!.library[0]!, "battlefield")!;
     const [effectState, effect] = makeContinuousEffect(creatureOnBattlefield.state, {
@@ -54,15 +57,13 @@ function game(lordFirst: boolean): GameState {
     });
     const state: GameState = {
         ...effectState,
-        battlefield: lordFirst
-            ? [lordOnBattlefield.newId, creatureOnBattlefield.newId]
-            : [creatureOnBattlefield.newId, lordOnBattlefield.newId],
+        battlefield: lordFirst ? [lordOnBattlefield.newId, creatureOnBattlefield.newId] : [creatureOnBattlefield.newId, lordOnBattlefield.newId],
         objects: {
             ...creatureOnBattlefield.state.objects,
             [lordOnBattlefield.newId]: {
                 ...creatureOnBattlefield.state.objects[lordOnBattlefield.newId]!,
                 damage: 2,
-                counters: { "+1/+1": 1 },
+                counters: { charge: 1 },
             },
             [creatureOnBattlefield.newId]: {
                 ...creatureOnBattlefield.state.objects[creatureOnBattlefield.newId]!,

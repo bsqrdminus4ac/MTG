@@ -1,6 +1,6 @@
 import { fail, ok, type ApplyResult } from "../core/result";
 import { assertNever } from "../core/util";
-import { getCardName, getCharacteristics, snapshotSource } from "../model/characteristics";
+import { getCardName, getCharacteristics, snapshotObject } from "../model/characteristics";
 import { abilityChoice, chooseMany, chooseOne, yesNo, type Choice } from "../model/decisions";
 import { describeAbility, getCardText } from "../model/effects";
 import type { GameEvent } from "../model/events";
@@ -106,7 +106,7 @@ export function commitCast(state: GameState): ApplyResult {
                 targets: castingInfo.targets,
                 bindings: castingInfo.bindings,
             };
-            const spellLki = snapshotSource(moved.state, moved.newId);
+            const spellLki = snapshotObject(moved.state, moved.newId);
             if (!spellLki) return fail("Unable to snapshot spell on the stack");
             out.push({
                 type: "spellCast",

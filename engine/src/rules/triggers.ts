@@ -1,5 +1,5 @@
 import { isTrue, ok, type ApplyResult } from "../core/result";
-import { snapshotSource } from "../model/characteristics";
+import { snapshotObject } from "../model/characteristics";
 import type { ChoiceValue } from "../model/decisions";
 import { describeAbility } from "../model/effects";
 import type { GameEvent } from "../model/events";
@@ -52,7 +52,7 @@ export function detectTriggers(state: GameState, events: readonly GameEvent[]): 
 function liveWatchers(state: GameState): Partial<Record<TriggerEvent, ObjectSnapshot[]>> {
     const watchers: Partial<Record<TriggerEvent, ObjectSnapshot[]>> = {};
     for (const obj of Object.values(state.objects)) {
-        const snap = snapshotSource(state, obj.id);
+        const snap = snapshotObject(state, obj.id);
         if (!snap) continue;
         for (const ability of snap.chars.abilities) {
             if (ability.kind !== "triggered") continue;

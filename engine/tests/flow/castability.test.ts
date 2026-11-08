@@ -4,9 +4,9 @@ import type { AbilityOfKind } from "../../src/model/abilities";
 import type { CardDefinition } from "../../src/model/cardDefinition";
 import { cardDefId, playerId, type ObjectId, type StackId } from "../../src/model/ids";
 import type { GameState } from "../../src/model/state";
-import { moveObject } from "../../src/model/zones";
 import { createGame } from "../../src/setup";
 import { priorityOptions } from "../../src/flow/priority";
+import { moveDefinition } from "../helpers";
 
 const alice = playerId("alice");
 const bob = playerId("bob");
@@ -227,14 +227,6 @@ function game(
     ]);
 }
 
-function moveDefinition(state: GameState, player: typeof alice | typeof bob, definition: CardDefinition, zone: "hand" | "battlefield" | "stack") {
-    const card = state.players[player]!.library.find((id) => state.objects[id]?.definitionId === definition.id);
-    if (card === undefined) throw new Error(`Missing ${definition.name} in ${player}'s library`);
-    const moved = moveObject(state, card, zone);
-    if (!moved) throw new Error(`Unable to move ${definition.name}`);
-    return { state: moved.state, id: moved.newId };
-}
-
 function atPrecombatMain(state: GameState): GameState {
     return { ...state, turn: { ...state.turn, step: "precombatMain" } };
 }
@@ -254,10 +246,10 @@ describe("castability and activatability options", () => {
         const inHand = moveDefinition(game([creature, creatureOnlySpell], [creatureOnlySpell, creature]), alice, creatureOnlySpell, "hand");
         const state = atPrecombatMain(inHand.state);
 
-        expect(offersCast(state, inHand.id)).toBe(false);
+        expect(offersCast(state, inHand.newId)).toBe(false);
 
         const creatureOnBattlefield = moveDefinition(state, bob, creature, "battlefield");
-        expect(offersCast(creatureOnBattlefield.state, inHand.id)).toBe(true);
+        expect(offersCast(creatureOnBattlefield.state, inHand.newId)).toBe(true);
     });
 
     test("does not offer a creature-only spell when the only opposing creature has hexproof", () => {
@@ -269,13 +261,13 @@ describe("castability and activatability options", () => {
         );
         const hexproofOnBattlefield = moveDefinition(inHand.state, bob, hexproofCreature, "battlefield");
 
-        expect(offersCast(atPrecombatMain(hexproofOnBattlefield.state), inHand.id)).toBe(false);
+        expect(offersCast(atPrecombatMain(hexproofOnBattlefield.state), inHand.newId)).toBe(false);
     });
 
     test("offers an up-to-one-target spell when there are no legal targets", () => {
         const inHand = moveDefinition(game([optionalTargetSpell], [optionalTargetSpell]), alice, optionalTargetSpell, "hand");
 
-        expect(offersCast(atPrecombatMain(inHand.state), inHand.id)).toBe(true);
+        expect(offersCast(atPrecombatMain(inHand.state), inHand.newId)).toBe(true);
     });
 
     test("does not offer unaffordable spells or abilities", () => {
@@ -287,8 +279,8 @@ describe("castability and activatability options", () => {
         state = spell.state;
         const abilitySource = moveDefinition(state, alice, unaffordableAbilitySource, "battlefield");
 
-        expect(offersCast(atPrecombatMain(abilitySource.state), spell.id)).toBe(false);
-        expect(offersActivation(abilitySource.state, abilitySource.id, 0)).toBe(false);
+        expect(offersCast(atPrecombatMain(abilitySource.state), spell.newId)).toBe(false);
+        expect(offersActivation(abilitySource.state, abilitySource.newId, 0)).toBe(false);
     });
 
     test("offers instants but not sorceries during combat or while the stack is non-empty", () => {
@@ -305,7 +297,7 @@ describe("castability and activatability options", () => {
                 kind: "spell",
                 id: spellOnStack.state.nextId as StackId,
                 controller: alice,
-                source: spellOnStack.id,
+                source: spellOnStack.newId,
                 targets: [],
                 ability: stackCharacteristics.abilities.find((ability): ability is AbilityOfKind<"spell"> => ability.kind === "spell")!,
                 bindings: {},
@@ -316,17 +308,17 @@ describe("castability and activatability options", () => {
             turn: { ...state.turn, step: "beginningOfCombat" as const },
         };
 
-        expect(offersCast(combatState, sorceryInHand.id)).toBe(false);
-        expect(offersCast(combatState, instantInHand.id)).toBe(true);
-        expect(offersCast(atPrecombatMain(stackState), sorceryInHand.id)).toBe(false);
-        expect(offersCast(atPrecombatMain(stackState), instantInHand.id)).toBe(true);
+        expect(offersCast(combatState, sorceryInHand.newId)).toBe(false);
+        expect(offersCast(combatState, instantInHand.newId)).toBe(true);
+        expect(offersCast(atPrecombatMain(stackState), sorceryInHand.newId)).toBe(false);
+        expect(offersCast(atPrecombatMain(stackState), instantInHand.newId)).toBe(true);
     });
 
     test("does not offer an ability whose only mana source is its own tapped source", () => {
         const state = game([sharedSourceAbilities], [sharedSourceAbilities]);
         const source = moveDefinition(state, alice, sharedSourceAbilities, "battlefield");
 
-        expect(offersActivation(source.state, source.id, 0)).toBe(false);
+        expect(offersActivation(source.state, source.newId, 0)).toBe(false);
     });
 
     test("considers each decision when checking whether a mana ability can pay a spell cost", () => {
@@ -340,8 +332,8 @@ describe("castability and activatability options", () => {
         state = payableSpell.state;
         const unpayableSpell = moveDefinition(state, alice, whiteSpell, "hand");
 
-        expect(offersCast(atPrecombatMain(unpayableSpell.state), payableSpell.id)).toBe(true);
-        expect(offersCast(atPrecombatMain(unpayableSpell.state), unpayableSpell.id)).toBe(false);
+        expect(offersCast(atPrecombatMain(unpayableSpell.state), payableSpell.newId)).toBe(true);
+        expect(offersCast(atPrecombatMain(unpayableSpell.state), unpayableSpell.newId)).toBe(false);
     });
 
     test("a creature entering this turn can use a tap ability only if it has haste", () => {
@@ -352,10 +344,10 @@ describe("castability and activatability options", () => {
         const withoutHaste = moveDefinition(state, alice, sharedSourceAbilities, "battlefield");
         const withHaste = moveDefinition(withoutHaste.state, alice, hastyTapAbilitySource, "battlefield");
 
-        expect(withoutHaste.state.objects[withoutHaste.id]?.turnEnteredZone).toBe(withoutHaste.state.turn.number);
-        expect(withHaste.state.objects[withHaste.id]?.turnEnteredZone).toBe(withHaste.state.turn.number);
-        expect(offersActivation(withoutHaste.state, withoutHaste.id, 1)).toBe(false);
-        expect(offersActivation(withHaste.state, withHaste.id, 1)).toBe(true);
+        expect(withoutHaste.state.objects[withoutHaste.newId]?.turnEnteredZone).toBe(withoutHaste.state.turn.number);
+        expect(withHaste.state.objects[withHaste.newId]?.turnEnteredZone).toBe(withHaste.state.turn.number);
+        expect(offersActivation(withoutHaste.state, withoutHaste.newId, 1)).toBe(false);
+        expect(offersActivation(withHaste.state, withHaste.newId, 1)).toBe(true);
     });
 
     test("returns a failure instead of throwing when directly casting an unavailable spell", () => {
@@ -364,7 +356,7 @@ describe("castability and activatability options", () => {
 
         let result: ReturnType<typeof applyAction> | undefined;
         expect(() => {
-            result = applyAction(state, { type: "castSpell", player: alice, card: inHand.id });
+            result = applyAction(state, { type: "castSpell", player: alice, card: inHand.newId });
         }).not.toThrow();
         expect(result).toMatchObject({ ok: false });
     });
@@ -378,14 +370,14 @@ describe("castability and activatability options", () => {
             ...atPrecombatMain(damagedCreature.state),
             objects: {
                 ...damagedCreature.state.objects,
-                [damagedCreature.id]: {
-                    ...damagedCreature.state.objects[damagedCreature.id]!,
+                [damagedCreature.newId]: {
+                    ...damagedCreature.state.objects[damagedCreature.newId]!,
                     damage: 2,
                 },
             },
         };
 
-        const startCast = applyAction(state, { type: "castSpell", player: alice, card: spell.id });
+        const startCast = applyAction(state, { type: "castSpell", player: alice, card: spell.newId });
         if (!startCast.ok || startCast.state.pending?.kind !== "yesNo") {
             throw new Error("Expected the spell payment decision");
         }
@@ -396,8 +388,8 @@ describe("castability and activatability options", () => {
         });
         if (!committed.ok) throw new Error(committed.error);
 
-        expect(committed.state.objects[damagedCreature.id]).toBeUndefined();
-        const creatureMoved = committed.events.find((event) => event.type === "cardMoved" && event.oldId === damagedCreature.id);
+        expect(committed.state.objects[damagedCreature.newId]).toBeUndefined();
+        const creatureMoved = committed.events.find((event) => event.type === "cardMoved" && event.oldId === damagedCreature.newId);
         expect(creatureMoved).toMatchObject({ type: "cardMoved", from: "battlefield" });
         if (creatureMoved?.type !== "cardMoved") throw new Error("Expected the lethal creature to move");
         expect(committed.state.players[bob]?.graveyard).toContain(creatureMoved.newId);
@@ -406,6 +398,6 @@ describe("castability and activatability options", () => {
         if (!passed.ok) throw new Error(passed.error);
         expect(passed.state.priority?.holder).toBe(bob);
         expect(passed.state.pending).toMatchObject({ kind: "priority", player: bob });
-        expect(passed.state.objects[damagedCreature.id]).toBeUndefined();
+        expect(passed.state.objects[damagedCreature.newId]).toBeUndefined();
     });
 });

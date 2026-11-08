@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import type { CardDefinition } from "../../src/model/cardDefinition";
-import { snapshotSource } from "../../src/model/characteristics";
+import { snapshotObject } from "../../src/model/characteristics";
 import { cardDefId, playerId } from "../../src/model/ids";
 import { moveObject } from "../../src/model/zones";
 import { createGame } from "../../src/setup";
@@ -23,10 +23,13 @@ const creature: CardDefinition = {
 };
 
 function game() {
-    return createGame([creature], [
-        { id: alice, deck: [creature.id, creature.id] },
-        { id: bob, deck: [] },
-    ]);
+    return createGame(
+        [creature],
+        [
+            { id: alice, deck: [creature.id, creature.id] },
+            { id: bob, deck: [] },
+        ],
+    );
 }
 
 describe("card movement snapshots", () => {
@@ -49,7 +52,7 @@ describe("card movement snapshots", () => {
             },
             continuousEffects: [effect],
         };
-        const expectedLki = snapshotSource(battlefield, entered.newId);
+        const expectedLki = snapshotObject(battlefield, entered.newId);
         const moved = moveObject(battlefield, entered.newId, "graveyard")!;
 
         expect(moved.events[0]).toMatchObject({
@@ -78,7 +81,7 @@ describe("card movement snapshots", () => {
         });
         if (event?.type !== "cardMoved") throw new Error("Expected a cardMoved event");
         expect(event.before).toBeUndefined();
-        expect(event.after).toEqual(snapshotSource(entered.state, entered.newId));
+        expect(event.after).toEqual(snapshotObject(entered.state, entered.newId));
     });
 
     test.each([

@@ -1,6 +1,6 @@
 import { type ApplyResult, fail } from "../core/result";
 import type { AbilityOfKind } from "../model/abilities";
-import { snapshotSource } from "../model/characteristics";
+import { snapshotObject } from "../model/characteristics";
 import { describeAbility } from "../model/effects";
 import type { ObjectId, PlayerId } from "../model/ids";
 import type { AbilityCast, GameState } from "../model/state";
@@ -25,7 +25,7 @@ export function beginActivation(state: GameState, player: PlayerId, source: Obje
     if (!activatable.ok) return activatable;
 
     const rollback = state;
-    const sourceSnapshot = snapshotSource(state, source);
+    const sourceSnapshot = snapshotObject(state, source);
     if (!sourceSnapshot) return fail("Source object is gone");
     const targetSpecs = new Array(ability.targets.length).fill(false);
     const casting: AbilityCast = {

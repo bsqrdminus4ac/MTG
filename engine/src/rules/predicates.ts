@@ -1,6 +1,6 @@
 import { goodResult, isTrue, type Result } from "../core/result";
 import { assertNever } from "../core/util";
-import { snapshotSource } from "../model/characteristics";
+import { snapshotObject } from "../model/characteristics";
 import type { EventOfType, GameEvent } from "../model/events";
 import type { PlayerId } from "../model/ids";
 import { evalObjectPredicate } from "../model/objectPredicates";
@@ -47,7 +47,7 @@ function evalStackLeaf(state: GameState, scope: EvalScope, entry: StackEntry, pr
             return goodResult((predicate.who === "you") === (entry.controller === scope.controller));
         case "spellMatches": {
             if (entry.kind !== "spell") return goodResult(false);
-            const spellSnap = snapshotSource(state, entry.source);
+            const spellSnap = snapshotObject(state, entry.source);
             if (!spellSnap) return goodResult(false);
             return evalObjectPredicate(scope, spellSnap, predicate.of);
         }
@@ -123,5 +123,5 @@ function evalEventLeaf(state: GameState, scope: EvalScope, event: GameEvent, pre
 function moverSnapshot(state: GameState, event: EventOfType<"cardMoved">, leaf: EventLeaves["cardMoved"]): ObjectSnapshot | undefined {
     const arriving = leaf.to === "battlefield";
     const snap = arriving ? event.after : (event.before ?? event.after);
-    return snap ?? snapshotSource(state, event.newId); // may be undefined if the object is gone
+    return snap ?? snapshotObject(state, event.newId); // may be undefined if the object is gone
 }

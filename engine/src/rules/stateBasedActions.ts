@@ -1,6 +1,6 @@
 import { type ApplyResult, applySequentially, fail, ok } from "../core/result";
 import { withEntry } from "../core/util";
-import { snapshotSource } from "../model/characteristics";
+import { snapshotObject } from "../model/characteristics";
 import type { GameEvent } from "../model/events";
 import type { ObjectId } from "../model/ids";
 import type { GameState, ObjectSnapshot } from "../model/state";
@@ -105,7 +105,7 @@ function checkFor0Toughness(state: GameState): ApplyResult {
     for (const id of state.battlefield) {
         const obj = state.objects[id];
         if (!obj) return fail(`Unable to find obj ${id}`);
-        const snapshot = snapshotSource(state, id);
+        const snapshot = snapshotObject(state, id);
         if (!snapshot) return fail(`Unable to locate characteristics of object #${obj.id}`);
         if (snapshot.chars.types.includes("Creature") && (snapshot.chars.toughness ?? 0) <= 0) {
             idsToMove.push(snapshot);
@@ -128,7 +128,7 @@ function checkForLethalDamage(state: GameState): ApplyResult {
     for (const id of state.battlefield) {
         const obj = state.objects[id];
         if (!obj) return fail(`Unable to find obj ${id}`);
-        const snapshot = snapshotSource(state, id);
+        const snapshot = snapshotObject(state, id);
         if (!snapshot) return fail(`Unable to locate characteristics of object #${obj.id}`);
         if (snapshot.chars.types.includes("Creature") && obj.damage >= (snapshot.chars.toughness ?? 0)) {
             idsToMove.push(snapshot);
@@ -153,7 +153,7 @@ function checkFor0Loyalty(state: GameState): ApplyResult {
     for (const id of state.battlefield) {
         const obj = state.objects[id];
         if (!obj) return fail(`Unable to find obj ${id}`);
-        const snapshot = snapshotSource(state, id);
+        const snapshot = snapshotObject(state, id);
         if (!snapshot) return fail(`Unable to locate characteristics of object #${obj.id}`);
         if (snapshot.chars.types.includes("Planeswalker") && (obj.counters["loyalty"] ?? 0) <= 0) {
             idsToMove.push(snapshot);

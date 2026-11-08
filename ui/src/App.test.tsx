@@ -1,5 +1,5 @@
 import { bolt, drake, forest } from "@mtg/definitions";
-import { chooseMany, getCharacteristics, indexChoice, moveObject, orderingDecision, yesNo, type CardDefinition, type DecisionId, type GameState, type StackId } from "@mtg/engine";
+import { chooseMany, createGame, getCharacteristics, indexChoice, moveObject, orderingDecision, yesNo, type CardDefinition, type DecisionId, type GameState, type StackId } from "@mtg/engine";
 import { StrictMode } from "react";
 import { act, fireEvent, render, renderHook, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
@@ -25,24 +25,30 @@ function zoneOf(region: HTMLElement, title: string): HTMLDetailsElement {
 
 const cardsIn = (zone: HTMLElement) => [...zone.querySelectorAll<HTMLDetailsElement>("details.obj")];
 
-function withCardText(state: GameState, card: CardDefinition, description: string): GameState {
-    const id = card.id;
-    const definition = state.definitions[id];
-    if (!definition) throw new Error(`expected ${card.name} definition`);
-    const ability = definition.abilities[0];
+function cardWithText(card: CardDefinition, description: string): CardDefinition {
+    const ability = card.abilities[0];
     if (!ability || !("effects" in ability)) throw new Error(`expected effects on ${card.name}`);
 
     const describedAbility = {
         ...ability,
         effects: ability.effects.map((effect, index) => (index === 0 ? { ...effect, description } : effect)),
     };
-    return {
-        ...state,
-        definitions: {
-            ...state.definitions,
-            [id]: { ...definition, abilities: [describedAbility, ...definition.abilities.slice(1)] },
-        },
-    };
+    return { ...card, abilities: [describedAbility, ...card.abilities.slice(1)] };
+}
+
+function gameWithCards(cards: readonly CardDefinition[]): GameState {
+    let state = createGame(cards, [
+        { id: ALICE, deck: cards.map((card) => card.id) },
+        { id: BOB, deck: [] },
+    ]);
+    for (const card of cards) {
+        const id = state.players[ALICE]?.library.find((objectId) => state.objects[objectId]?.definitionId === card.id);
+        if (id === undefined) throw new Error(`expected ${card.name} in Alice's library`);
+        const moved = moveObject(state, id, "hand");
+        if (!moved) throw new Error(`unable to move ${card.name} to Alice's hand`);
+        state = moved.state;
+    }
+    return state;
 }
 
 describe("in-progress state panels", () => {
@@ -128,7 +134,7 @@ describe("zones", () => {
     });
 
     test("shows authored effect text under Card Text and replaces the this placeholder", () => {
-        const state = withCardText(newDemoGame(), forest, "<this> taps to add one green mana.");
+        const state = gameWithCards([cardWithText(forest, "<this> taps to add one green mana.")]);
         const id = must(state.players[ALICE]!.hand.find((id) => state.objects[id]?.definitionId === forest.id));
         render(<ObjectCard state={state} id={id} />);
 
@@ -337,7 +343,10 @@ describe("stack panel", () => {
     });
 
     test("lists entries with the top of the stack first", () => {
-        const base = withCardText(withCardText(newDemoGame(), bolt, "<this> deals three damage."), forest, "<this> taps for green mana.");
+        const base = gameWithCards([
+            cardWithText(bolt, "<this> deals three damage."),
+            cardWithText(forest, "<this> taps for green mana."),
+        ]);
         const hand = must(base.players[ALICE]).hand;
         const find = (def: CardDefinition) => must(hand.find((id) => base.objects[id]?.definitionId === def.id));
 

@@ -1,6 +1,6 @@
 import { applySequentially, fail, ok, type ApplyResult } from "../core/result";
 import { keysOf, withEntry } from "../core/util";
-import { getCardName, hasCardType, hasKeyword, snapshotSource } from "../model/characteristics";
+import { getCardName, hasCardType, hasKeyword, snapshotObject } from "../model/characteristics";
 import { chooseMany, chooseOne, nullChoice, objectChoice, orderingDecision, playerChoice, type Choice } from "../model/decisions";
 import type { GameEvent } from "../model/events";
 import type { ObjectId, PlayerId } from "../model/ids";
@@ -149,11 +149,11 @@ export function declareAttacks(state: GameState): ApplyResult {
     );
     if (!result.ok) return result;
     const attackEvents: GameEvent[] = Object.values(state.combat.attackers).flatMap((a) => {
-        const attackerLki = snapshotSource(result.state, a.id);
+        const attackerLki = snapshotObject(result.state, a.id);
         if (!attackerLki) return [];
         if (!a.attackTarget) return [];
         if (a.attackTarget.kind === "object") {
-            const targetLki = snapshotSource(result.state, a.attackTarget.id);
+            const targetLki = snapshotObject(result.state, a.attackTarget.id);
             if (!targetLki) return [];
             return {
                 type: "attackDeclared",
@@ -304,7 +304,7 @@ export function declareBlocks(state: GameState, player: PlayerId): ApplyResult {
 
     const events: GameEvent[] = [];
     for (const attacker of Object.values(state.combat.attackers)) {
-        const attackerLki = snapshotSource(state, attacker.id)!;
+        const attackerLki = snapshotObject(state, attacker.id)!;
         if (attacker.blockedBy) {
             events.push(
                 ...attacker.blockedBy.map(
@@ -312,7 +312,7 @@ export function declareBlocks(state: GameState, player: PlayerId): ApplyResult {
                         type: "blockDeclared",
                         player,
                         attackerLki,
-                        blockerLki: snapshotSource(state, blocker)!,
+                        blockerLki: snapshotObject(state, blocker)!,
                     }),
                 ),
             );
@@ -430,7 +430,7 @@ export function processCombatDamage(state: GameState, isFirstStrikeStep?: boolea
 const snap = (state: GameState, snapshots: Map<ObjectId, ObjectSnapshot>, id: ObjectId) => {
     let s = snapshots.get(id);
     if (!s) {
-        s = snapshotSource(state, id) ?? undefined;
+        s = snapshotObject(state, id) ?? undefined;
         if (s) snapshots.set(id, s);
     }
     return s;

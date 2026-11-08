@@ -1,7 +1,7 @@
 import { fail, ok, type ApplyResult } from "../core/result";
 import { withEntry } from "../core/util";
 import type { ActivatableAbilityInfo } from "../model/abilities";
-import { snapshotSource } from "../model/characteristics";
+import { snapshotObject } from "../model/characteristics";
 import type { Decision, ResolvedAnswer } from "../model/decisions";
 import { describeAbility } from "../model/effects";
 import type { GameEvent } from "../model/events";
@@ -91,7 +91,7 @@ export function activateManaAbility(state: GameState, player: PlayerId, source: 
     if (!ability.isManaAbility) return fail("That isn't a mana ability");
     if (ability.targets.length > 0) return fail("Mana abilities can't have targets");
 
-    const sourceSnapshot = snapshotSource(state, source); // BEFORE costs: sacrifice moves the source
+    const sourceSnapshot = snapshotObject(state, source); // BEFORE costs: sacrifice moves the source
     if (!sourceSnapshot) return fail("That object is gone");
 
     // Mana abilities don't use the stack (CR 605). We just resolve it immediately.

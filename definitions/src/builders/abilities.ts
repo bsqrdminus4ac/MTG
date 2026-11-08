@@ -2,7 +2,6 @@ import {
     COLORS,
     YOU,
     type Ability,
-    type AppliedEffect,
     type BindingRef,
     type CardEffect,
     type Condition,
@@ -48,8 +47,6 @@ export const staticAbility = (effect: StaticEffect, activeZones?: Zone[]): Abili
     effect,
     activeZones: activeZones ?? ["battlefield"],
 });
-
-export const appliedAbility = (effect: AppliedEffect): Ability => ({ kind: "applied", effect });
 
 export const thisEntersTheBattlefield = (interveningIf?: Condition): EventTrigger =>
     interveningIf

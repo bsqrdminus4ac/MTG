@@ -1,6 +1,6 @@
 import { fail, isTrue, type ApplyResult } from "../core/result";
 import { withEntry } from "../core/util";
-import { getCharacteristics, isPermanentType, snapshotSource } from "../model/characteristics";
+import { getCharacteristics, isPermanentType, snapshotObject } from "../model/characteristics";
 import type { ResolvedAnswer } from "../model/decisions";
 import type { GameEvent } from "../model/events";
 import type { Binding, EvalScope, Frame, GameState, ResolutionInProgress } from "../model/state";
@@ -53,7 +53,7 @@ export function beginResolution(state: GameState): ApplyResult {
         }
     }
 
-    const sourceSnapshot = entry.kind === "ability" ? entry.sourceSnapshot : snapshotSource(state, entry.source);
+    const sourceSnapshot = entry.kind === "ability" ? entry.sourceSnapshot : snapshotObject(state, entry.source);
     if (!sourceSnapshot) return fail("Unable to acquire snapshot of spell's source");
     const resolving: ResolutionInProgress = {
         entry,

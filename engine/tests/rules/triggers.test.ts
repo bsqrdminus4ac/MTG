@@ -8,18 +8,19 @@ vi.mock("../../src/rules/triggers", async (importOriginal) => {
     };
 });
 
-import { submitAnswer, applyAction } from "../../src/engine";
+import { applyAction, submitAnswer } from "../../src/engine";
+import { grantPriority } from "../../src/flow/priority";
+import { runResolution } from "../../src/flow/resolution";
+import { placePendingTriggers } from "../../src/flow/triggers";
 import type { AbilityOfKind } from "../../src/model/abilities";
 import type { CardDefinition } from "../../src/model/cardDefinition";
-import { snapshotSource } from "../../src/model/characteristics";
-import { cardDefId, playerId, type ObjectId, type StackId } from "../../src/model/ids";
+import { snapshotObject } from "../../src/model/characteristics";
+import { cardDefId, playerId, type StackId } from "../../src/model/ids";
 import type { GameState, Target } from "../../src/model/state";
 import { moveObject } from "../../src/model/zones";
-import { createGame } from "../../src/setup";
 import { detectTriggers } from "../../src/rules/triggers";
-import { runResolution } from "../../src/flow/resolution";
-import { grantPriority } from "../../src/flow/priority";
-import { placePendingTriggers } from "../../src/flow/triggers";
+import { createGame } from "../../src/setup";
+import { moveDefinition } from "../helpers";
 
 const alice = playerId("alice");
 const bob = playerId("bob");
@@ -81,26 +82,11 @@ const damageAbility: AbilityOfKind<"triggered"> = {
     triggerableZones: ["battlefield"],
 };
 
-function game(
-    definitions: readonly CardDefinition[],
-    aliceDeck: readonly CardDefinition[] = definitions,
-    bobDeck: readonly CardDefinition[] = [],
-): GameState {
-    return createGame(
-        definitions,
-        [
-            { id: alice, deck: aliceDeck.map((definition) => definition.id) },
-            { id: bob, deck: bobDeck.map((definition) => definition.id) },
-        ],
-    );
-}
-
-function moveDefinition(state: GameState, player: typeof alice | typeof bob, definition: CardDefinition, zone: "hand" | "battlefield" | "graveyard") {
-    const card = state.players[player]?.library.find((id) => state.objects[id]?.definitionId === definition.id);
-    if (card === undefined) throw new Error(`Missing ${definition.name} in ${player}'s library`);
-    const moved = moveObject(state, card, zone);
-    if (!moved) throw new Error(`Unable to move ${definition.name}`);
-    return moved;
+function game(definitions: readonly CardDefinition[], aliceDeck: readonly CardDefinition[] = definitions, bobDeck: readonly CardDefinition[] = []): GameState {
+    return createGame(definitions, [
+        { id: alice, deck: aliceDeck.map((definition) => definition.id) },
+        { id: bob, deck: bobDeck.map((definition) => definition.id) },
+    ]);
 }
 
 const triggerSpy = vi.mocked(detectTriggers);
@@ -192,11 +178,9 @@ describe("detectTriggers", () => {
         const sourceCard = creature("damage-source");
         const initial = game([watcher, sourceCard]);
         const sourceOnBattlefield = moveDefinition(initial, alice, watcher, "battlefield");
-        const source = sourceOnBattlefield.state.players[alice]?.library.find(
-            (id) => sourceOnBattlefield.state.objects[id]?.definitionId === sourceCard.id,
-        );
+        const source = sourceOnBattlefield.state.players[alice]?.library.find((id) => sourceOnBattlefield.state.objects[id]?.definitionId === sourceCard.id);
         if (source === undefined) throw new Error("Missing resolving source");
-        const sourceLki = snapshotSource(sourceOnBattlefield.state, source);
+        const sourceLki = snapshotObject(sourceOnBattlefield.state, source);
         if (!sourceLki) throw new Error("Missing resolving source snapshot");
         const resolvingAbility: AbilityOfKind<"activated"> = {
             kind: "activated",
@@ -303,10 +287,7 @@ describe("detectTriggers", () => {
         expect(result.ok).toBe(true);
         if (!result.ok) return;
         expect(result.state.pendingTriggers[alice]).toHaveLength(2);
-        expect(result.state.pendingTriggers[alice]?.map((trigger) => trigger.ability)).toEqual([
-            firstWatcher.abilities[0],
-            secondWatcher.abilities[0],
-        ]);
+        expect(result.state.pendingTriggers[alice]?.map((trigger) => trigger.ability)).toEqual([firstWatcher.abilities[0], secondWatcher.abilities[0]]);
     });
 });
 

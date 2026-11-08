@@ -2,7 +2,7 @@ import type { EffectTarget } from "./effects";
 import type { EffectId, ObjectId, PlayerId, Timestamp } from "./ids";
 import type { Color } from "./mana";
 import type { ObjectPredicate } from "./predicates";
-import type { CardType, Keyword } from "./vocabulary";
+import type { CardType, Keyword, Zone } from "./vocabulary";
 
 export type Layer =
     | "copy" // Layer 1: Copy effect and face down cards
@@ -60,15 +60,16 @@ export const LAYER_OF: Record<Modification["kind"], Layer> = {
 
 export type Duration = "untilEndOfTurn" | "whileSourceOnBattlefield" | "permanent";
 
-export type ObjectMatch = Readonly<{ kind: "matching"; filter: ObjectPredicate }>;
+export type ObjectMatch = Readonly<{ kind: "matching"; filter: ObjectPredicate; zones?: readonly Zone[] }>;
 export type AffectedSet = Readonly<{ kind: "self" }> | ObjectMatch;
 
+/**  A static effect tied to the static ability of an object */
 export interface StaticEffect {
     readonly affects: AffectedSet;
     readonly modifications: Modification[];
     readonly description?: string;
 }
-
+/** The template an applyContinuousEffect effect carries. It is definition data only and never lives in state or on an object as a rule. Resolution turns it into a live ContinuousEffect in state.continuousEffects */
 export interface AppliedEffect {
     readonly affects: EffectTarget | ObjectMatch;
     readonly modifications: Modification[];
@@ -85,4 +86,5 @@ export interface ContinuousEffect {
     readonly affects: Readonly<{ kind: "objects"; ids: ObjectId[] }> | ObjectMatch;
     readonly modifications: Modification[];
     readonly duration: Duration;
+    readonly description?: string;
 }

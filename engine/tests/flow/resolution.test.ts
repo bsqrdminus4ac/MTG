@@ -1,16 +1,16 @@
 import { describe, expect, test } from "vitest";
 import { applyAction, submitAnswer } from "../../src/engine";
+import { beginResolution } from "../../src/flow/resolution";
+import { placePendingTriggers } from "../../src/flow/triggers";
 import type { AbilityOfKind } from "../../src/model/abilities";
 import type { CardDefinition } from "../../src/model/cardDefinition";
-import { snapshotSource } from "../../src/model/characteristics";
+import { snapshotObject } from "../../src/model/characteristics";
 import { type TargetSpec } from "../../src/model/effects";
 import { cardDefId, playerId, type ObjectId, type StackId } from "../../src/model/ids";
 import type { Bindings, GameState, Target } from "../../src/model/state";
 import { moveObject } from "../../src/model/zones";
-import { createGame } from "../../src/setup";
-import { beginResolution } from "../../src/flow/resolution";
 import { detectTriggers } from "../../src/rules/triggers";
-import { placePendingTriggers } from "../../src/flow/triggers";
+import { createGame } from "../../src/setup";
 
 const alice = playerId("alice");
 const bob = playerId("bob");
@@ -118,7 +118,7 @@ function putTriggeredAbilityOnStack(
     state: GameState,
     source: ObjectId,
     ability: AbilityOfKind<"triggered">,
-    sourceSnapshot = snapshotSource(state, source),
+    sourceSnapshot = snapshotObject(state, source),
     bindings: Bindings = {},
     targets: readonly (readonly Target[])[] = [],
 ): GameState {
@@ -126,16 +126,18 @@ function putTriggeredAbilityOnStack(
     const entryId = state.nextId as StackId;
     return {
         ...state,
-        stack: [{
-            kind: "ability",
-            id: entryId,
-            controller: alice,
-            source,
-            targets,
-            bindings,
-            ability,
-            sourceSnapshot,
-        }],
+        stack: [
+            {
+                kind: "ability",
+                id: entryId,
+                controller: alice,
+                source,
+                targets,
+                bindings,
+                ability,
+                sourceSnapshot,
+            },
+        ],
         priority: null,
     };
 }
@@ -150,7 +152,7 @@ describe("ability resolution", () => {
             ],
         );
         const source = moveObject(initial, initial.players[alice]!.library[0]!, "battlefield")!;
-        const sourceSnapshot = snapshotSource(source.state, source.newId);
+        const sourceSnapshot = snapshotObject(source.state, source.newId);
         if (!sourceSnapshot) throw new Error("Expected source snapshot");
 
         const ability: AbilityOfKind<"activated"> = {
@@ -195,7 +197,13 @@ describe("ability resolution", () => {
     });
 
     test("fizzles when its intervening-if condition becomes false before resolution", () => {
-        const initial = createGame([bear], [{ id: alice, deck: [bear.id] }, { id: bob, deck: [] }]);
+        const initial = createGame(
+            [bear],
+            [
+                { id: alice, deck: [bear.id] },
+                { id: bob, deck: [] },
+            ],
+        );
         const source = moveObject(initial, initial.players[alice]!.library[0]!, "battlefield");
         if (!source) throw new Error("Unable to move the source to the battlefield");
         const ability: AbilityOfKind<"triggered"> = {
@@ -218,10 +226,12 @@ describe("ability resolution", () => {
         const result = mustResolve(responseChangedCondition);
 
         expect(result.state.players[alice]?.life).toBe(20);
-        expect(result.events).toContainEqual(expect.objectContaining({
-            type: "stackEntryFizzles",
-            reason: "interveningIf",
-        }));
+        expect(result.events).toContainEqual(
+            expect.objectContaining({
+                type: "stackEntryFizzles",
+                reason: "interveningIf",
+            }),
+        );
         expect(result.events).not.toContainEqual(expect.objectContaining({ type: "stackEntryResolved" }));
     });
 
@@ -237,7 +247,13 @@ describe("ability resolution", () => {
             triggerableZones: ["battlefield"],
         };
         const diesCard: CardDefinition = { ...bear, abilities: [ability] };
-        const initial = createGame([diesCard], [{ id: alice, deck: [diesCard.id] }, { id: bob, deck: [] }]);
+        const initial = createGame(
+            [diesCard],
+            [
+                { id: alice, deck: [diesCard.id] },
+                { id: bob, deck: [] },
+            ],
+        );
         const source = moveObject(initial, initial.players[alice]!.library[0]!, "battlefield")!;
         const died = moveObject(source.state, source.newId, "graveyard")!;
         const detected = detectTriggers(died.state, died.events);
@@ -250,10 +266,12 @@ describe("ability resolution", () => {
         expect(result.state.objects[source.newId]).toBeUndefined();
         expect(result.state.players[alice]?.graveyard).toContain(died.newId);
         expect(result.state.players[bob]?.life).toBe(19);
-        expect(result.events).toContainEqual(expect.objectContaining({
-            type: "damageDealt",
-            sourceLki: expect.objectContaining({ id: source.newId, chars: expect.objectContaining({ power: 2 }) }),
-        }));
+        expect(result.events).toContainEqual(
+            expect.objectContaining({
+                type: "damageDealt",
+                sourceLki: expect.objectContaining({ id: source.newId, chars: expect.objectContaining({ power: 2 }) }),
+            }),
+        );
     });
 
     test("uses event.amount from the triggering damage event", () => {
@@ -265,19 +283,27 @@ describe("ability resolution", () => {
             triggerableZones: ["battlefield"],
         };
         const watcher: CardDefinition = { ...bear, id: cardDefId("damage-drawer"), abilities: [ability] };
-        const initial = createGame([watcher], [{ id: alice, deck: [watcher.id] }, { id: bob, deck: [] }]);
+        const initial = createGame(
+            [watcher],
+            [
+                { id: alice, deck: [watcher.id] },
+                { id: bob, deck: [] },
+            ],
+        );
         const source = moveObject(initial, initial.players[alice]!.library[0]!, "battlefield")!;
-        const sourceSnapshot = snapshotSource(source.state, source.newId);
+        const sourceSnapshot = snapshotObject(source.state, source.newId);
         if (!sourceSnapshot) throw new Error("Expected source snapshot");
-        const detected = detectTriggers(source.state, [{
-            type: "damageDealt",
-            source: source.newId,
-            sourceLki: sourceSnapshot,
-            target: { kind: "player", id: bob },
-            targetName: "bob",
-            amount: 4,
-            isCombatDamage: false,
-        }]);
+        const detected = detectTriggers(source.state, [
+            {
+                type: "damageDealt",
+                source: source.newId,
+                sourceLki: sourceSnapshot,
+                target: { kind: "player", id: bob },
+                targetName: "bob",
+                amount: 4,
+                isCombatDamage: false,
+            },
+        ]);
         if (!detected.ok) throw new Error(detected.error);
         const placed = placePendingTriggers(detected.state, detected.events);
         if (!placed.ok) throw new Error(placed.error);
@@ -294,14 +320,22 @@ describe("ability resolution", () => {
                 event: "cardMoved",
                 when: { kind: "cardMoved", from: "battlefield", to: "graveyard" },
             },
-            targets: [{
-                filter: { kind: "object", filter: { kind: "all", of: [
-                    { kind: "inZone", zone: "graveyard" },
-                    { kind: "hasType", type: "Creature" },
-                ] } },
-                minCount: 1,
-                maxCount: 1,
-            }],
+            targets: [
+                {
+                    filter: {
+                        kind: "object",
+                        filter: {
+                            kind: "all",
+                            of: [
+                                { kind: "inZone", zone: "graveyard" },
+                                { kind: "hasType", type: "Creature" },
+                            ],
+                        },
+                    },
+                    minCount: 1,
+                    maxCount: 1,
+                },
+            ],
             effects: [],
             triggerableZones: ["battlefield"],
         };
@@ -309,7 +343,10 @@ describe("ability resolution", () => {
         const movedCard: CardDefinition = { ...bear, id: cardDefId("moved-card") };
         const initial = createGame(
             [watcher, movedCard],
-            [{ id: alice, deck: [watcher.id, movedCard.id] }, { id: bob, deck: [] }],
+            [
+                { id: alice, deck: [watcher.id, movedCard.id] },
+                { id: bob, deck: [] },
+            ],
         );
         const watcherOnField = moveObject(initial, initial.players[alice]!.library[0]!, "battlefield")!;
         const cardOnField = moveObject(watcherOnField.state, watcherOnField.state.players[alice]!.library[0]!, "battlefield")!;
@@ -342,13 +379,17 @@ describe("ability resolution", () => {
             targets: [],
             effects: [
                 { kind: "askYesNo", who: { kind: "player", who: "controller" }, prompt: "Draw a card?", bindAs: "mayDraw" },
-                { kind: "if", condition: { kind: "flag", name: "mayDraw" }, then: [
-                    { kind: "draw", who: { kind: "player", who: "controller" }, count: 1 },
-                ] },
+                { kind: "if", condition: { kind: "flag", name: "mayDraw" }, then: [{ kind: "draw", who: { kind: "player", who: "controller" }, count: 1 }] },
             ],
             triggerableZones: ["battlefield"],
         };
-        const yesInitial = createGame([bear], [{ id: alice, deck: [bear.id, bear.id] }, { id: bob, deck: [] }]);
+        const yesInitial = createGame(
+            [bear],
+            [
+                { id: alice, deck: [bear.id, bear.id] },
+                { id: bob, deck: [] },
+            ],
+        );
         const yesSource = moveObject(yesInitial, yesInitial.players[alice]!.library[0]!, "battlefield")!;
         const yesPaused = mustResolve(putTriggeredAbilityOnStack(yesSource.state, yesSource.newId, mayDraw));
         if (yesPaused.state.pending?.kind !== "yesNo") throw new Error("Expected a yes/no decision");
@@ -359,7 +400,13 @@ describe("ability resolution", () => {
         });
         if (!yesResult.ok) throw new Error(yesResult.error);
 
-        const noInitial = createGame([bear], [{ id: alice, deck: [bear.id, bear.id] }, { id: bob, deck: [] }]);
+        const noInitial = createGame(
+            [bear],
+            [
+                { id: alice, deck: [bear.id, bear.id] },
+                { id: bob, deck: [] },
+            ],
+        );
         const noSource = moveObject(noInitial, noInitial.players[alice]!.library[0]!, "battlefield")!;
         const noPaused = mustResolve(putTriggeredAbilityOnStack(noSource.state, noSource.newId, mayDraw));
         if (noPaused.state.pending?.kind !== "yesNo") throw new Error("Expected a yes/no decision");
@@ -380,18 +427,32 @@ describe("ability resolution", () => {
         const targeted: AbilityOfKind<"triggered"> = {
             kind: "triggered",
             trigger: { event: "lifeChanged", when: { kind: "lifeChanged" } },
-            targets: [{
-                filter: { kind: "object", filter: { kind: "all", of: [
-                    { kind: "inZone", zone: "battlefield" },
-                    { kind: "hasType", type: "Creature" },
-                ] } },
-                minCount: 1,
-                maxCount: 1,
-            }],
+            targets: [
+                {
+                    filter: {
+                        kind: "object",
+                        filter: {
+                            kind: "all",
+                            of: [
+                                { kind: "inZone", zone: "battlefield" },
+                                { kind: "hasType", type: "Creature" },
+                            ],
+                        },
+                    },
+                    minCount: 1,
+                    maxCount: 1,
+                },
+            ],
             effects: [{ kind: "destroy", target: { kind: "target", spec: 0 } }],
             triggerableZones: ["battlefield"],
         };
-        const initial = createGame([bear], [{ id: alice, deck: [bear.id, bear.id] }, { id: bob, deck: [] }]);
+        const initial = createGame(
+            [bear],
+            [
+                { id: alice, deck: [bear.id, bear.id] },
+                { id: bob, deck: [] },
+            ],
+        );
         const source = moveObject(initial, initial.players[alice]!.library[0]!, "battlefield")!;
         const target = moveObject(source.state, source.state.players[alice]!.library[0]!, "battlefield")!;
         const stackState = putTriggeredAbilityOnStack(target.state, source.newId, targeted, undefined, {}, [[{ kind: "object", id: target.newId }]]);
@@ -399,10 +460,12 @@ describe("ability resolution", () => {
 
         const result = mustResolve(responded.state);
 
-        expect(result.events).toContainEqual(expect.objectContaining({
-            type: "stackEntryFizzles",
-            reason: "lackOfTargets",
-        }));
+        expect(result.events).toContainEqual(
+            expect.objectContaining({
+                type: "stackEntryFizzles",
+                reason: "lackOfTargets",
+            }),
+        );
         expect(result.events).not.toContainEqual(expect.objectContaining({ type: "stackEntryResolved" }));
         expect(result.state.objects[target.newId]).toBeUndefined();
     });
@@ -426,7 +489,10 @@ describe("ability resolution", () => {
         const secondWatcher: CardDefinition = { ...bear, id: cardDefId("second-watcher"), abilities: [secondAbility] };
         const initial = createGame(
             [firstWatcher, secondWatcher],
-            [{ id: alice, deck: [firstWatcher.id, secondWatcher.id] }, { id: bob, deck: [] }],
+            [
+                { id: alice, deck: [firstWatcher.id, secondWatcher.id] },
+                { id: bob, deck: [] },
+            ],
         );
         const first = moveObject(initial, initial.players[alice]!.library[0]!, "battlefield")!;
         const second = moveObject(first.state, first.state.players[alice]!.library[0]!, "battlefield")!;
@@ -444,8 +510,9 @@ describe("ability resolution", () => {
         expect(secondEntry?.kind).toBe("ability");
         if (secondEntry?.kind !== "ability") return;
         expect(secondEntry.ability).toEqual(secondAbility);
-        expect(result.events.findIndex((event) => event.type === "stackEntryResolved" && event.id === firstEntry.id))
-            .toBeLessThan(result.events.findIndex((event) => event.type === "abilityTriggered" && event.abilitySourceLki.id === second.newId));
+        expect(result.events.findIndex((event) => event.type === "stackEntryResolved" && event.id === firstEntry.id)).toBeLessThan(
+            result.events.findIndex((event) => event.type === "abilityTriggered" && event.abilitySourceLki.id === second.newId),
+        );
     });
 });
 

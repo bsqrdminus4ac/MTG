@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import type { CardDefinition } from "../../src/model/cardDefinition";
-import { snapshotSource } from "../../src/model/characteristics";
+import { snapshotObject } from "../../src/model/characteristics";
 import { cardDefId, playerId } from "../../src/model/ids";
 import { evalObjectPredicate } from "../../src/model/objectPredicates";
 import type { ObjectPredicate } from "../../src/model/predicates";
@@ -44,7 +44,7 @@ describe("evalPredicate", () => {
             ],
         };
         const scope = { bindings: {}, controller: alice, source: moved.newId };
-        const snap = snapshotSource(moved.state, moved.newId)!;
+        const snap = snapshotObject(moved.state, moved.newId)!;
         expect(evalObjectPredicate(scope, snap, nonblackCreature)).toEqual({ ok: true, value: true });
 
         const [effectState, colorEffect] = makeContinuousEffect(moved.state, {
@@ -58,7 +58,7 @@ describe("evalPredicate", () => {
             ...effectState,
             continuousEffects: [...effectState.continuousEffects, colorEffect],
         };
-        const blackSnap = snapshotSource(blackState, moved.newId)!;
+        const blackSnap = snapshotObject(blackState, moved.newId)!;
 
         expect(blackSnap.chars.colors).toEqual(["B"]);
         expect(evalObjectPredicate(scope, blackSnap, nonblackCreature)).toEqual({ ok: true, value: false });

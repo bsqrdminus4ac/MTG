@@ -1,6 +1,6 @@
 import { type ApplyResult, fail, ok } from "../core/result";
 import { withEntry } from "../core/util";
-import { getCardName, getCharacteristics, hasKeyword, snapshotSource } from "../model/characteristics";
+import { getCardName, getCharacteristics, hasKeyword, snapshotObject } from "../model/characteristics";
 import type { GameEvent } from "../model/events";
 import type { ObjectId, PlayerId } from "../model/ids";
 import { type ManaType, addMana } from "../model/mana";
@@ -71,7 +71,7 @@ export function damageCreature(state: GameState, target: ObjectId, source: Objec
     if (!obj) return ok(state, []);
     if (amount === 0) return ok(state, []);
     const next = { ...state, objects: withEntry(state.objects, target, { ...obj, damage: obj.damage + amount }) };
-    const targetLki = snapshotSource(next, target);
+    const targetLki = snapshotObject(next, target);
     if (!targetLki) return fail("Unable to locate characteristics of target");
     return ok(next, [{ type: "damageDealt", source: source.id, sourceLki: source, amount, target: { kind: "object", id: target }, targetLki, isCombatDamage }]);
 }
@@ -82,7 +82,7 @@ export function damagePlaneswalker(state: GameState, target: ObjectId, source: O
     if (amount === 0) return ok(state, []);
     if (!("loyalty" in obj.counters)) return fail("Planeswalkers have to have loyalty counters defined");
     const next = { ...state, objects: withEntry(state.objects, target, { ...obj, counters: withEntry(obj.counters, "loyalty", obj.counters["loyalty"] - amount) }) };
-    const targetLki = snapshotSource(next, target);
+    const targetLki = snapshotObject(next, target);
     if (!targetLki) return fail("Unable to locate characteristics of target");
     return ok(next, [{ type: "damageDealt", source: source.id, sourceLki: source, amount, target: { kind: "object", id: target }, targetLki, isCombatDamage }]);
 }
