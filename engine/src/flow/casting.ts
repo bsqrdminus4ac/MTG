@@ -257,11 +257,7 @@ export function payManaOptions(state: GameState): ApplyResult {
     const manaAbilities = getAllManaSources(nextState, player, card);
     if (manaAbilities.length === 0) return fail("Not enough mana abilities left to pay for this spell");
     const options = manaAbilities.map((ability) =>
-        abilityChoice(
-            ability.source,
-            ability.abilityIndex,
-            getCardText(ability.ability.effects)[0] ?? `Ability #${ability.abilityIndex + 1} of ${getCharacteristics(nextState, ability.source)?.name}`,
-        ),
+        abilityChoice(ability.source, ability.ref, getCardText(ability.ability.effects)[0] ?? `Ability ${ability.ref} of ${getCharacteristics(nextState, ability.source)?.name}`),
     );
 
     prompt = casting.kind === "spell" ? `Add mana to cast ${castName}?` : `Add mana to activate ${castName}?`;
@@ -294,7 +290,7 @@ export function applyAddManaDecision(state: GameState, answer: readonly Choice[]
     if (answer.length !== 1) return fail("Can only select one mana ability to use at a time");
     const choice = answer[0]!;
     if (choice.value.kind !== "ability") return fail("Adding mana while casting has to be via an ability");
-    const activatedResult = activateManaAbility(state, state.casting.player, choice.value.id, choice.value.index);
+    const activatedResult = activateManaAbility(state, state.casting.player, choice.value.id, choice.value.ref);
     if (!activatedResult.ok) return activatedResult;
     if (activatedResult.waiting) return activatedResult; // waiting for a decision; return as is
     const casting = activatedResult.state.casting;

@@ -1,8 +1,11 @@
+import type { Ability, AbilityRef } from "./abilities";
 import type { Characteristics } from "./cardDefinition";
 import type { ObjectId } from "./ids";
-import { getCachedCharacteristics } from "./layers";
+import { getCachedCharacteristics, refKey } from "./layers";
 import type { GameState, ObjectSnapshot } from "./state";
 import type { CardType, Keyword } from "./vocabulary";
+
+const NO_ABILITIES: readonly { ref: AbilityRef; ability: Ability }[] = [];
 
 export const isPermanentType = (t: CardType): boolean => t !== "Instant" && t !== "Sorcery";
 
@@ -13,7 +16,16 @@ export const isPermanentType = (t: CardType): boolean => t !== "Instant" && t !=
  * Simplifications to revisit: no dependency ordering inside a layer (CR 613.8)
  */
 export function getCharacteristics(state: GameState, id: ObjectId): Characteristics | null {
-    return getCachedCharacteristics(state).get(id) ?? null;
+    return getCachedCharacteristics(state).get(id)?.[0] ?? null;
+}
+
+export function getAllAbilities(state: GameState, id: ObjectId): readonly { ref: AbilityRef; ability: Ability }[] {
+    return getCachedCharacteristics(state).get(id)?.[1] ?? NO_ABILITIES;
+}
+
+export function getAbilityByRef(state: GameState, source: ObjectId, ref: AbilityRef): Ability | undefined {
+    const key = refKey(source, ref);
+    return getAllAbilities(state, source).find((a) => refKey(source, a.ref) === key)?.ability;
 }
 
 export function getCardName(state: GameState, id: ObjectId, withId?: boolean): string {

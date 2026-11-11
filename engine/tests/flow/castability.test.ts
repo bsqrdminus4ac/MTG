@@ -1,11 +1,12 @@
 import { describe, expect, test } from "vitest";
 import { applyAction, submitAnswer } from "../../src/engine";
-import type { AbilityOfKind } from "../../src/model/abilities";
+import { priorityOptions } from "../../src/flow/priority";
+import type { AbilityOfKind, AbilityRef } from "../../src/model/abilities";
 import type { CardDefinition } from "../../src/model/cardDefinition";
 import { cardDefId, playerId, type ObjectId, type StackId } from "../../src/model/ids";
+import { refKey } from "../../src/model/layers";
 import type { GameState } from "../../src/model/state";
 import { createGame } from "../../src/setup";
-import { priorityOptions } from "../../src/flow/priority";
 import { moveDefinition } from "../helpers";
 
 const alice = playerId("alice");
@@ -43,43 +44,51 @@ const creatureOnlySpell: CardDefinition = {
     subtypes: [],
     power: null,
     toughness: null,
-    abilities: [{
-        kind: "spell",
-        targets: [{
-            filter: {
-                kind: "object",
-                filter: {
-                    kind: "all",
-                    of: [
-                        { kind: "inZone", zone: "battlefield" },
-                        { kind: "hasType", type: "Creature" },
-                    ],
+    abilities: [
+        {
+            kind: "spell",
+            targets: [
+                {
+                    filter: {
+                        kind: "object",
+                        filter: {
+                            kind: "all",
+                            of: [
+                                { kind: "inZone", zone: "battlefield" },
+                                { kind: "hasType", type: "Creature" },
+                            ],
+                        },
+                    },
+                    minCount: 1,
+                    maxCount: 1,
+                    description: "creature",
                 },
-            },
-            minCount: 1,
-            maxCount: 1,
-            description: "creature",
-        }],
-        effects: [{ kind: "destroy", target: { kind: "target", spec: 0 } }],
-    }],
+            ],
+            effects: [{ kind: "destroy", target: { kind: "target", spec: 0 } }],
+        },
+    ],
 };
 
 const optionalTargetSpell: CardDefinition = {
     ...creatureOnlySpell,
     id: cardDefId("castability-optional-target"),
     name: "Optional Target",
-    abilities: [{
-        kind: "spell",
-        targets: [{
-            filter: {
-                kind: "object",
-                filter: { kind: "hasType", type: "Creature" },
-            },
-            minCount: 0,
-            maxCount: 1,
-        }],
-        effects: [],
-    }],
+    abilities: [
+        {
+            kind: "spell",
+            targets: [
+                {
+                    filter: {
+                        kind: "object",
+                        filter: { kind: "hasType", type: "Creature" },
+                    },
+                    minCount: 0,
+                    maxCount: 1,
+                },
+            ],
+            effects: [],
+        },
+    ],
 };
 
 const unaffordableSpell: CardDefinition = {
@@ -169,36 +178,38 @@ const multipleChoiceManaSource: CardDefinition = {
     types: ["Artifact"],
     power: null,
     toughness: null,
-    abilities: [{
-        kind: "activated",
-        activateableZones: ["battlefield"],
-        cost: { tap: true },
-        timingRestriction: "instantSpeed",
-        isManaAbility: true,
-        targets: [],
-        effects: [
-            {
-                kind: "choose",
-                chooser: { kind: "player", who: "controller" },
-                from: { kind: "manaType", allowed: ["R", "G"] },
-                min: 1,
-                max: 1,
-                bindAs: "firstMana",
-                prompt: "Choose the first mana type",
-            },
-            {
-                kind: "choose",
-                chooser: { kind: "player", who: "controller" },
-                from: { kind: "manaType", allowed: ["B", "U"] },
-                min: 1,
-                max: 1,
-                bindAs: "secondMana",
-                prompt: "Choose the second mana type",
-            },
-            { kind: "addMana", mana: { kind: "bound", name: "firstMana" }, amount: 1 },
-            { kind: "addMana", mana: { kind: "bound", name: "secondMana" }, amount: 1 },
-        ],
-    }],
+    abilities: [
+        {
+            kind: "activated",
+            activateableZones: ["battlefield"],
+            cost: { tap: true },
+            timingRestriction: "instantSpeed",
+            isManaAbility: true,
+            targets: [],
+            effects: [
+                {
+                    kind: "choose",
+                    chooser: { kind: "player", who: "controller" },
+                    from: { kind: "manaType", allowed: ["R", "G"] },
+                    min: 1,
+                    max: 1,
+                    bindAs: "firstMana",
+                    prompt: "Choose the first mana type",
+                },
+                {
+                    kind: "choose",
+                    chooser: { kind: "player", who: "controller" },
+                    from: { kind: "manaType", allowed: ["B", "U"] },
+                    min: 1,
+                    max: 1,
+                    bindAs: "secondMana",
+                    prompt: "Choose the second mana type",
+                },
+                { kind: "addMana", mana: { kind: "bound", name: "firstMana" }, amount: 1 },
+                { kind: "addMana", mana: { kind: "bound", name: "secondMana" }, amount: 1 },
+            ],
+        },
+    ],
 };
 
 const redBlackSpell: CardDefinition = {
@@ -216,15 +227,14 @@ const whiteSpell: CardDefinition = {
     manaCost: { generic: 0, pips: ["W"] },
 };
 
-function game(
-    definitions: readonly CardDefinition[],
-    aliceDeck: readonly CardDefinition[],
-    bobDeck: readonly CardDefinition[] = [creature],
-): GameState {
-    return createGame([creature, ...definitions], [
-        { id: alice, deck: aliceDeck.map(({ id }) => id) },
-        { id: bob, deck: bobDeck.map(({ id }) => id) },
-    ]);
+function game(definitions: readonly CardDefinition[], aliceDeck: readonly CardDefinition[], bobDeck: readonly CardDefinition[] = [creature]): GameState {
+    return createGame(
+        [creature, ...definitions],
+        [
+            { id: alice, deck: aliceDeck.map(({ id }) => id) },
+            { id: bob, deck: bobDeck.map(({ id }) => id) },
+        ],
+    );
 }
 
 function atPrecombatMain(state: GameState): GameState {
@@ -235,9 +245,9 @@ function offersCast(state: GameState, card: ObjectId): boolean {
     return priorityOptions(state, alice).some((option) => option.action.type === "castSpell" && option.action.card === card);
 }
 
-function offersActivation(state: GameState, source: ObjectId, abilityIndex: number): boolean {
+function offersActivation(state: GameState, source: ObjectId, abilityRef: AbilityRef): boolean {
     return priorityOptions(state, alice).some(
-        (option) => option.action.type === "activateAbility" && option.action.source === source && option.action.abilityIndex === abilityIndex,
+        (option) => option.action.type === "activateAbility" && option.action.source === source && refKey(option.action.source, option.action.abilityRef) === refKey(source, abilityRef),
     );
 }
 
@@ -253,12 +263,7 @@ describe("castability and activatability options", () => {
     });
 
     test("does not offer a creature-only spell when the only opposing creature has hexproof", () => {
-        const inHand = moveDefinition(
-            game([hexproofCreature, creatureOnlySpell], [creatureOnlySpell], [hexproofCreature]),
-            alice,
-            creatureOnlySpell,
-            "hand",
-        );
+        const inHand = moveDefinition(game([hexproofCreature, creatureOnlySpell], [creatureOnlySpell], [hexproofCreature]), alice, creatureOnlySpell, "hand");
         const hexproofOnBattlefield = moveDefinition(inHand.state, bob, hexproofCreature, "battlefield");
 
         expect(offersCast(atPrecombatMain(hexproofOnBattlefield.state), inHand.newId)).toBe(false);
@@ -271,16 +276,13 @@ describe("castability and activatability options", () => {
     });
 
     test("does not offer unaffordable spells or abilities", () => {
-        let state = game(
-            [unaffordableSpell, unaffordableAbilitySource],
-            [unaffordableSpell, unaffordableAbilitySource],
-        );
+        let state = game([unaffordableSpell, unaffordableAbilitySource], [unaffordableSpell, unaffordableAbilitySource]);
         const spell = moveDefinition(state, alice, unaffordableSpell, "hand");
         state = spell.state;
         const abilitySource = moveDefinition(state, alice, unaffordableAbilitySource, "battlefield");
 
         expect(offersCast(atPrecombatMain(abilitySource.state), spell.newId)).toBe(false);
-        expect(offersActivation(abilitySource.state, abilitySource.newId, 0)).toBe(false);
+        expect(offersActivation(abilitySource.state, abilitySource.newId, { kind: "printed", index: 0 })).toBe(false);
     });
 
     test("offers instants but not sorceries during combat or while the stack is non-empty", () => {
@@ -293,15 +295,17 @@ describe("castability and activatability options", () => {
         const stackCharacteristics = spellOnStack.state.definitions[stackSpell.id]!;
         const stackState: GameState = {
             ...spellOnStack.state,
-            stack: [{
-                kind: "spell",
-                id: spellOnStack.state.nextId as StackId,
-                controller: alice,
-                source: spellOnStack.newId,
-                targets: [],
-                ability: stackCharacteristics.abilities.find((ability): ability is AbilityOfKind<"spell"> => ability.kind === "spell")!,
-                bindings: {},
-            }],
+            stack: [
+                {
+                    kind: "spell",
+                    id: spellOnStack.state.nextId as StackId,
+                    controller: alice,
+                    source: spellOnStack.newId,
+                    targets: [],
+                    ability: stackCharacteristics.abilities.find((ability): ability is AbilityOfKind<"spell"> => ability.kind === "spell")!,
+                    bindings: {},
+                },
+            ],
         };
         const combatState = {
             ...atPrecombatMain(state),
@@ -318,14 +322,11 @@ describe("castability and activatability options", () => {
         const state = game([sharedSourceAbilities], [sharedSourceAbilities]);
         const source = moveDefinition(state, alice, sharedSourceAbilities, "battlefield");
 
-        expect(offersActivation(source.state, source.newId, 0)).toBe(false);
+        expect(offersActivation(source.state, source.newId, { kind: "printed", index: 0 })).toBe(false);
     });
 
     test("considers each decision when checking whether a mana ability can pay a spell cost", () => {
-        let state = game(
-            [multipleChoiceManaSource, redBlackSpell, whiteSpell],
-            [multipleChoiceManaSource, redBlackSpell, whiteSpell],
-        );
+        let state = game([multipleChoiceManaSource, redBlackSpell, whiteSpell], [multipleChoiceManaSource, redBlackSpell, whiteSpell]);
         const source = moveDefinition(state, alice, multipleChoiceManaSource, "battlefield");
         state = source.state;
         const payableSpell = moveDefinition(state, alice, redBlackSpell, "hand");
@@ -337,17 +338,14 @@ describe("castability and activatability options", () => {
     });
 
     test("a creature entering this turn can use a tap ability only if it has haste", () => {
-        const state = game(
-            [sharedSourceAbilities, hastyTapAbilitySource],
-            [sharedSourceAbilities, hastyTapAbilitySource],
-        );
+        const state = game([sharedSourceAbilities, hastyTapAbilitySource], [sharedSourceAbilities, hastyTapAbilitySource]);
         const withoutHaste = moveDefinition(state, alice, sharedSourceAbilities, "battlefield");
         const withHaste = moveDefinition(withoutHaste.state, alice, hastyTapAbilitySource, "battlefield");
 
         expect(withoutHaste.state.objects[withoutHaste.newId]?.turnEnteredZone).toBe(withoutHaste.state.turn.number);
         expect(withHaste.state.objects[withHaste.newId]?.turnEnteredZone).toBe(withHaste.state.turn.number);
-        expect(offersActivation(withoutHaste.state, withoutHaste.newId, 1)).toBe(false);
-        expect(offersActivation(withHaste.state, withHaste.newId, 1)).toBe(true);
+        expect(offersActivation(withoutHaste.state, withoutHaste.newId, { kind: "printed", index: 1 })).toBe(false);
+        expect(offersActivation(withHaste.state, withHaste.newId, { kind: "printed", index: 1 })).toBe(true);
     });
 
     test("returns a failure instead of throwing when directly casting an unavailable spell", () => {

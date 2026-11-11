@@ -1,4 +1,5 @@
 import { type Result, badResult, goodResult } from "../core/result";
+import type { AbilityRef } from "../model/abilities";
 import { getCharacteristics } from "../model/characteristics";
 import type { ObjectId, PlayerId } from "../model/ids";
 import type { EvalScope, GameState } from "../model/state";
@@ -21,7 +22,7 @@ export function checkCastable(state: GameState, player: PlayerId, card: ObjectId
     if (!canCastSpellNow(state, player, chars)) return badResult("You can't cast that card now");
 
     // 2. targets (iterates objects)
-    const scope: EvalScope = { controller: player, source: card,  bindings: {}};
+    const scope: EvalScope = { controller: player, source: card, bindings: {} };
     if (!hasEnoughTargets(state, scope, spell.targets)) return badResult("There aren't enough legal targets");
 
     // 3. mana (recursive search, so last)
@@ -30,11 +31,11 @@ export function checkCastable(state: GameState, player: PlayerId, card: ObjectId
     return goodResult(null);
 }
 
-export function checkActivatable(state: GameState, player: PlayerId, source: ObjectId, abilityIndex: number): Result<null> {
-    const abilityInfo = findActivatableAbility(state, player, source, abilityIndex);
+export function checkActivatable(state: GameState, player: PlayerId, source: ObjectId, abilityRef: AbilityRef): Result<null> {
+    const abilityInfo = findActivatableAbility(state, player, source, abilityRef);
     if (!abilityInfo.ok) return abilityInfo;
 
-    const scope: EvalScope = { controller: player, source,  bindings: {}};
+    const scope: EvalScope = { controller: player, source, bindings: {} };
     if (!hasEnoughTargets(state, scope, abilityInfo.value.ability.targets)) return badResult("There aren't enough legal targets");
 
     const cost = calculateFinalCost(state, player, abilityInfo.value.chars, abilityInfo.value.ability);

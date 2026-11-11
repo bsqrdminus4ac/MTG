@@ -1,6 +1,8 @@
 import { badResult, goodResult, type Result } from "../core/result";
+import type { AbilityRef } from "./abilities";
 import type { Action } from "./actions";
 import type { DecisionId, ObjectId, PlayerId, StackId, TriggerId } from "./ids";
+import { refKey } from "./layers";
 import type { ManaType } from "./mana";
 
 /**
@@ -22,7 +24,7 @@ export type ChoiceValue =
     | Readonly<{ kind: "object"; id: ObjectId }>
     | Readonly<{ kind: "player"; id: PlayerId }>
     | Readonly<{ kind: "index"; index: number }> // e.g. which mode of a modal spell
-    | Readonly<{ kind: "ability"; id: ObjectId; index: number }>
+    | Readonly<{ kind: "ability"; id: ObjectId; ref: AbilityRef }>
     | Readonly<{ kind: "trigger"; id: TriggerId }>
     | Readonly<{ kind: "stackEntry"; id: StackId }>
     | Readonly<{ kind: "mana"; mana: ManaType }>
@@ -58,10 +60,10 @@ export const indexChoice = (index: number, label: string): Choice => ({
     label,
     value: { kind: "index", index },
 });
-export const abilityChoice = (id: ObjectId, abilityIndex: number, label: string): Choice => ({
-    id: `object:${id}#${abilityIndex}`,
+export const abilityChoice = (id: ObjectId, abilityRef: AbilityRef, label: string): Choice => ({
+    id: refKey(id, abilityRef),
     label,
-    value: { kind: "ability", id, index: abilityIndex },
+    value: { kind: "ability", id, ref: abilityRef },
 });
 export const triggerChoice = (id: TriggerId, source: ObjectId, label: string): Choice => ({
     id: `object:${source}#${id}`,

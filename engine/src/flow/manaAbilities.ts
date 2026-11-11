@@ -1,11 +1,12 @@
 import { fail, ok, type ApplyResult } from "../core/result";
 import { withEntry } from "../core/util";
-import type { ActivatableAbilityInfo } from "../model/abilities";
+import type { AbilityRef, ActivatableAbilityInfo } from "../model/abilities";
 import { snapshotObject } from "../model/characteristics";
 import type { Decision, ResolvedAnswer } from "../model/decisions";
 import { describeAbility } from "../model/effects";
 import type { GameEvent } from "../model/events";
 import type { ObjectId, PlayerId } from "../model/ids";
+import { refKey } from "../model/layers";
 import { canPayMana, type ManaCost, type ManaPool } from "../model/mana";
 import type { Binding, Frame, GameState, ManaResolutionInProgress } from "../model/state";
 import { findActivatableAbility, getAllActivatableAbilities } from "../rules/abilityQueries";
@@ -21,13 +22,7 @@ export function getAllManaSources(state: GameState, player: PlayerId, excludeSou
 
 function hashManaSearchState(pool: ManaPool, abilities: ActivatableAbilityInfo[]) {
     let hash = Object.values(pool).join("|");
-    hash =
-        hash +
-        "^" +
-        [...abilities]
-            .sort((a, b) => a.source - b.source || a.abilityIndex - b.abilityIndex)
-            .map((a) => `${a.source}#${a.abilityIndex}`)
-            .join("|");
+    hash = hash + "^" + abilities.map((a) => refKey(a.source, a.ref)).join("|");
     return hash;
 }
 
@@ -48,7 +43,7 @@ export function couldHaveManaToPayCost(state: GameState, player: PlayerId, cost:
 
     let couldHaveMana = false;
     for (const ability of availableManaAbilities) {
-        const stateToCheck = activateManaAbility(state, player, ability.source, ability.abilityIndex);
+        const stateToCheck = activateManaAbility(state, player, ability.source, ability.ref);
         if (canFinishManaAbility(stateToCheck, player, cost, searchedStates, excludeSource)) {
             couldHaveMana = true;
             break;
@@ -84,8 +79,8 @@ function answersFor(decision: Decision): ResolvedAnswer[] {
     return [];
 }
 
-export function activateManaAbility(state: GameState, player: PlayerId, source: ObjectId, abilityIndex: number): StepResult {
-    const found = findActivatableAbility(state, player, source, abilityIndex);
+export function activateManaAbility(state: GameState, player: PlayerId, source: ObjectId, abilityRef: AbilityRef): StepResult {
+    const found = findActivatableAbility(state, player, source, abilityRef);
     if (!found.ok) return fail(found.error);
     const { chars, ability } = found.value;
     if (!ability.isManaAbility) return fail("That isn't a mana ability");

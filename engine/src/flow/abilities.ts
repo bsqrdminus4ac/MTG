@@ -1,5 +1,5 @@
 import { type ApplyResult, fail } from "../core/result";
-import type { AbilityOfKind } from "../model/abilities";
+import type { AbilityOfKind, AbilityRef } from "../model/abilities";
 import { snapshotObject } from "../model/characteristics";
 import { describeAbility } from "../model/effects";
 import type { ObjectId, PlayerId } from "../model/ids";
@@ -9,19 +9,19 @@ import { checkActivatable } from "./castability";
 import { continueCasting } from "./casting";
 import { activateManaAbility } from "./manaAbilities";
 
-export function activateAbilityForPriority(state: GameState, player: PlayerId, source: ObjectId, abilityIndex: number): ApplyResult {
-    const found = findActivatableAbility(state, player, source, abilityIndex);
+export function activateAbilityForPriority(state: GameState, player: PlayerId, source: ObjectId, abilityRef: AbilityRef): ApplyResult {
+    const found = findActivatableAbility(state, player, source, abilityRef);
     if (!found.ok) return fail(found.error);
 
     if (found.value.ability.isManaAbility) {
-        return activateManaAbility(state, player, source, abilityIndex);
+        return activateManaAbility(state, player, source, abilityRef);
     } else {
-        return beginActivation(state, player, source, abilityIndex, found.value.ability);
+        return beginActivation(state, player, source, abilityRef, found.value.ability);
     }
 }
 
-export function beginActivation(state: GameState, player: PlayerId, source: ObjectId, abilityIndex: number, ability: AbilityOfKind<"activated">): ApplyResult {
-    const activatable = checkActivatable(state, player, source, abilityIndex);
+export function beginActivation(state: GameState, player: PlayerId, source: ObjectId, abilityRef: AbilityRef, ability: AbilityOfKind<"activated">): ApplyResult {
+    const activatable = checkActivatable(state, player, source, abilityRef);
     if (!activatable.ok) return activatable;
 
     const rollback = state;

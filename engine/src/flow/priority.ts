@@ -5,6 +5,7 @@ import { type PriorityOption, priorityDecision } from "../model/decisions";
 import { describeAbility } from "../model/effects";
 import type { GameEvent } from "../model/events";
 import type { ObjectId, PlayerId } from "../model/ids";
+import { refKey } from "../model/layers";
 import { type GameState, nextPlayer } from "../model/state";
 import { moveObject } from "../model/zones";
 import { getAllActivatableAbilities } from "../rules/abilityQueries";
@@ -90,18 +91,18 @@ export function priorityOptions(state: GameState, player: PlayerId): readonly Pr
 
     options.push(
         ...getAllActivatableAbilities(state, player)
-            .filter(({ source, abilityIndex }) => checkActivatable(state, player, source, abilityIndex).ok)
-            .map(({ source, ability, abilityIndex }): PriorityOption => {
+            .filter(({ source, ref }) => checkActivatable(state, player, source, ref).ok)
+            .map(({ source, ability, ref }): PriorityOption => {
                 const sourceName = getCardName(state, source);
                 const cardText = describeAbility(ability, sourceName);
                 return {
-                    id: `activate:${source}:${abilityIndex}`,
+                    id: `activate:${refKey(source, ref)}`,
                     label: `Activate ${sourceName}'s ability` + (cardText ? ` (${cardText})` : ""),
                     action: {
                         type: "activateAbility",
                         player,
                         source,
-                        abilityIndex,
+                        abilityRef: ref,
                     },
                 };
             }),

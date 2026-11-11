@@ -1,7 +1,6 @@
 import type { CardDefinition } from "@mtg/engine";
-import { thisEntersTheBattlefield, triggered } from "../builders/abilities";
+import { thisEntersTheBattlefield, triggered, whenThisDies } from "../builders/abilities";
 import { creature, noncreatureArtifact } from "../builders/defineCard";
-
 
 export const visionarySprite: CardDefinition = creature({
     name: "Visionary Sprite",
@@ -53,7 +52,7 @@ export const cask: CardDefinition = creature({
     toughness: 1,
     abilities: [
         triggered({
-            trigger: { event: "cardMoved", when: { kind: "cardMoved", from: "battlefield", to: "graveyard", object: { kind: "isSource" } } },
+            trigger: whenThisDies(),
             effects: [
                 {
                     kind: "damage",

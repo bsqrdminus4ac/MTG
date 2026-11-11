@@ -79,12 +79,13 @@ export function App() {
             value={newGameType}
             onChange={(event) => {
               const value = event.currentTarget.value;
-              setNewGameType(value === "activation" || value === "triggers" ? value : "demo");
+              setNewGameType(value === "activation" || value === "triggers" || value === "continuous" ? value : "demo");
             }}
           >
             <option value="demo">Demo game</option>
             <option value="activation">Activation test</option>
             <option value="triggers">Triggered ability test</option>
+            <option value="continuous">Continuous ability test</option>
           </select>
           <button type="button" onClick={() => game.reset(newGameType)}>
             New game

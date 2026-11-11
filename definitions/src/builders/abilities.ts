@@ -126,3 +126,15 @@ export const grantKeyword = (filter: ObjectPredicate, keywords: Keyword[], descr
 
 export const thisGets = (power: number, toughness: number, description?: string) =>
     staticAbility({ ...{ affects: { kind: "self" }, modifications: [{ kind: "modifyPT", power, toughness }] }, ...(description !== undefined && { description }) });
+
+export const creaturesYouControl = (excludeSource?: boolean): ObjectPredicate => ({
+    kind: "all",
+    of: [
+        { kind: "inZone", zone: "battlefield" },
+        { kind: "hasType", type: "Creature" },
+        { kind: "controlledBy", who: "you" },
+        ...(excludeSource ? [{ kind: "not", of: { kind: "isSource" } } as ObjectPredicate] : []),
+    ],
+});
+
+export const whenThisDies = (): EventTrigger => ({ event: "cardMoved", when: { kind: "cardMoved", from: "battlefield", to: "graveyard", object: { kind: "isSource" } } });

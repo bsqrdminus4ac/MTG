@@ -1,6 +1,6 @@
 import type { StaticEffect } from "./continuous";
 import type { CardEffect, Condition, TargetSpec } from "./effects";
-import type { ObjectId } from "./ids";
+import type { EffectId, ObjectId } from "./ids";
 import type { ManaCost } from "./mana";
 import type { EventLeaves, Predicate, TriggerEvent } from "./predicates";
 import type { Keyword, Zone } from "./vocabulary";
@@ -36,10 +36,14 @@ export type Ability =
 
 export type AbilityOfKind<K extends Ability["kind"]> = Extract<Ability, { kind: K }>;
 
+export type AbilityRef = { kind: "printed"; index: number } | { kind: "granted"; from: GrantOrigin; index: number };
+
+export type GrantOrigin = { kind: "effect"; id: EffectId } | { kind: "static"; source: ObjectId; ability: AbilityRef }; // the granting static ability's own ref
+
 export interface ActivatableAbilityInfo {
     source: ObjectId;
     ability: AbilityOfKind<"activated">;
-    abilityIndex: number;
+    ref: AbilityRef;
 }
 
 // To ensure bindings are consistent, require that predicates use the same event kind throughout for now,

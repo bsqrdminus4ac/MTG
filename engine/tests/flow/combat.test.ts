@@ -1,13 +1,14 @@
 import { describe, expect, test } from "vitest";
 import { submitAnswer } from "../../src/engine";
-import { processCombatDamage, startCombatDamage } from "../../src/flow/combat";
+import { beginDeclareBlockers, processCombatDamage, startCombatDamage } from "../../src/flow/combat";
 import type { CardDefinition } from "../../src/model/cardDefinition";
-import { snapshotObject } from "../../src/model/characteristics";
+import { hasKeyword, snapshotObject } from "../../src/model/characteristics";
 import type { GameEvent } from "../../src/model/events";
 import { cardDefId, playerId, type ObjectId } from "../../src/model/ids";
 import type { GameState } from "../../src/model/state";
 import { moveObject } from "../../src/model/zones";
 import { createGame } from "../../src/setup";
+import { makeContinuousEffect } from "../helpers";
 
 const alice = playerId("alice");
 const bob = playerId("bob");
@@ -103,6 +104,70 @@ describe("combat damage", () => {
                 isCombatDamage: true,
             },
         ]);
+    });
+
+    describe("declare blockers", () => {
+        test.each(["static", "continuous"] as const)("a creature whose flying is removed by a %s effect can be blocked without flying or reach", (effectKind) => {
+            const flyingAttacker = creature("flying-attacker", 2, 2, [{ kind: "keyword", keyword: "flying" }]);
+            const staticAbility = {
+                kind: "static" as const,
+                activeZones: ["battlefield" as const],
+                effect: {
+                    affects: {
+                        kind: "matching" as const,
+                        filter: { kind: "hasKeyword" as const, keyword: "flying" as const },
+                    },
+                    modifications: [{ kind: "removeKeywords" as const, keywords: ["flying" as const] }],
+                },
+            };
+            const blockerDefinition = creature("ground-blocker", 2, 2, effectKind === "static" ? [staticAbility] : []);
+            const { state: initialState, attacker, blockers } = combatState(flyingAttacker, [blockerDefinition]);
+            const blocker = blockers[0]!;
+            let state: GameState = {
+                ...initialState,
+                turn: { ...initialState.turn, step: "declareBlockers" },
+                combat: {
+                    rollback: null,
+                    attackers: {
+                        [attacker]: { id: attacker, attackTarget: { kind: "player", id: bob } },
+                    },
+                },
+            };
+
+            if (effectKind === "continuous") {
+                const [nextState, effect] = makeContinuousEffect(state, {
+                    source: blocker,
+                    controller: bob,
+                    affects: { kind: "objects", ids: [attacker] },
+                    modification: { kind: "removeKeywords", keywords: ["flying"] },
+                    duration: "permanent",
+                });
+                state = { ...nextState, continuousEffects: [...nextState.continuousEffects, effect] };
+            }
+
+            expect(hasKeyword(state, attacker, "flying")).toBe(false);
+            expect(hasKeyword(state, blocker, "flying")).toBe(false);
+
+            const blockDecisionResult = beginDeclareBlockers(state);
+            expect(blockDecisionResult.ok).toBe(true);
+            if (!blockDecisionResult.ok) return;
+            const decision = blockDecisionResult.state.pending;
+            expect(decision?.kind).toBe("choose");
+            if (decision?.kind !== "choose") return;
+            const blockOption = decision.options.find((option) => option.value.kind === "object" && option.value.id === attacker);
+            expect(blockOption).toBeDefined();
+            if (!blockOption) return;
+
+            const result = submitAnswer(blockDecisionResult.state, {
+                player: bob,
+                decision: decision.id,
+                answer: { kind: "choose", selected: [blockOption.id] },
+            });
+
+            expect(result.ok).toBe(true);
+            if (!result.ok) return;
+            expect(result.state.combat?.attackers[attacker]?.blockedBy).toContain(blocker);
+        });
     });
 
     test("a blocked attacker without trample damages its blocker but not the player", () => {

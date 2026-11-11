@@ -11,17 +11,24 @@ import {
     drake,
     dustyFilter,
     forest,
+    gloriousAnthem,
+    giantGrowth,
     grove,
     island,
+    infusion,
+    llanowar,
     mountain,
     painfulPeak,
+    plains,
     pyroAdept,
     reclamation,
     scrapIdol,
     scrapShooter,
     skeins,
+    swamp,
     treasureChest,
     visionarySprite,
+    wingSplicer,
 } from "@mtg/definitions";
 
 export const ALICE = playerId("Alice");
@@ -110,6 +117,50 @@ export function triggeredAbilityTestGame(): GameState {
 
     for (const player of [ALICE, BOB]) {
         for (let i = 0; i < 5; i++) state = drawCard(state, player).state;
+    }
+
+    state = {
+        ...state,
+        turn: { number: 2, activePlayer: ALICE, step: "precombatMain" },
+        priority: { holder: ALICE, consecutivePasses: 0 },
+    };
+    return withPriorityDecision(state);
+}
+
+/** A mixed-card scenario for continuous-effect testing. */
+export function continuousAbilityTestGame(): GameState {
+    const players = [
+        {
+            player: ALICE,
+            cards: [plains, forest, island, mountain, gloriousAnthem, wingSplicer, bear, giantGrowth, bolt, drake, discardLife, skeins, reclamation],
+            battlefield: [plains, forest, island, mountain, gloriousAnthem, wingSplicer, bear],
+            hand: [giantGrowth, bolt, drake],
+        },
+        {
+            player: BOB,
+            cards: [forest, swamp, island, mountain, llanowar, bear, infusion, bolt, drake, reclamation, cask, skeins],
+            battlefield: [forest, swamp, island, mountain, llanowar, bear],
+            hand: [infusion, bolt, drake],
+        },
+    ] as const;
+    let state = createGame(
+        ALL_DEFINITIONS,
+        players.map(({ player, cards }) => ({
+            id: player,
+            deck: cards.map((card) => card.id),
+        })),
+    );
+
+    for (const { player, battlefield, hand } of players) {
+        for (const [cards, zone] of [[battlefield, "battlefield"], [hand, "hand"]] as const) {
+            for (const card of cards) {
+                const cardInLibrary = state.players[player]?.library.find((id) => state.objects[id]?.definitionId === card.id);
+                if (cardInLibrary === undefined) throw new Error(`Missing ${card.name} in ${player}'s library`);
+                const moved = moveObject(state, cardInLibrary, zone);
+                if (!moved) throw new Error(`Unable to move ${card.name} to ${zone}`);
+                state = moved.state;
+            }
+        }
     }
 
     state = {

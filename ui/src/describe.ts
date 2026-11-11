@@ -1,7 +1,9 @@
 import {
+    getAbilityByRef,
     getCardText,
     getCharacteristics,
     type Ability,
+    type AbilityRef,
     type Action,
     type Amount,
     type Answer,
@@ -94,6 +96,8 @@ export function describeModification(m: Modification): string {
       return `gains ${m.colors.join("")} color${m.colors.length === 1 ? "" : "s"}`;
     case "addKeywords":
       return `gains ${m.keywords.join(" and ")}`;
+    case "addAbilities":
+      return `gains ${m.abilities.map(describeAbility).join(" and ")}`;
     case "removeKeywords":
       return `loses ${m.keywords.join(" and ")}`;
     case "switchPT":
@@ -507,7 +511,11 @@ const describeTargetSpecs = (specs?: TargetSpec[]): string => {
   return ` targeting ${specs.map((s) => { 
     const count = s.minCount === s.maxCount ? s.maxCount : `${s.minCount} - ${s.maxCount}`
     const isPlural = s.minCount !== 1 || s.maxCount !== 1;
-    const filterDescription = s.description ? `${s.description}${isPlural ? "s" : ""}` : describeTargetFilter(s.filter, isPlural);
+    const filterDescription = s.description
+      ? isPlural && !s.description.endsWith("s")
+        ? `${s.description}s`
+        : s.description
+      : describeTargetFilter(s.filter, isPlural);
     return `${count} ${filterDescription}`;
   }).join(", ")}`;
 }
@@ -564,6 +572,13 @@ export function describeTarget(state: GameState, t: Target): string {
   return t.kind === "object" ? `${nameOf(state, t.id)} (#${t.id})` : `player ${t.id}`;
 }
 
+function describeAbilityReference(state: GameState, id: ObjectId, ref: AbilityRef): string {
+  const description = describeAbility(getAbilityByRef(state, id, ref));
+  if (description) return `ability of ${nameOf(state, id)} (#${id}): ${description}`;
+  const ability = ref.kind === "printed" ? `ability ${ref.index + 1}` : "granted ability";
+  return `${ability} of ${nameOf(state, id)} (#${id})`;
+}
+
 export function describeChoiceValue(state: GameState, v: ChoiceValue): string {
   switch (v.kind) {
       case "object":
@@ -573,7 +588,7 @@ export function describeChoiceValue(state: GameState, v: ChoiceValue): string {
       case "index":
           return `option ${v.index}`;
       case "ability":
-          return `activate ability ${v.index + 1} of ${nameOf(state, v.id)} (#${v.id})`;
+          return `activate ${describeAbilityReference(state, v.id, v.ref)}`;
       case "trigger":
           return `triggered ability #${v.id}`;
       case "stackEntry":
@@ -615,7 +630,7 @@ export function describeAction(state: GameState, a: Action): string {
     case "castSpell":
       return `cast ${nameOf(state, a.card)} (#${a.card})`;
     case "activateAbility":
-      return `activate ability ${a.abilityIndex + 1} of ${nameOf(state, a.source)} (#${a.source})`;
+      return `activate ${describeAbilityReference(state, a.source, a.abilityRef)}`;
     default:
       return unreachable(a);
   }

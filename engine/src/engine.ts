@@ -83,7 +83,7 @@ export function applyAction(state: GameState, action: Action): ApplyResult {
         case "castSpell":
             return beginSpellCast(state, action.player, action.card);
         case "activateAbility":
-            return activateAbilityForPriority(state, action.player, action.source, action.abilityIndex);
+            return activateAbilityForPriority(state, action.player, action.source, action.abilityRef);
         default:
             return assertNever(action);
     }

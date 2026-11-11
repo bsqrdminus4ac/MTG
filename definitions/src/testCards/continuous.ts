@@ -1,24 +1,11 @@
 import type { CardDefinition } from "@mtg/engine";
-import { anthem, grantKeyword } from "../builders/abilities";
+import { anthem, creaturesYouControl, drawCards, grantKeyword, tapForMana, triggered, whenThisDies } from "../builders/abilities";
 import { creature, enchantment, instant } from "../builders/defineCard";
 
 export const gloriousAnthem = enchantment({
     name: "Glorious Anthem",
     cost: "1W",
-    abilities: [
-        anthem(
-            {
-                kind: "all",
-                of: [
-                    { kind: "inZone", zone: "battlefield" },
-                    { kind: "hasType", type: "Creature" },
-                    { kind: "controlledBy", who: "you" },
-                ],
-            },
-            1,
-            1,
-        ),
-    ],
+    abilities: [anthem(creaturesYouControl(), 1, 1)],
 });
 
 export const wingSplicer = creature({
@@ -27,20 +14,7 @@ export const wingSplicer = creature({
     power: 1,
     toughness: 1,
     subtypes: ["Human", "Artificer"],
-    abilities: [
-        grantKeyword(
-            {
-                kind: "all",
-                of: [
-                    { kind: "inZone", zone: "battlefield" },
-                    { kind: "hasType", type: "Creature" },
-                    { kind: "controlledBy", who: "you" },
-                    { kind: "not", of: { kind: "isSource" } },
-                ],
-            },
-            ["flying"],
-        ),
-    ],
+    abilities: [grantKeyword(creaturesYouControl(true), ["flying"])],
 });
 
 export const giantGrowth = instant({
@@ -81,4 +55,61 @@ export const giantGrowth = instant({
     ],
 });
 
-export const CONTINUOUS_TEST_CARDS: CardDefinition[] = [gloriousAnthem, wingSplicer, giantGrowth];
+export const llanowar = creature({
+    name: "Llanowar Tribe",
+    cost: "G",
+    power: 1,
+    toughness: 1,
+    subtypes: ["Elf", "Druid"],
+    abilities: [
+        {
+            kind: "static",
+            activeZones: ["battlefield"],
+            effect: {
+                affects: { kind: "matching", filter: creaturesYouControl() },
+                modifications: [{ kind: "addAbilities", abilities: [tapForMana("G")] }],
+                description: 'Creatures you control have "{T}: Add G".',
+            },
+        },
+    ],
+});
+
+export const infusion = instant({
+    name: "Hela's Infusion",
+    cost: "B",
+    abilities: [
+        {
+            kind: "spell",
+            targets: [
+                {
+                    filter: {
+                        kind: "object",
+                        filter: {
+                            kind: "all",
+                            of: [
+                                { kind: "inZone", zone: "battlefield" },
+                                { kind: "hasType", type: "Creature" },
+                            ],
+                        },
+                    },
+                    minCount: 1,
+                    maxCount: 1,
+                    description: "creature",
+                },
+            ],
+            effects: [
+                {
+                    kind: "applyContinuousEffect",
+                    template: {
+                        affects: { kind: "target", spec: 0 },
+                        duration: "untilEndOfTurn",
+                        modifications: [{ kind: "addAbilities", abilities: [triggered({ trigger: whenThisDies(), effects: [drawCards(1)] })] }],
+                    },
+                    description: 'Until end of turn, target creature gains "When this creature dies, draw a card."',
+                },
+            ],
+        },
+    ],
+});
+
+export const CONTINUOUS_TEST_CARDS: CardDefinition[] = [gloriousAnthem, wingSplicer, giantGrowth, llanowar, infusion];

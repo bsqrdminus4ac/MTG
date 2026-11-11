@@ -1,3 +1,4 @@
+import type { Ability } from "./abilities";
 import type { EffectTarget } from "./effects";
 import type { EffectId, ObjectId, PlayerId, Timestamp } from "./ids";
 import type { Color } from "./mana";
@@ -27,15 +28,16 @@ export type Modification =
     // Layer 3
 
     // Layer 4
-    | Readonly<{ kind: "setTypes"; types: CardType[] }>
-    | Readonly<{ kind: "addTypes"; types: CardType[] }>
+    | Readonly<{ kind: "setTypes"; types: readonly CardType[] }>
+    | Readonly<{ kind: "addTypes"; types: readonly CardType[] }>
     | Readonly<{ kind: "addSubtypes"; types: string[] }>
     // Layer 5
     | Readonly<{ kind: "setColors"; colors: readonly Color[] }>
     | Readonly<{ kind: "addColors"; colors: readonly Color[] }>
     // Layer 6
-    | Readonly<{ kind: "addKeywords"; keywords: Keyword[] }>
-    | Readonly<{ kind: "removeKeywords"; keywords: Keyword[] }>
+    | Readonly<{ kind: "addAbilities"; abilities: readonly Ability[] }>
+    | Readonly<{ kind: "addKeywords"; keywords: readonly Keyword[] }>
+    | Readonly<{ kind: "removeKeywords"; keywords: readonly Keyword[] }>
     // Layer 7a
 
     // Layer 7b
@@ -51,6 +53,7 @@ export const LAYER_OF: Record<Modification["kind"], Layer> = {
     addSubtypes: "type",
     setColors: "color",
     addColors: "color",
+    addAbilities: "ability",
     addKeywords: "ability",
     removeKeywords: "ability",
     setPT: "setPT",

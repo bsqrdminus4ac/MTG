@@ -1,3 +1,4 @@
+import type { AbilityRef } from "./abilities";
 import type { ObjectId, PlayerId } from "./ids";
 
 /** Everything a player can ask the engine to do. The engine validates each one against the rules. */
@@ -13,5 +14,5 @@ export type Action =
           type: "activateAbility";
           player: PlayerId;
           source: ObjectId;
-          abilityIndex: number;
+          abilityRef: AbilityRef;
       }>;

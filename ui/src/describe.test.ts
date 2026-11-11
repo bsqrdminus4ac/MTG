@@ -1,8 +1,8 @@
 import { bolt, forest, gloriousAnthem, grove, skeins, wingSplicer } from "@mtg/definitions";
-import { type GameState, type ObjectId } from "@mtg/engine";
+import { nextID, type EffectId, type GameState, type ObjectId } from "@mtg/engine";
 import { describe, expect, test } from "vitest";
 import { ALICE, newDemoGame } from "./demo";
-import { describeAbility, describeCardText, describeEffect, describeEffects, describeEvent, describeEventPredicate, describeManaCost, describeModification, describePool, findProblems } from "./describe";
+import { describeAbility, describeAction, describeCardText, describeChoiceValue, describeEffect, describeEffects, describeEvent, describeEventPredicate, describeManaCost, describeModification, describePool, findProblems } from "./describe";
 
 describe("text describers", () => {
     test("mana costs", () => {
@@ -40,6 +40,7 @@ describe("text describers", () => {
         expect(describeModification({ kind: "addSubtypes", types: ["Elf", "Druid"] })).toBe("gains subtypes Elf and Druid");
         expect(describeModification({ kind: "addColors", colors: ["U", "R"] })).toBe("gains UR colors");
         expect(describeModification({ kind: "addKeywords", keywords: ["flying", "trample"] })).toBe("gains flying and trample");
+        expect(describeModification({ kind: "addAbilities", abilities: [forest.abilities[0]!] })).toBe("gains Mana ability: {T} → add 1× {G}");
         expect(describeModification({ kind: "removeKeywords", keywords: ["flying"] })).toBe("loses flying");
         expect(describeModification({ kind: "switchPT" })).toBe("switches power and toughness");
     });
@@ -224,6 +225,34 @@ describe("text describers", () => {
         ).toBe("Spell targeting 1 player or object, 2 creatures: do nothing");
     });
 
+    test("does not pluralize custom target descriptions that are already plural", () => {
+        expect(
+            describeAbility({
+                kind: "triggered",
+                trigger: {
+                    event: "cardMoved",
+                    when: { kind: "cardMoved" },
+                },
+                targets: [
+                    {
+                        filter: { kind: "object", filter: { kind: "hasType", type: "Creature" } },
+                        minCount: 0,
+                        maxCount: 1,
+                        description: "creatures",
+                    },
+                    {
+                        filter: { kind: "player", filter: { kind: "anyPlayer" } },
+                        minCount: 0,
+                        maxCount: 1,
+                        description: "players",
+                    },
+                ],
+                effects: [],
+                triggerableZones: ["battlefield"],
+            }),
+        ).toContain("targeting 0 - 1 creatures, 0 - 1 players:");
+    });
+
     test("expands loop effects and describes their bound values", () => {
         const ability = skeins.abilities[0];
         const effect = ability?.kind === "spell" ? ability.effects[0] : undefined;
@@ -267,6 +296,58 @@ describe("text describers", () => {
                 },
             ]),
         ).toBe("Gain life?; If the answer to “Gain life?” is yes, you gain 2 life; otherwise, you lose 1 life");
+    });
+});
+
+describe("ability references", () => {
+    test("describes a printed ability in actions and choices", () => {
+        const state = newDemoGame();
+        const source = Object.values(state.objects).find((object) => object.definitionId === forest.id)?.id;
+        if (source === undefined) throw new Error("Expected a Forest in the game");
+        const abilityRef = { kind: "printed" as const, index: 0 };
+
+        expect(describeAction(state, { type: "activateAbility", player: ALICE, source, abilityRef })).toContain("Mana ability:");
+        expect(describeChoiceValue(state, { kind: "ability", id: source, ref: abilityRef })).toContain("Mana ability:");
+    });
+
+    test("describes a granted ability", () => {
+        const game = newDemoGame();
+        const source = Object.values(game.objects).find((object) => object.definitionId === forest.id)?.id;
+        if (source === undefined) throw new Error("Expected a Forest in the game");
+        const [withNextId, effectId] = nextID<EffectId>(game);
+        const state: GameState = {
+            ...withNextId,
+            continuousEffects: [
+                ...game.continuousEffects,
+                {
+                    id: effectId,
+                    source,
+                    controller: ALICE,
+                    timestamp: game.objects[source]!.timestamp,
+                    affects: { kind: "objects", ids: [source] },
+                    modifications: [
+                        {
+                            kind: "addAbilities",
+                            abilities: [
+                                {
+                                    kind: "activated",
+                                    cost: { tap: true },
+                                    targets: [],
+                                    effects: [{ kind: "gainLife", who: { kind: "player", who: "controller" }, amount: 1 }],
+                                    activateableZones: ["battlefield"],
+                                    timingRestriction: "instantSpeed",
+                                },
+                            ],
+                        },
+                    ],
+                    duration: "permanent",
+                },
+            ],
+        };
+        const abilityRef = { kind: "granted" as const, from: { kind: "effect" as const, id: effectId }, index: 0 };
+
+        expect(describeAction(state, { type: "activateAbility", player: ALICE, source, abilityRef })).toContain("Activated:");
+        expect(describeChoiceValue(state, { kind: "ability", id: source, ref: abilityRef })).toContain("Activated:");
     });
 });
 

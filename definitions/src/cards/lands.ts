@@ -66,4 +66,32 @@ export const grove = land({
     ],
 });
 
-export const LANDS: readonly CardDefinition[] = [plains, island, swamp, mountain, forest, grove];
+export const confluence = land({
+    name: "Mana Confluence",
+    abilities: [
+        {
+            kind: "activated",
+            activateableZones: ["battlefield"],
+            cost: { tap: true },
+            timingRestriction: "instantSpeed",
+            isManaAbility: true,
+            targets: [],
+            effects: [
+                {
+                    kind: "choose",
+                    chooser: { kind: "player", who: "controller" },
+                    from: { kind: "manaType", allowed: ["W", "U", "B", "R", "G"] },
+                    min: 1,
+                    max: 1,
+                    bindAs: "chosenManaType",
+                    prompt: "Add one mana of any color. You lose 1 life.",
+                    description: "{T}: Add one mana of any color. You lose 1 life.",
+                },
+                { kind: "addMana", mana: { kind: "bound", name: "chosenManaType" }, amount: 1 },
+                { kind: "loseLife", who: { kind: "player", who: "controller" }, amount: 1 },
+            ],
+        },
+    ],
+});
+
+export const LANDS: readonly CardDefinition[] = [plains, island, swamp, mountain, forest, grove, confluence];

@@ -1,6 +1,6 @@
 import { submitAnswer, type Answer, type DecisionId, type GameEvent, type GameState, type PlayerId, type Submission } from "@mtg/engine";
 import { useCallback, useState } from "react";
-import { activationTestGame, newDemoGame, triggeredAbilityTestGame } from "./demo";
+import { activationTestGame, continuousAbilityTestGame, newDemoGame, triggeredAbilityTestGame } from "./demo";
 import { describeAnswer, describeEvent } from "./describe";
 
 export interface LogEntry {
@@ -36,19 +36,23 @@ function appendLog(log: readonly LogEntry[], drafts: readonly Draft[]): readonly
     return [...log, ...added].slice(-MAX_LOG);
 }
 
-export type GameType = "demo" | "activation" | "triggers";
+export type GameType = "demo" | "activation" | "triggers" | "continuous";
 
 function freshModel(gameType: GameType = "demo"): Model {
     const startingState = gameType === "activation"
         ? activationTestGame()
         : gameType === "triggers"
             ? triggeredAbilityTestGame()
-            : newDemoGame();
+            : gameType === "continuous"
+                ? continuousAbilityTestGame()
+                : newDemoGame();
     const startDescription = gameType === "activation"
         ? "New game: activation test scenario"
         : gameType === "triggers"
             ? "New game: triggered ability test scenario"
-            : "New game: alice vs bob, 7 cards each (decks are not shuffled)";
+            : gameType === "continuous"
+                ? "New game: continuous ability test scenario"
+                : "New game: alice vs bob, 7 cards each (decks are not shuffled)";
     return {
         state: startingState,
         log: appendLog([], [{ kind: "event", text: startDescription }]),
