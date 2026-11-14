@@ -9,7 +9,7 @@ import { STEPS, type Step } from "../model/vocabulary";
 import { drawCardResult, moveObject } from "../model/zones";
 import { expireEffects } from "../rules/continuousEffects";
 import { openDecision } from "../rules/pending";
-import { beginCombat, beginDeclareBlockers, processCombatDamage } from "./combat";
+import { beginCombat, beginDeclareBlockers, startCombatDamage } from "./combat";
 import { givePriorityToActivePlayer } from "./priority";
 
 export const MAX_HAND_SIZE = 7;
@@ -64,10 +64,15 @@ export function advanceStep(state: GameState, events: readonly GameEvent[]): App
             if (!next.combat) {
                 continue; // Skip combat damage step if no attackers are declared
             }
-            const result = processCombatDamage(next);
+            const result = startCombatDamage(next);
             if (!result.ok) return result;
-            next = result.state;
             out.push(...result.events);
+
+            if (result.state.pending) {
+                return ok(result.state, out);
+            } else {
+                next = result.state;
+            }
         } else if (step === "cleanup") {
             const excess = handExcess(next);
             if (excess > 0) return ok(askDiscard(next, excess), out); // pauses until answered

@@ -1,5 +1,5 @@
 import { applySequentially, fail, ok, type ApplyResult } from "../core/result";
-import { keysOf, withEntry } from "../core/util";
+import { withEntry } from "../core/util";
 import { getCardName, hasCardType, hasKeyword, snapshotObject } from "../model/characteristics";
 import { chooseMany, chooseOne, nullChoice, objectChoice, orderingDecision, playerChoice, type Choice } from "../model/decisions";
 import type { GameEvent } from "../model/events";
@@ -242,7 +242,7 @@ export function chooseBlockers(state: GameState, player: PlayerId): ApplyResult 
     let currentBlocks = { ...state.combat.blocksChosen };
     let currentState = { ...state };
     const isFirstChoice = !Object.values(state.combat.blocksChosen).includes(true);
-    for (const blocker of keysOf(state.combat.blocksChosen)) {
+    for (const blocker of getAllAvailableBlockers(state, player)) {
         if (!state.combat.blocksChosen[blocker]) {
             const blockOptions = getBlockableAttackers(state, blocker);
             if (blockOptions.length === 0) {
@@ -373,6 +373,7 @@ function canBlockThisAttacker(state: GameState, blocker: ObjectId, attacker: Com
     if (blockObj.tapped) return false;
     if (!hasCardType(state, blocker, "Creature") || !hasCardType(state, attacker.id, "Creature")) return false;
     if (blockObj.controller === attackObj.controller) return false;
+    if (hasKeyword(state, attacker.id, "flying") && !(hasKeyword(state, blocker, "flying") || hasKeyword(state, blocker, "reach"))) return false;
     return true;
 }
 
@@ -424,7 +425,7 @@ export function processCombatDamage(state: GameState, isFirstStrikeStep?: boolea
         Object.values(state.combat.attackers).map((a) => (currentState: GameState) => dealCombatDamage(currentState, a, snapshots, isFirstStrikeStep)),
     );
     if (!combatDoneState.ok) return combatDoneState;
-    return givePriorityToActivePlayer(combatDoneState.state, combatDoneState.events);
+    return givePriorityToActivePlayer({ ...combatDoneState.state, combat: null }, combatDoneState.events);
 }
 
 const snap = (state: GameState, snapshots: Map<ObjectId, ObjectSnapshot>, id: ObjectId) => {
