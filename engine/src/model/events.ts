@@ -1,4 +1,4 @@
-import type { Duration } from "./continuous";
+import type { ContinuousEffect } from "./continuous";
 import { type ObjectId, type PlayerId, type StackId } from "./ids";
 import type { ManaType } from "./mana";
 import type { AttackableTarget, ObjectSnapshot, Target } from "./state";
@@ -34,8 +34,8 @@ type ObjectEvent =
     | Readonly<{ type: "permanentUntapped"; object: ObjectId; cardName: string }>
     | Readonly<{ type: "permanentDestroyed"; object: ObjectId; cardName: string; sourceName?: string }>
     | Readonly<{ type: "permanentSacrificed"; object: ObjectId; cardName: string; sourceName?: string }>
-    | Readonly<{ type: "continuousEffectCreated"; modType: "locked" | "rules"; sourceName: string | undefined; duration: Duration; description: string | undefined }>
-    | Readonly<{ type: "continuousEffectExpired"; sourceName: string | undefined; duration: Duration; description: string | undefined }>;
+    | Readonly<{ type: "continuousEffectCreated"; effect: ContinuousEffect }>
+    | Readonly<{ type: "continuousEffectExpired"; effect: ContinuousEffect }>;
 
 type StackEvent =
     | Readonly<{ type: "spellCast"; player: PlayerId; card: ObjectId; spellLki: ObjectSnapshot; targets: readonly Target[] }>

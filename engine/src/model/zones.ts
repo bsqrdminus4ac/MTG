@@ -118,7 +118,7 @@ function handleContinuousEffectsOnMove(state: GameState, oldId: ObjectId, from: 
         }
         return ok(
             { ...state, continuousEffects: remaining },
-            expired.map((e) => ({ type: "continuousEffectExpired", sourceName: e.sourceName, description: e.description, duration: e.duration })),
+            expired.map((e) => ({ type: "continuousEffectExpired", effect: e })),
         );
     }
     return ok(state, []);

@@ -2,7 +2,7 @@ import { fail, ok, type ApplyResult } from "../core/result";
 import { assertNever } from "../core/util";
 import { getCardName, getCharacteristics, snapshotObject } from "../model/characteristics";
 import { abilityChoice, chooseMany, chooseOne, yesNo, type Choice } from "../model/decisions";
-import { describeAbility, getCardText } from "../model/effects";
+import { abilityText } from "../model/effects";
 import type { GameEvent } from "../model/events";
 import { type ObjectId, type PlayerId } from "../model/ids";
 import { canPayMana } from "../model/mana";
@@ -70,7 +70,7 @@ export function cancelCast(state: GameState): ApplyResult {
                   type: "abilityActivateCancelled",
                   player: state.casting.player,
                   abilitySource: state.casting.sourceSnapshot.id,
-                  description: describeAbility(state.casting.ability, state.casting.sourceSnapshot.chars.name, true),
+                  description: abilityText(state.casting.ability, state.casting.sourceSnapshot.chars.name),
                   sourceName: state.casting.sourceSnapshot.chars.name,
               };
     return ok(state.casting.rollback, [...state.casting.events, event]);
@@ -133,7 +133,7 @@ export function commitCast(state: GameState): ApplyResult {
                 abilitySourceLki: entry.sourceSnapshot,
                 player: castingInfo.player,
                 targets: castingInfo.targets.flat(), //TODO: Consider making event layered too
-                description: describeAbility(entry.ability, entry.sourceSnapshot.chars.name, true),
+                description: abilityText(entry.ability, entry.sourceSnapshot.chars.name),
             });
             const stackState = pushStackEntry(currentState, entry);
             return grantPriority({ ...stackState, casting: null }, out, castingInfo.player, 0);
@@ -256,9 +256,7 @@ export function payManaOptions(state: GameState): ApplyResult {
 
     const manaAbilities = getAllManaSources(nextState, player, card);
     if (manaAbilities.length === 0) return fail("Not enough mana abilities left to pay for this spell");
-    const options = manaAbilities.map((ability) =>
-        abilityChoice(ability.source, ability.ref, getCardText(ability.ability.effects)[0] ?? `Ability ${ability.ref} of ${getCharacteristics(nextState, ability.source)?.name}`),
-    );
+    const options = manaAbilities.map((ability) => abilityChoice(ability.source, ability.ref, getCardName(nextState, ability.source)));
 
     prompt = casting.kind === "spell" ? `Add mana to cast ${castName}?` : `Add mana to activate ${castName}?`;
 

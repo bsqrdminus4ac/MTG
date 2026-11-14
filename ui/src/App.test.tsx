@@ -1,7 +1,7 @@
 import { bolt, drake, forest } from "@mtg/definitions";
 import { chooseMany, createGame, getCharacteristics, indexChoice, moveObject, orderingDecision, yesNo, type CardDefinition, type DecisionId, type GameState, type StackId } from "@mtg/engine";
-import { StrictMode } from "react";
 import { act, fireEvent, render, renderHook, screen, waitFor, within } from "@testing-library/react";
+import { StrictMode } from "react";
 import { describe, expect, test, vi } from "vitest";
 import { App, ProgressState } from "./App";
 import { DecisionPanel } from "./components/DecisionPanel";
@@ -31,7 +31,7 @@ function cardWithText(card: CardDefinition, description: string): CardDefinition
 
     const describedAbility = {
         ...ability,
-        effects: ability.effects.map((effect, index) => (index === 0 ? { ...effect, description } : effect)),
+        text: description,
     };
     return { ...card, abilities: [describedAbility, ...card.abilities.slice(1)] };
 }
@@ -152,7 +152,7 @@ describe("zones", () => {
         const summary = must(cardText.closest("summary"));
         expect(summary.querySelector(".name")?.textContent).toBe("Forest");
         expect(summary.querySelector(".obj-card-text")?.textContent).toBe("Forest taps to add one green mana.");
-        expect(screen.getByText("Mana ability: {T} → add 1× {G}")).toBeTruthy();
+        expect(screen.getByText("{T} → add 1× {G}")).toBeTruthy();
     });
 
     test("includes keyword abilities in the collapsed card text", () => {
@@ -351,10 +351,7 @@ describe("stack panel", () => {
     });
 
     test("lists entries with the top of the stack first", () => {
-        const base = gameWithCards([
-            cardWithText(bolt, "<this> deals three damage."),
-            cardWithText(forest, "<this> taps for green mana."),
-        ]);
+        const base = gameWithCards([cardWithText(bolt, "<this> deals three damage."), cardWithText(forest, "<this> taps for green mana.")]);
         const hand = must(base.players[ALICE]).hand;
         const find = (def: CardDefinition) => must(hand.find((id) => base.objects[id]?.definitionId === def.id));
 
@@ -412,6 +409,6 @@ describe("stack panel", () => {
         expect(text).toContain("deal 3 damage to target 1"); // the spell's effect, read from its card
         expect(text).toContain("Card TextLightning Bolt deals three damage.");
         expect(text).toContain("player Bob"); // its target
-        expect(text).toContain("Mana ability: {T} → add 1× {G}"); // the ability is read from its source card
+        expect(text).toContain("add 1× {G}"); // the ability is read from its source card
     });
 });

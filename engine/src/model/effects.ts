@@ -1,3 +1,4 @@
+import type { Ability } from "./abilities";
 import type { AppliedEffect } from "./continuous";
 import type { ManaType } from "./mana";
 import type { Comparison, ObjectPredicate, PlayerPredicate, Predicate, StackPredicate } from "./predicates";
@@ -14,7 +15,7 @@ export type TargetFilter =
     | { kind: "stackEntry"; filter: StackPredicate }
     | { kind: "anyOf"; of: TargetFilter[] };
 
-export type TargetSpec = { filter: TargetFilter; minCount: number; maxCount: number; description?: string };
+export type TargetSpec = { filter: TargetFilter; minCount: number; maxCount: number; targetName?: string };
 
 export const permanentOfType = (allowedTypes: PermanentType[] | "any"): TargetFilter => {
     const inBattlefield: ObjectPredicate = { kind: "inZone", zone: "battlefield" };
@@ -66,15 +67,11 @@ type InternalEffect = Readonly<{ kind: "setBinding"; bindAs: string; value: Bind
 
 export type Effect = ControlFlowEffect | PrimitiveEffect | InternalEffect;
 
-export type CardEffect = Effect & { readonly description?: string };
-
-export function getCardText(effects: readonly CardEffect[]): string[] {
-    return effects.flatMap((effect) => (effect.description?.trim() ? [effect.description] : []));
-}
-
-export function describeAbility(ability: { readonly effects: readonly CardEffect[] }, sourceName: string, includeFallback?: boolean): string {
-    const text = getCardText(ability.effects).map((t) => t.replaceAll("<this>", sourceName));
-    return text.length > 0 ? text.join(" ") : includeFallback ? `${sourceName}'s ability` : "";
+export function abilityText(ability: Ability, sourceName: string): string {
+    if (ability.kind === "keyword") {
+        return ability.keyword.charAt(0).toUpperCase() + ability.keyword.slice(1).toLowerCase();
+    }
+    return ability.text.replaceAll("<this>", sourceName);
 }
 
 export const mayDo = (who: EffectTarget, prompt: string, bindAs: string, then: readonly Effect[]): Effect[] => {

@@ -20,9 +20,9 @@ export const pyroAdept = creature({
                     kind: "damage",
                     amount: 1,
                     to: { kind: "target", spec: 0 },
-                    description: "{T}: <this> deals 1 damage to any target.",
                 },
             ],
+            text: "{T}: <this> deals 1 damage to any target.",
         },
     ],
 });
@@ -38,6 +38,7 @@ export const clockworkScribe = noncreatureArtifact({
             timingRestriction: "instantSpeed",
             targets: [],
             effects: [drawCards(1)],
+            text: "1, {T}: Draw a card.",
         },
     ],
 });
@@ -56,7 +57,8 @@ export const arcaneElf = creature({
             cost: { mana: { generic: 1, pips: ["G"] }, tap: true },
             targets: [],
             timingRestriction: "instantSpeed",
-            effects: [{ kind: "gainLife", amount: 2, who: { kind: "player", who: "controller" }, description: "You gain 2 life." }],
+            effects: [{ kind: "gainLife", amount: 2, who: { kind: "player", who: "controller" } }],
+            text: "1G, {T}: You gain 2 life.",
         },
     ],
 });
@@ -71,7 +73,8 @@ export const scrapIdol = noncreatureArtifact({
             cost: { sacrificeSelf: true },
             targets: [],
             timingRestriction: "instantSpeed",
-            effects: [{ kind: "gainLife", amount: 3, who: { kind: "player", who: "controller" }, description: "You gain 3 life." }],
+            effects: [{ kind: "gainLife", amount: 3, who: { kind: "player", who: "controller" } }],
+            text: "Sacrifice <this>: You gain 3 life.",
         },
     ],
 });
@@ -101,11 +104,12 @@ export const scrapShooter = creature({
                     },
                     minCount: 1,
                     maxCount: 1,
-                    description: "creature",
+                    targetName: "creature",
                 },
             ],
             timingRestriction: "instantSpeed",
-            effects: [{ kind: "damage", amount: 2, to: { kind: "target", spec: 0 }, description: "<this> deals 2 damage to any target." }],
+            effects: [{ kind: "damage", amount: 2, to: { kind: "target", spec: 0 } }],
+            text: "Sacrifice <this>: <this> deals 2 damage to any target.",
         },
     ],
 });
@@ -121,7 +125,8 @@ export const treasureChest = noncreatureArtifact({
             isManaAbility: true,
             targets: [],
             timingRestriction: "instantSpeed",
-            effects: [{ kind: "addMana", mana: { kind: "mana", type: "R" }, amount: 1, description: "Add R." }],
+            effects: [{ kind: "addMana", mana: { kind: "mana", type: "R" }, amount: 1 }],
+            text: "{T}, sacrifice <this>: Add R.",
         },
     ],
 });
@@ -137,9 +142,10 @@ export const painfulPeak = land({
             timingRestriction: "instantSpeed",
             isManaAbility: true,
             effects: [
-                { kind: "addMana", mana: { kind: "mana", type: "R" }, amount: 1, description: "Add R." },
-                { kind: "loseLife", amount: 1, who: { kind: "player", who: "controller" }, description: "You lose 1 life." },
+                { kind: "addMana", mana: { kind: "mana", type: "R" }, amount: 1 },
+                { kind: "loseLife", amount: 1, who: { kind: "player", who: "controller" } },
             ],
+            text: "{T}: Add R. You lose 1 life.",
         },
     ],
 });
@@ -154,7 +160,8 @@ export const dustyFilter = land({
             targets: [],
             timingRestriction: "instantSpeed",
             isManaAbility: true,
-            effects: [{ kind: "addMana", mana: { kind: "mana", type: "G" }, amount: 2, description: "Add GG." }],
+            effects: [{ kind: "addMana", mana: { kind: "mana", type: "G" }, amount: 2 }],
+            text: "1, {T}: Add GG.",
         },
     ],
 });

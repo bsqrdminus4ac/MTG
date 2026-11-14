@@ -74,6 +74,7 @@ const testAbility: AbilityOfKind<"triggered"> = {
     targets: [],
     effects: [],
     triggerableZones: ["battlefield"],
+    text: "",
 };
 
 function sourceSnapshot(state: GameState, source: ObjectId) {
@@ -209,6 +210,7 @@ function targetedContinuousSpell(
                 },
             },
         ],
+        text: "",
     };
     return {
         id: cardDefId(id),
@@ -252,6 +254,7 @@ function untargetedContinuousSpell(
                 },
             },
         ],
+        text: "",
     };
     return {
         id: cardDefId(id),
@@ -423,6 +426,7 @@ describe("resolved continuous effects", () => {
                         affects: { kind: "matching", filter: { kind: "hasType", type: "Creature" } },
                         modifications: [{ kind: "setPT", power: 4, toughness: 4 }],
                     },
+                    text: "",
                 },
             ],
         };

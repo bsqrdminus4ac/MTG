@@ -1,8 +1,19 @@
 import { bolt, forest, gloriousAnthem, grove, skeins, wingSplicer } from "@mtg/definitions";
-import { nextID, type EffectId, type GameState, type ObjectId } from "@mtg/engine";
+import { abilityText, nextID, type EffectId, type GameState, type ObjectId } from "@mtg/engine";
 import { describe, expect, test } from "vitest";
 import { ALICE, newDemoGame } from "./demo";
-import { describeAbility, describeAction, describeCardText, describeChoiceValue, describeEffect, describeEffects, describeEvent, describeEventPredicate, describeManaCost, describeModification, describePool, findProblems } from "./describe";
+import {
+    describeAction,
+    describeAllEffects,
+    describeChoiceValue,
+    describeEffect,
+    describeEvent,
+    describeEventPredicate,
+    describeManaCost,
+    describeModification,
+    describePool,
+    findProblems,
+} from "./describe";
 
 describe("text describers", () => {
     test("mana costs", () => {
@@ -18,20 +29,21 @@ describe("text describers", () => {
     });
 
     test("abilities", () => {
-        expect(describeAbility({ kind: "keyword", keyword: "flying" })).toBe("Keyword: flying");
-        expect(describeCardText({ kind: "keyword", keyword: "firstStrike" })).toEqual(["First strike"]);
+        expect(abilityText({ kind: "keyword", keyword: "flying" }, "Test")).toBe("Flying");
+        expect(abilityText({ kind: "keyword", keyword: "firstStrike" }, "Test")).toBe("Firststrike");
         expect(
-            describeCardText(
+            abilityText(
                 {
                     kind: "spell",
                     targets: [],
-                    effects: [{ kind: "gainLife", who: { kind: "player", who: "controller" }, amount: 1, description: "<this> gains life." }],
+                    effects: [{ kind: "gainLife", who: { kind: "player", who: "controller" }, amount: 1 }],
+                    text: "<this> gains life.",
                 },
                 "Healing Light",
             ),
-        ).toEqual(["Healing Light gains life."]);
-        expect(describeAbility(forest.abilities[0]!)).toBe("Mana ability: {T} → add 1× {G}");
-        expect(describeAbility(bolt.abilities[0]!)).toBe("Spell targeting 1 player or object: deal 3 damage to target 1");
+        ).toBe("Healing Light gains life.");
+        expect(abilityText(forest.abilities[0]!, "Forest")).toBe("Tap: Add G.");
+        expect(abilityText(bolt.abilities[0]!, "Lightning Bolt")).toBe("Lightning Bolt deals 3 damage to any target.");
     });
 
     test("modifications", () => {
@@ -40,20 +52,16 @@ describe("text describers", () => {
         expect(describeModification({ kind: "addSubtypes", types: ["Elf", "Druid"] })).toBe("gains subtypes Elf and Druid");
         expect(describeModification({ kind: "addColors", colors: ["U", "R"] })).toBe("gains UR colors");
         expect(describeModification({ kind: "addKeywords", keywords: ["flying", "trample"] })).toBe("gains flying and trample");
-        expect(describeModification({ kind: "addAbilities", abilities: [forest.abilities[0]!] })).toBe("gains Mana ability: {T} → add 1× {G}");
+        expect(describeModification({ kind: "addAbilities", abilities: [forest.abilities[0]!] })).toBe('gains "Tap: Add G."');
         expect(describeModification({ kind: "removeKeywords", keywords: ["flying"] })).toBe("loses flying");
         expect(describeModification({ kind: "switchPT" })).toBe("switches power and toughness");
     });
 
     test("static abilities describe their affected objects and all modifications", () => {
-        expect(describeAbility(gloriousAnthem.abilities[0])).toBe(
-            "Static: an object that is in battlefield and is a creature and is controlled by you: +1/+1",
-        );
-        expect(describeAbility(wingSplicer.abilities[0])).toBe(
-            "Static: an object that is in battlefield and is a creature and is controlled by you and does not match this object: gains flying",
-        );
+        expect(describeAllEffects(gloriousAnthem.abilities[0]!)).toBe("an object that is in battlefield and is a creature and is controlled by you: +1/+1");
+        expect(describeAllEffects(wingSplicer.abilities[0]!)).toBe("an object that is in battlefield and is a creature and is controlled by you and does not match this object: gains flying");
         expect(
-            describeAbility({
+            describeAllEffects({
                 kind: "static",
                 activeZones: ["battlefield"],
                 effect: {
@@ -62,15 +70,15 @@ describe("text describers", () => {
                         { kind: "modifyPT", power: 1, toughness: 1 },
                         { kind: "addKeywords", keywords: ["vigilance"] },
                     ],
-                    description: "This creature gets +1/+1 and has vigilance.",
                 },
+                text: "This creature gets +1/+1 and has vigilance.",
             }),
-        ).toBe("Static: This creature gets +1/+1 and has vigilance.");
+        ).toBe("this object: +1/+1, gains vigilance");
     });
 
-    test("describes event predicates for triggered abilities", () => {
+    test("describes effects on triggered abilities", () => {
         expect(
-            describeAbility({
+            describeAllEffects({
                 kind: "triggered",
                 trigger: {
                     event: "cardMoved",
@@ -90,11 +98,12 @@ describe("text describers", () => {
                 targets: [],
                 effects: [{ kind: "gainLife", who: { kind: "player", who: "controller" }, amount: 1 }],
                 triggerableZones: ["battlefield"],
+                text: "Whenever a creature you control dies, you gain 1 life.",
             }),
-        ).toBe("Triggered: Whenever an object that is a creature and is controlled by you moves from battlefield to graveyard → you gain 1 life");
+        ).toBe("you gain 1 life");
 
         expect(
-            describeAbility({
+            describeAllEffects({
                 kind: "triggered",
                 trigger: {
                     event: "cardDrawn",
@@ -104,8 +113,9 @@ describe("text describers", () => {
                 targets: [],
                 effects: [],
                 triggerableZones: ["battlefield"],
+                text: "Whenever you draw a card if 2 >= 1.",
             }),
-        ).toBe("Triggered: Whenever you draw a card if 2 >= 1 → do nothing");
+        ).toBe("");
     });
 
     test("describes each event predicate and its qualifiers", () => {
@@ -178,79 +188,94 @@ describe("text describers", () => {
 
     test("describes continuous effect creation and expiration events", () => {
         const state = newDemoGame();
+        const source = Object.values(state.objects).find((object) => object.definitionId === forest.id);
+        if (!source) throw new Error("Expected a Forest in the demo game");
+        const [, effectId] = nextID<EffectId>(state);
+        const effect = {
+            id: effectId,
+            source: source.id,
+            controller: source.controller,
+            timestamp: source.timestamp,
+            affects: { kind: "matching" as const, filter: { kind: "hasType" as const, type: "Creature" as const } },
+            modifications: [{ kind: "modifyPT" as const, power: 3, toughness: 3 }],
+            duration: "untilEndOfTurn" as const,
+        };
         expect(
             describeEvent(state, {
                 type: "continuousEffectCreated",
-                modType: "locked",
-                sourceName: "Giant Growth",
-                duration: "untilEndOfTurn",
-                description: "Target creature gets +3/+3.",
+                effect,
             }),
-        ).toBe("Continuous effect from Giant Growth created (locked; until end of turn): Target creature gets +3/+3.");
+        ).toBe(`Continuous effect created: +3/+3 on an object that is a creature — from Forest (timestamp ${source.timestamp}, until end of turn)`);
         expect(
             describeEvent(state, {
                 type: "continuousEffectExpired",
-                sourceName: undefined,
-                duration: "whileSourceOnBattlefield",
-                description: undefined,
+                effect: { ...effect, duration: "whileSourceOnBattlefield" },
             }),
-        ).toBe("Continuous effect expired (while its source remains on the battlefield)");
+        ).toBe(`Continuous effect expired: +3/+3 on an object that is a creature — from Forest (timestamp ${source.timestamp}, while its source remains on the battlefield)`);
     });
 
-    test("target descriptions use custom text or fall back to the filter kind", () => {
+    test("ability text is read from the authored text", () => {
         expect(
-            describeAbility({
-                kind: "spell",
-                targets: [
-                    {
-                        filter: {
-                            kind: "anyOf",
-                            of: [
-                                { kind: "player", filter: { kind: "opponent" } },
-                                { kind: "object", filter: { kind: "hasType", type: "Creature" } },
-                            ],
+            abilityText(
+                {
+                    kind: "spell",
+                    targets: [
+                        {
+                            filter: {
+                                kind: "anyOf",
+                                of: [
+                                    { kind: "player", filter: { kind: "opponent" } },
+                                    { kind: "object", filter: { kind: "hasType", type: "Creature" } },
+                                ],
+                            },
+                            minCount: 1,
+                            maxCount: 1,
                         },
-                        minCount: 1,
-                        maxCount: 1,
-                    },
-                    {
-                        filter: { kind: "object", filter: { kind: "hasType", type: "Creature" } },
-                        minCount: 2,
-                        maxCount: 2,
-                        description: "creature",
-                    },
-                ],
-                effects: [],
-            }),
-        ).toBe("Spell targeting 1 player or object, 2 creatures: do nothing");
+                        {
+                            filter: { kind: "object", filter: { kind: "hasType", type: "Creature" } },
+                            minCount: 2,
+                            maxCount: 2,
+                            targetName: "creature",
+                        },
+                    ],
+                    effects: [],
+                    text: "Choose a player or object and two creatures.",
+                },
+                "Test",
+            ),
+        ).toBe("Choose a player or object and two creatures.");
     });
 
-    test("does not pluralize custom target descriptions that are already plural", () => {
+    test("authored triggered ability text is not generated from target filters", () => {
         expect(
-            describeAbility({
-                kind: "triggered",
-                trigger: {
-                    event: "cardMoved",
-                    when: { kind: "cardMoved" },
+            abilityText(
+                {
+                    kind: "triggered",
+                    trigger: {
+                        event: "cardMoved",
+                        when: { kind: "cardMoved" },
+                    },
+                    targets: [
+                        {
+                            filter: { kind: "object", filter: { kind: "hasType", type: "Creature" } },
+                            minCount: 0,
+                            maxCount: 1,
+                            targetName: "creatures",
+                        },
+                        {
+                            filter: { kind: "player", filter: { kind: "anyPlayer" } },
+                            minCount: 0,
+                            maxCount: 1,
+                            targetName: "players",
+                        },
+                    ],
+                    effects: [],
+                    triggerableZones: ["battlefield"],
+                    text: "Whenever an event happens, choose up to one of each.",
                 },
-                targets: [
-                    {
-                        filter: { kind: "object", filter: { kind: "hasType", type: "Creature" } },
-                        minCount: 0,
-                        maxCount: 1,
-                        description: "creatures",
-                    },
-                    {
-                        filter: { kind: "player", filter: { kind: "anyPlayer" } },
-                        minCount: 0,
-                        maxCount: 1,
-                        description: "players",
-                    },
-                ],
-                effects: [],
-                triggerableZones: ["battlefield"],
-            }),
-        ).toContain("targeting 0 - 1 creatures, 0 - 1 players:");
+                "Test",
+            ),
+        ).toBe("Whenever an event happens, choose up to one of each.");
     });
 
     test("expands loop effects and describes their bound values", () => {
@@ -258,44 +283,52 @@ describe("text describers", () => {
         const effect = ability?.kind === "spell" ? ability.effects[0] : undefined;
 
         expect(effect).toBeDefined();
-        expect(describeEffect(effect!)).toBe("For each player, Choice: Discard a card; the cards selected by the choice are discarded from their owner's hand");
+        expect(describeEffect(effect!)).toBe("For each player, Choice: Discard a card; $picked are discarded from their owner's hand");
     });
 
     test("describes mana added using a chosen mana type", () => {
         expect(
-            describeEffects([
-                {
-                    kind: "choose",
-                    chooser: { kind: "player", who: "controller" },
-                    from: { kind: "manaType", allowed: ["R", "G"] },
-                    min: 1,
-                    max: 1,
-                    bindAs: "chosenManaType",
-                    prompt: "Add {R} or {G}.",
-                },
-                { kind: "addMana", mana: { kind: "bound", name: "chosenManaType" }, amount: 1 },
-            ]),
-        ).toBe("Choice: Add {R} or {G}.; add 1× the chosen mana type");
+            describeAllEffects({
+                kind: "spell",
+                targets: [],
+                text: "",
+                effects: [
+                    {
+                        kind: "choose",
+                        chooser: { kind: "player", who: "controller" },
+                        from: { kind: "manaType", allowed: ["R", "G"] },
+                        min: 1,
+                        max: 1,
+                        bindAs: "chosenManaType",
+                        prompt: "Add {R} or {G}.",
+                    },
+                    { kind: "addMana", mana: { kind: "bound", name: "chosenManaType" }, amount: 1 },
+                ],
+            }),
+        ).toBe("Choice: Add {R} or {G}.. add 1× $chosenManaType");
     });
 
     test("describes a mana ability that adds a chosen mana type", () => {
-        expect(describeAbility(grove.abilities[1])).toBe(
-            "Mana ability: {T} → Choice: Add {R} or {G}. Each opponent gains 1 life.; add 1× the chosen mana type; For each opponent, that opponent gains 1 life",
-        );
+        expect(abilityText(grove.abilities[1]!, "Grove")).toBe("{T}: Add {R} or {G}. Each opponent gains 1 life.");
     });
 
     test("describes conditional branches and the yes/no answer they depend on", () => {
         expect(
-            describeEffects([
-                { kind: "askYesNo", who: { kind: "player", who: "controller" }, prompt: "Gain life?", bindAs: "accepted" },
-                {
-                    kind: "if",
-                    condition: { kind: "flag", name: "accepted" },
-                    then: [{ kind: "gainLife", who: { kind: "player", who: "controller" }, amount: 2 }],
-                    else: [{ kind: "loseLife", who: { kind: "player", who: "controller" }, amount: 1 }],
-                },
-            ]),
-        ).toBe("Gain life?; If the answer to “Gain life?” is yes, you gain 2 life; otherwise, you lose 1 life");
+            describeAllEffects({
+                kind: "spell",
+                targets: [],
+                text: "",
+                effects: [
+                    { kind: "askYesNo", who: { kind: "player", who: "controller" }, prompt: "Gain life?", bindAs: "accepted" },
+                    {
+                        kind: "if",
+                        condition: { kind: "flag", name: "accepted" },
+                        then: [{ kind: "gainLife", who: { kind: "player", who: "controller" }, amount: 2 }],
+                        else: [{ kind: "loseLife", who: { kind: "player", who: "controller" }, amount: 1 }],
+                    },
+                ],
+            }),
+        ).toBe("Gain life?. If $accepted, you gain 2 life; otherwise, you lose 1 life");
     });
 });
 
@@ -306,8 +339,8 @@ describe("ability references", () => {
         if (source === undefined) throw new Error("Expected a Forest in the game");
         const abilityRef = { kind: "printed" as const, index: 0 };
 
-        expect(describeAction(state, { type: "activateAbility", player: ALICE, source, abilityRef })).toContain("Mana ability:");
-        expect(describeChoiceValue(state, { kind: "ability", id: source, ref: abilityRef })).toContain("Mana ability:");
+        expect(describeAction(state, { type: "activateAbility", player: ALICE, source, abilityRef })).toContain("Tap: Add G.");
+        expect(describeChoiceValue(state, { kind: "ability", id: source, ref: abilityRef })).toContain("Tap: Add G.");
     });
 
     test("describes a granted ability", () => {
@@ -336,6 +369,7 @@ describe("ability references", () => {
                                     effects: [{ kind: "gainLife", who: { kind: "player", who: "controller" }, amount: 1 }],
                                     activateableZones: ["battlefield"],
                                     timingRestriction: "instantSpeed",
+                                    text: "Tap: You gain 1 life.",
                                 },
                             ],
                         },
@@ -346,8 +380,8 @@ describe("ability references", () => {
         };
         const abilityRef = { kind: "granted" as const, from: { kind: "effect" as const, id: effectId }, index: 0 };
 
-        expect(describeAction(state, { type: "activateAbility", player: ALICE, source, abilityRef })).toContain("Activated:");
-        expect(describeChoiceValue(state, { kind: "ability", id: source, ref: abilityRef })).toContain("Activated:");
+        expect(describeAction(state, { type: "activateAbility", player: ALICE, source, abilityRef })).toContain("Tap: You gain 1 life.");
+        expect(describeChoiceValue(state, { kind: "ability", id: source, ref: abilityRef })).toContain("Tap: You gain 1 life.");
     });
 });
 

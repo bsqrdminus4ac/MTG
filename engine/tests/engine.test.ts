@@ -38,10 +38,11 @@ const targetSpellAbility: AbilityOfKind<"spell"> = {
             },
             minCount: 1,
             maxCount: 1,
-            description: "player",
+            targetName: "player",
         },
     ],
     effects: [],
+    text: "",
 };
 
 const targetSpell: CardDefinition = {
@@ -208,6 +209,7 @@ describe("spell targeting", () => {
                 targets: [],
                 effects: [],
                 triggerableZones: ["battlefield"],
+                text: "",
             },
             sourceSnapshot: snapshotObject(spell.state, spell.newId)!,
             bindings: {},

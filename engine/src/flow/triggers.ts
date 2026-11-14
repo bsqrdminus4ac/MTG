@@ -1,6 +1,6 @@
 import { fail, ok, type ApplyResult } from "../core/result";
 import { chooseMany, orderingDecision, triggerChoice, type Choice } from "../model/decisions";
-import { describeAbility } from "../model/effects";
+import { abilityText } from "../model/effects";
 import type { GameEvent } from "../model/events";
 import type { PlayerId } from "../model/ids";
 import { getRemainingPlayersInTurnOrder, type EvalScope, type GameState, type PendingTrigger, type Target } from "../model/state";
@@ -88,7 +88,7 @@ export function selectTargetOptions(state: GameState, events: readonly GameEvent
             type: "abilityTriggered",
             player: currentTriggerInfo.trigger.controlller,
             abilitySourceLki: currentTriggerInfo.trigger.lki,
-            description: describeAbility(currentTriggerInfo.trigger.ability, currentTriggerInfo.trigger.lki.chars.name),
+            description: abilityText(currentTriggerInfo.trigger.ability, currentTriggerInfo.trigger.lki.chars.name),
             targets: currentTriggerInfo.targets.flat(),
         };
         return selectTargetOptions(currentState, [...events, triggerEvent]); // Move on to next trigger in placingTriggers queue

@@ -3,7 +3,7 @@ import { withEntry } from "../core/util";
 import type { AbilityRef, ActivatableAbilityInfo } from "../model/abilities";
 import { snapshotObject } from "../model/characteristics";
 import type { Decision, ResolvedAnswer } from "../model/decisions";
-import { describeAbility } from "../model/effects";
+import { abilityText } from "../model/effects";
 import type { GameEvent } from "../model/events";
 import type { ObjectId, PlayerId } from "../model/ids";
 import { refKey } from "../model/layers";
@@ -99,7 +99,7 @@ export function activateManaAbility(state: GameState, player: PlayerId, source: 
         sourceSnapshot,
         frames: [{ effects: ability.effects, pc: 0 }],
         bindings: {},
-        abilityDescription: describeAbility(ability, chars.name, true),
+        abilityDescription: abilityText(ability, chars.name),
     };
 
     return runManaAbilityResolution({ ...payResult.state, resolvingMana: resolving });

@@ -335,6 +335,7 @@ details.obj[open] > summary {
 .obj-card-text {
   color: var(--muted);
   font-size: 12px;
+  white-space: pre-line;
 }
 .stack-summary-main {
   display: flex;

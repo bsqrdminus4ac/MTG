@@ -31,3 +31,11 @@ export function partition<T>(array: readonly T[], condition: (element: T) => boo
         [[], []],
     );
 }
+
+type OmitUndefined<T> = {
+    [K in keyof T as undefined extends T[K] ? never : K]: T[K];
+} & {
+    [K in keyof T as undefined extends T[K] ? K : never]?: Exclude<T[K], undefined>;
+};
+
+export const omitUndefined = <T extends object>(obj: T): OmitUndefined<T> => Object.fromEntries(Object.entries(obj).filter(([, value]) => value !== undefined)) as OmitUndefined<T>;

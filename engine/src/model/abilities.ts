@@ -1,5 +1,5 @@
 import type { StaticEffect } from "./continuous";
-import type { CardEffect, Condition, TargetSpec } from "./effects";
+import type { Condition, Effect, TargetSpec } from "./effects";
 import type { EffectId, ObjectId } from "./ids";
 import type { ManaCost } from "./mana";
 import type { EventLeaves, Predicate, TriggerEvent } from "./predicates";
@@ -14,25 +14,27 @@ export type Cost = Readonly<{
 export type Ability =
     | Readonly<{ kind: "keyword"; keyword: Keyword }>
     /** The text of an instant or sorcery. */
-    | Readonly<{ kind: "spell"; targets: TargetSpec[]; effects: readonly CardEffect[] }>
+    | Readonly<{ kind: "spell"; targets: TargetSpec[]; effects: readonly Effect[]; text: string }>
     | Readonly<{
           kind: "activated";
           cost: Cost;
           isManaAbility?: boolean; // mana abilities don't use the stack (CR 605)
           targets: TargetSpec[];
-          effects: readonly CardEffect[];
+          effects: readonly Effect[];
           activateableZones: readonly Zone[];
           timingRestriction: "sorcerySpeed" | "instantSpeed";
+          text: string;
       }>
     | Readonly<{
           kind: "triggered";
           trigger: EventTrigger;
           targets: TargetSpec[];
-          effects: readonly CardEffect[];
+          effects: readonly Effect[];
           triggerableZones: readonly Zone[];
           isManaAbility?: boolean; // If a triggered ability caused by a mana ability has no target and itself adds mana, it is also a mana ability
+          text: string;
       }>
-    | Readonly<{ kind: "static"; effect: StaticEffect; activeZones: readonly Zone[] | "all" }>;
+    | Readonly<{ kind: "static"; effect: StaticEffect; activeZones: readonly Zone[] | "all"; text: string }>;
 
 export type AbilityOfKind<K extends Ability["kind"]> = Extract<Ability, { kind: K }>;
 

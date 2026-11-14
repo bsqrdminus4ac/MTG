@@ -61,10 +61,11 @@ const creatureOnlySpell: CardDefinition = {
                     },
                     minCount: 1,
                     maxCount: 1,
-                    description: "creature",
+                    targetName: "creature",
                 },
             ],
             effects: [{ kind: "destroy", target: { kind: "target", spec: 0 } }],
+            text: "",
         },
     ],
 };
@@ -87,6 +88,7 @@ const optionalTargetSpell: CardDefinition = {
                 },
             ],
             effects: [],
+            text: "",
         },
     ],
 };
@@ -96,7 +98,7 @@ const unaffordableSpell: CardDefinition = {
     id: cardDefId("castability-unaffordable-spell"),
     name: "Unaffordable Spell",
     manaCost: oneGeneric,
-    abilities: [{ kind: "spell", targets: [], effects: [] }],
+    abilities: [{ kind: "spell", targets: [], effects: [], text: "" }],
 };
 
 const sorcery: CardDefinition = {
@@ -104,14 +106,14 @@ const sorcery: CardDefinition = {
     id: cardDefId("castability-sorcery"),
     name: "Test Sorcery",
     types: ["Sorcery"],
-    abilities: [{ kind: "spell", targets: [], effects: [] }],
+    abilities: [{ kind: "spell", targets: [], effects: [], text: "" }],
 };
 
 const instant: CardDefinition = {
     ...optionalTargetSpell,
     id: cardDefId("castability-instant"),
     name: "Test Instant",
-    abilities: [{ kind: "spell", targets: [], effects: [] }],
+    abilities: [{ kind: "spell", targets: [], effects: [], text: "" }],
 };
 
 const stackSpell: CardDefinition = {
@@ -128,6 +130,7 @@ const unaffordableAbility: AbilityOfKind<"activated"> = {
     effects: [],
     activateableZones: ["battlefield"],
     timingRestriction: "instantSpeed",
+    text: "",
 };
 
 const unaffordableAbilitySource: CardDefinition = {
@@ -145,6 +148,7 @@ const selfManaAbility: AbilityOfKind<"activated"> = {
     effects: [],
     activateableZones: ["battlefield"],
     timingRestriction: "instantSpeed",
+    text: "",
 };
 
 const ownManaSourceAbility: AbilityOfKind<"activated"> = {
@@ -155,6 +159,7 @@ const ownManaSourceAbility: AbilityOfKind<"activated"> = {
     effects: [{ kind: "addMana", mana: { kind: "mana", type: "G" }, amount: 1 }],
     activateableZones: ["battlefield"],
     timingRestriction: "instantSpeed",
+    text: "",
 };
 
 const sharedSourceAbilities: CardDefinition = {
@@ -208,6 +213,7 @@ const multipleChoiceManaSource: CardDefinition = {
                 { kind: "addMana", mana: { kind: "bound", name: "firstMana" }, amount: 1 },
                 { kind: "addMana", mana: { kind: "bound", name: "secondMana" }, amount: 1 },
             ],
+            text: "",
         },
     ],
 };
@@ -217,7 +223,7 @@ const redBlackSpell: CardDefinition = {
     id: cardDefId("castability-red-black-spell"),
     name: "Red Black Spell",
     manaCost: { generic: 0, pips: ["R", "B"] },
-    abilities: [{ kind: "spell", targets: [], effects: [] }],
+    abilities: [{ kind: "spell", targets: [], effects: [], text: "" }],
 };
 
 const whiteSpell: CardDefinition = {

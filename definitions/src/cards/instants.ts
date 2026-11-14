@@ -14,7 +14,8 @@ export const bolt = instant({
                     maxCount: 1,
                 },
             ],
-            effects: [{ kind: "damage", to: { kind: "target", spec: 0 }, amount: 3, description: "<this> deals 3 damage to any target." }],
+            effects: [{ kind: "damage", to: { kind: "target", spec: 0 }, amount: 3 }],
+            text: "<this> deals 3 damage to any target.",
         },
     ],
 });

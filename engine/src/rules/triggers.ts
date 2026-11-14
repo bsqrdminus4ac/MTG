@@ -1,7 +1,7 @@
 import { isTrue, ok, type ApplyResult } from "../core/result";
 import { snapshotObject } from "../model/characteristics";
 import type { ChoiceValue } from "../model/decisions";
-import { describeAbility } from "../model/effects";
+import { abilityText } from "../model/effects";
 import type { GameEvent } from "../model/events";
 import { nextID, type PlayerId, type TriggerId } from "../model/ids";
 import { isTriggerEvent, type TriggerEvent, type TriggerGameEvent } from "../model/predicates";
@@ -10,7 +10,7 @@ import { evalCondition } from "./conditions";
 import { evalEventPredicate } from "./predicates";
 
 export function describeTrigger(state: GameState, trigger: PendingTrigger): string {
-    const abilityDesc = describeAbility(trigger.ability, trigger.lki.chars.name);
+    const abilityDesc = abilityText(trigger.ability, trigger.lki.chars.name);
     return `Triggered ability of ${trigger.lki.chars.name}` + (abilityDesc.length > 0 ? `: ${abilityDesc}` : "");
 }
 

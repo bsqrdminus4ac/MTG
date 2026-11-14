@@ -1,6 +1,6 @@
 import {
+    abilityText,
     getAbilityByRef,
-    getCardText,
     getCharacteristics,
     type Ability,
     type AbilityRef,
@@ -35,6 +35,8 @@ import {
     type TargetSpec,
     type Zone,
 } from "@mtg/engine";
+import { refKey } from "../../engine/src/model/layers";
+import { getAbilityForSpell } from "../../engine/src/rules/stack";
 
 function unreachable(value: never): never {
   throw new Error(`Unhandled variant: ${JSON.stringify(value)}`);
@@ -97,7 +99,7 @@ export function describeModification(m: Modification): string {
     case "addKeywords":
       return `gains ${m.keywords.join(" and ")}`;
     case "addAbilities":
-      return `gains ${m.abilities.map(describeAbility).join(" and ")}`;
+      return `gains "${m.abilities.map((a) => abilityText(a, "<this>")).join('" and "')}"`;
     case "removeKeywords":
       return `loses ${m.keywords.join(" and ")}`;
     case "switchPT":
@@ -111,10 +113,19 @@ function describeModifications(modifications: readonly Modification[]): string {
   return modifications.map(describeModification).join(", ");
 }
 
+export function describeAllEffects(ability: Ability): string {
+    if (ability.kind === "keyword") return ability.keyword;
+    if (ability.kind === "static") return describeStaticEffect(ability.effect);
+    return ability.effects.map((e) => {
+        const cost = ability.kind === "activated" ? describeCost( ability.cost) : "";
+        const effect = describeEffect(e);
+        return cost === "" ? effect : `${cost} → ${effect}`;
+    }).join(". ");
+}
+
 function describeStaticEffect(effect: StaticEffect): string {
-  if (effect.description) return effect.description;
-  const who = effect.affects.kind === "self" ? "this object" : describeObjectPredicate(effect.affects.filter);
-  return `${who}: ${describeModifications(effect.modifications)}`;
+    const who = effect.affects.kind === "self" ? "this object" : describeObjectPredicate(effect.affects.filter);
+    return `${who}: ${describeModifications(effect.modifications)}`;
 }
 
 function describeAppliedEffect(effect: AppliedEffect): string {
@@ -141,136 +152,123 @@ export function describeContinuousEffect(state: GameState, e: ContinuousEffect):
   const who = e.affects.kind === "objects"
     ? e.affects.ids.map((id) => nameOf(state, id)).join(", ")
     : describeObjectPredicate(e.affects.filter);
-  return `${describeModifications(e.modifications)} on ${who} — from ${nameOf(state, e.source)} (timestamp ${e.timestamp}, ${e.duration})`;
+  return `${describeModifications(e.modifications)} on ${who} — from ${nameOf(state, e.source)} (timestamp ${e.timestamp}, ${describeDuration(e.duration)})`;
 }
 
-function describeEffectTarget(t: EffectTarget, bindings: Readonly<Record<string, string>> = {}): string {
-  switch (t.kind) {
-      case "target":
-          return `target ${t.spec + 1}`;
-      case "allTargets":
-          return "all targets";
-      case "self":
-          return "this object";
-      case "player":
-          switch (t.who) {
-            case "controller": return "you";
-            case "owner": return "this object's owner";
-            case "eachOpponent": return "each opponent";
-            case "eachPlayer": return "each player";
-            default: return unreachable(t.who);
-          }
-      case "bound":
-          return bindings[t.name] ?? `the targets chosen as ${t.name}`;
-      default:
-          return unreachable(t);
-  }
+function describeEffectTarget(t: EffectTarget): string {
+    switch (t.kind) {
+        case "target":
+            return `target ${t.spec + 1}`;
+        case "allTargets":
+            return "all targets";
+        case "self":
+            return "this object";
+        case "player":
+            switch (t.who) {
+                case "controller":
+                    return "you";
+                case "owner":
+                    return "this object's owner";
+                case "eachOpponent":
+                    return "each opponent";
+                case "eachPlayer":
+                    return "each player";
+                default:
+                    return unreachable(t.who);
+            }
+        case "bound":
+            return `$${t.name}`;
+        default:
+            return unreachable(t);
+    }
 }
 
 export function describeEffect(e: Effect): string {
-    return expandEffect(e, {});
+    switch (e.kind) {
+        case "draw":
+            return `${describeEffectTarget(e.who)} ${effectVerb(e.who, "draws", "draw")} ${describeAmount(e.count)}`;
+        case "damage":
+            return `deal ${describeAmount(e.amount)} damage to ${describeEffectTarget(e.to)}`;
+        case "gainLife":
+            return `${describeEffectTarget(e.who)} ${effectVerb(e.who, "gains", "gain")} ${describeAmount(e.amount)} life`;
+        case "loseLife":
+            return `${describeEffectTarget(e.who)} ${effectVerb(e.who, "loses", "lose")} ${describeAmount(e.amount)} life`;
+        case "destroy":
+            return `destroy ${describeEffectTarget(e.target)}`;
+        case "addMana": {
+            const mana = e.mana.kind === "mana" ? `{${e.mana.type}}` : `$${e.mana.name}`;
+            return `add ${describeAmount(e.amount)}× ${mana}`;
+        }
+        case "applyContinuousEffect":
+            return `apply effect: ${describeAppliedEffect(e.template)}`;
+        case "choose":
+            return describeEffectChoice(e);
+        case "discard":
+            return `$${e.cards.name} are discarded from their owner's hand`;
+        case "askYesNo":
+            return `${e.prompt}`;
+        case "if": {
+            const condition = describeCondition(e.condition);
+            const thenEffects = describeEffects(e.then);
+            const otherwise = e.else ? `; otherwise, ${describeEffects(e.else)}` : "";
+            return `If ${condition}, ${thenEffects}${otherwise}`;
+        }
+        case "forEach": {
+            const [subject, reference] = describeLoopSubject(e.over);
+            return `For ${subject}, ${describeEffects(e.body)}`;
+        }
+        case "setBinding":
+            return "";
+        default:
+            return unreachable(e);
+    }
 }
 
-function expandEffect(e: Effect, bindings: Readonly<Record<string, string>>): string {
-  switch (e.kind) {
-      case "draw":
-          return `${describeEffectTarget(e.who, bindings)} ${effectVerb(e.who, bindings, "draws", "draw")} ${describeAmountWithBindings(e.count, bindings)}`;
-      case "damage":
-          return `deal ${describeAmountWithBindings(e.amount, bindings)} damage to ${describeEffectTarget(e.to, bindings)}`;
-      case "gainLife":
-          return `${describeEffectTarget(e.who, bindings)} ${effectVerb(e.who, bindings, "gains", "gain")} ${describeAmountWithBindings(e.amount, bindings)} life`;
-      case "loseLife":
-          return `${describeEffectTarget(e.who, bindings)} ${effectVerb(e.who, bindings, "loses", "lose")} ${describeAmountWithBindings(e.amount, bindings)} life`;
-      case "destroy":
-          return `destroy ${describeEffectTarget(e.target, bindings)}`;
-      case "addMana": {
-          const mana = e.mana.kind === "mana"
-              ? `{${e.mana.type}}`
-              : bindings[e.mana.name] ?? `the mana type chosen as ${e.mana.name}`;
-          return `add ${describeAmountWithBindings(e.amount, bindings)}× ${mana}`;
-      }
-      case "applyContinuousEffect":
-          return `apply ${describeAppliedEffect(e.template)}`;
-      case "choose":
-          return describeEffectChoice(e);
-      case "discard":
-          return bindings[e.cards.name]
-              ? `${bindings[e.cards.name]} are discarded from their owner's hand`
-              : `The cards chosen as ${e.cards.name} are discarded from their owner's hand`;
-      case "askYesNo":
-          return `${e.prompt}`;
-      case "if": {
-          const condition = describeCondition(e.condition, bindings);
-          const thenEffects = describeEffectsWithBindings(e.then, bindings);
-          const otherwise = e.else ? `; otherwise, ${describeEffectsWithBindings(e.else, bindings)}` : "";
-          return `If ${condition}, ${thenEffects}${otherwise}`;
-      }
-      case "forEach": {
-          const [subject, reference] = describeLoopSubject(e.over, bindings);
-          return `For ${subject}, ${describeEffectsWithBindings(e.body, { ...bindings, [e.as]: reference })}`;
-      }
-      case "setBinding":
-          return "";
-      default:
-          return unreachable(e);
-  }
-}
-
-function effectVerb(target: EffectTarget, bindings: Readonly<Record<string, string>>, singular: string, plural: string): string {
+function effectVerb(target: EffectTarget, singular: string, plural: string): string {
     if (target.kind === "allTargets" || (target.kind === "player" && target.who === "controller")) return plural;
-    if (target.kind === "bound" && bindings[target.name] === "you") return plural;
     return singular;
 }
 
-function describeEffectsWithBindings(effects: readonly Effect[], bindings: Readonly<Record<string, string>>): string {
-    let currentBindings = bindings;
-    const descriptions = effects.map((effect) => {
-        const description = expandEffect(effect, currentBindings);
-        if (effect.kind === "askYesNo") currentBindings = { ...currentBindings, [effect.bindAs]: effect.prompt };
-        if (effect.kind === "choose") {
-            const valueDescription = effect.from.kind === "manaType" ? "the chosen mana type" : "the cards selected by the choice";
-            currentBindings = { ...currentBindings, [effect.bindAs]: valueDescription };
-        }
-        return description;
-    }).filter(Boolean);
+function describeEffects(effects: readonly Effect[]): string {
+    const descriptions = effects.map(describeEffect).filter(Boolean);
     return descriptions.length > 0 ? descriptions.join("; ") : "do nothing";
 }
 
-function describeLoopSubject(target: EffectTarget, bindings: Readonly<Record<string, string>>): [string, string] {
+function describeLoopSubject(target: EffectTarget): [string, string] {
     if (target.kind === "player") {
         switch (target.who) {
-            case "eachPlayer": return ["each player", "that player"];
-            case "eachOpponent": return ["each opponent", "that opponent"];
-            case "controller": return ["you", "you"];
-            case "owner": return ["the owner", "that owner"];
-            default: return unreachable(target.who);
+            case "eachPlayer":
+                return ["each player", "that player"];
+            case "eachOpponent":
+                return ["each opponent", "that opponent"];
+            case "controller":
+                return ["you", "you"];
+            case "owner":
+                return ["the owner", "that owner"];
+            default:
+                return unreachable(target.who);
         }
     }
     if (target.kind === "allTargets") return ["each target", "that target"];
     if (target.kind === "target") return [`target ${target.spec + 1}`, `target ${target.spec + 1}`];
     if (target.kind === "self") return ["this object", "this object"];
-    const label = bindings[target.name] ?? `the targets chosen as ${target.name}`;
+    const label = `$${target.name}`;
     return [label, label];
 }
 
-function describeAmountWithBindings(amount: Amount, bindings: Readonly<Record<string, string>>): string {
-    return typeof amount === "number" ? String(amount) : `the number of “${bindings[amount.name] ?? amount.name}”`;
-}
-
-function describeCondition(condition: Condition, bindings: Readonly<Record<string, string>>): string {
+function describeCondition(condition: Condition): string {
     switch (condition.kind) {
         case "flag":
-            return bindings[condition.name]
-                ? `the answer to “${bindings[condition.name]}” is yes`
-                : `“${condition.name}” is true`;
+            return `$${condition.name}`;
+
         case "compare":
-            return `${describeAmountWithBindings(condition.left, bindings)} ${condition.op} ${describeAmountWithBindings(condition.right, bindings)}`;
+            return `${describeAmount(condition.left)} ${condition.op} ${describeAmount(condition.right)}`;
         case "not":
-            return `not (${describeCondition(condition.of, bindings)})`;
+            return `not (${describeCondition(condition.of)})`;
         case "all":
-            return condition.of.map((part) => describeCondition(part, bindings)).join(" and ");
+            return condition.of.map((part) => describeCondition(part)).join(" and ");
         case "any":
-            return condition.of.map((part) => describeCondition(part, bindings)).join(" or ");
+            return condition.of.map((part) => describeCondition(part)).join(" or ");
         default:
             return unreachable(condition);
     }
@@ -491,7 +489,7 @@ function stripEventTiming(description: string): string {
 }
 
 export function describeAmount(a: Amount): string {
-    return typeof a === "number" ? String(a) : `the number of “${a.name}”`;
+    return typeof a === "number" ? String(a) : `$${a.name}`;
 }
 
 export function describeEffectChoice(e: Extract<Effect, { kind: "choose" }>): string {
@@ -511,11 +509,7 @@ const describeTargetSpecs = (specs?: TargetSpec[]): string => {
   return ` targeting ${specs.map((s) => { 
     const count = s.minCount === s.maxCount ? s.maxCount : `${s.minCount} - ${s.maxCount}`
     const isPlural = s.minCount !== 1 || s.maxCount !== 1;
-    const filterDescription = s.description
-      ? isPlural && !s.description.endsWith("s")
-        ? `${s.description}s`
-        : s.description
-      : describeTargetFilter(s.filter, isPlural);
+    const filterDescription = s.targetName ? (isPlural && !s.targetName.endsWith("s") ? `${s.targetName}s` : s.targetName) : describeTargetFilter(s.filter, isPlural);
     return `${count} ${filterDescription}`;
   }).join(", ")}`;
 }
@@ -534,35 +528,6 @@ function describeTargetFilter(filter: TargetFilter, plural: boolean): string {
             return unreachable(filter);
     }
 }
-export const describeEffects = (effects: readonly Effect[]): string => describeEffectsWithBindings(effects, {});
-
-export function describeAbility(a: Ability | undefined): string {
-    if (!a) return "";
-    switch (a.kind) {
-        case "keyword":
-            return `Keyword: ${a.keyword}`;
-        case "spell":
-            return `Spell${describeTargetSpecs(a.targets)}: ${describeEffects(a.effects)}`;
-        case "activated":
-            return `${a.isManaAbility ? "Mana ability" : "Activated"}${describeTargetSpecs(a.targets)}: ${describeCost(a.cost)} → ${describeEffects(a.effects)}`;
-        case "triggered":
-            return `Triggered${describeTargetSpecs(a.targets)}: ${describeEventPredicate(a.trigger.when)}${a.trigger.interveningIf ? ` if ${describeCondition(a.trigger.interveningIf, {})}` : ""} → ${describeEffects(a.effects)}`;
-        case "static":
-            return `Static: ${describeStaticEffect(a.effect)}`;
-        default:
-            return unreachable(a);
-    }
-}
-
-export function describeCardText(a: Ability | undefined, objectName = "this object"): string[] {
-    if (!a) return [];
-    if (a.kind === "keyword") {
-        const keyword = a.keyword.replace(/[A-Z]/g, (letter) => ` ${letter.toLowerCase()}`);
-        return [`${keyword[0]?.toUpperCase() ?? ""}${keyword.slice(1)}`];
-    }
-    if (!("effects" in a)) return [];
-    return getCardText(a.effects).map((text) => text.replace(/<this>/gi, objectName));
-}
 
 // ---------------------------------------------------------------------------
 // Targets, decisions, actions, events
@@ -573,10 +538,10 @@ export function describeTarget(state: GameState, t: Target): string {
 }
 
 function describeAbilityReference(state: GameState, id: ObjectId, ref: AbilityRef): string {
-  const description = describeAbility(getAbilityByRef(state, id, ref));
-  if (description) return `ability of ${nameOf(state, id)} (#${id}): ${description}`;
-  const ability = ref.kind === "printed" ? `ability ${ref.index + 1}` : "granted ability";
-  return `${ability} of ${nameOf(state, id)} (#${id})`;
+    const ability = getAbilityByRef(state, id, ref);
+    const key = refKey(id, ref);
+    if (!ability) return `Ability of ${nameOf(state, id)} (${key})`;
+    return `${abilityText(ability, nameOf(state, id))} (${key})`;
 }
 
 export function describeChoiceValue(state: GameState, v: ChoiceValue): string {
@@ -588,7 +553,7 @@ export function describeChoiceValue(state: GameState, v: ChoiceValue): string {
       case "index":
           return `option ${v.index}`;
       case "ability":
-          return `activate ${describeAbilityReference(state, v.id, v.ref)}`;
+          return `${describeAbilityReference(state, v.id, v.ref)}`;
       case "trigger":
           return `triggered ability #${v.id}`;
       case "stackEntry":
@@ -623,16 +588,25 @@ const describeManaType = (mana: ManaType): string => {
 
 export function describeAction(state: GameState, a: Action): string {
   switch (a.type) {
-    case "passPriority":
-      return "pass priority";
-    case "playLand":
-      return `play land ${nameOf(state, a.card)} (#${a.card})`;
-    case "castSpell":
-      return `cast ${nameOf(state, a.card)} (#${a.card})`;
-    case "activateAbility":
-      return `activate ${describeAbilityReference(state, a.source, a.abilityRef)}`;
-    default:
-      return unreachable(a);
+      case "passPriority":
+          return "";
+      case "playLand": {
+          const chars = getCharacteristics(state, a.card);
+          if (!chars) return "";
+          return chars.abilities.map((a) => abilityText(a, chars.name)).join("\n");
+      }
+      case "castSpell": {
+          const chars = getCharacteristics(state, a.card);
+          if (!chars) return "";
+          const cost = describeManaCost(chars.manaCost);
+          const spell = getAbilityForSpell(chars);
+          const text = spell && spell.text !== "" ? spell.text : "";
+          return cost === "" ? text : cost + (text === "" ? "" : `: ${text}`);
+      }
+      case "activateAbility":
+          return describeAbilityReference(state, a.source, a.abilityRef);
+      default:
+          return unreachable(a);
   }
 }
 
@@ -699,9 +673,9 @@ export function describeEvent(state: GameState, e: GameEvent): string {
       case "cardDiscarded":
           return e.cause ? `${e.cause} causes ${e.player} to discard ${e.cardName} (#${e.card})` : `${e.player} discards ${e.cardName} (#${e.card})`;
       case "continuousEffectCreated":
-          return `Continuous effect${e.sourceName ? ` from ${e.sourceName}` : ""} created (${e.modType}; ${describeDuration(e.duration)})${e.description ? `: ${e.description}` : ""}`;
+          return `Continuous effect created: ${describeContinuousEffect(state, e.effect)}`;
       case "continuousEffectExpired":
-          return `Continuous effect${e.sourceName ? ` from ${e.sourceName}` : ""} expired (${describeDuration(e.duration)})${e.description ? `: ${e.description}` : ""}`;
+          return `Continuous effect expired: ${describeContinuousEffect(state, e.effect)}`;
 
       // Spells & Abilities
       case "spellCast":

@@ -121,7 +121,7 @@ function collectTargets(state: GameState, scope: EvalScope, filter: TargetFilter
 }
 export function buildTargetPrompt(sourceName: string, spec: TargetSpec): string {
     let prompt = "Select ";
-    const targetDesc = spec.description ?? ` target ${spec.filter.kind}s`;
+    const targetDesc = spec.targetName ?? ` target ${spec.filter.kind}s`;
     if (spec.minCount === 1 && spec.maxCount === 1) {
         prompt += `the ${targetDesc} to target `;
     } else if (spec.minCount === spec.maxCount) {

@@ -5,7 +5,7 @@ import { creature, enchantment, instant } from "../builders/defineCard";
 export const gloriousAnthem = enchantment({
     name: "Glorious Anthem",
     cost: "1W",
-    abilities: [anthem(creaturesYouControl(), 1, 1)],
+    abilities: [anthem(creaturesYouControl(), 1, 1, "Creatures you control get +1/+1.")],
 });
 
 export const wingSplicer = creature({
@@ -14,7 +14,7 @@ export const wingSplicer = creature({
     power: 1,
     toughness: 1,
     subtypes: ["Human", "Artificer"],
-    abilities: [grantKeyword(creaturesYouControl(true), ["flying"])],
+    abilities: [grantKeyword(creaturesYouControl(true), ["flying"], "Other creatures you control have Flying.")],
 });
 
 export const giantGrowth = instant({
@@ -37,7 +37,7 @@ export const giantGrowth = instant({
                     },
                     minCount: 1,
                     maxCount: 1,
-                    description: "creature",
+                    targetName: "creature",
                 },
             ],
             effects: [
@@ -47,10 +47,10 @@ export const giantGrowth = instant({
                         affects: { kind: "target", spec: 0 },
                         duration: "untilEndOfTurn",
                         modifications: [{ kind: "modifyPT", power: 3, toughness: 3 }],
-                        description: "Target creature gets +3/+3 until end of turn.",
                     },
                 },
             ],
+            text: "Target creature gets +3/+3 until end of turn.",
         },
     ],
 });
@@ -68,8 +68,8 @@ export const llanowar = creature({
             effect: {
                 affects: { kind: "matching", filter: creaturesYouControl() },
                 modifications: [{ kind: "addAbilities", abilities: [tapForMana("G")] }],
-                description: 'Creatures you control have "{T}: Add G".',
             },
+            text: 'Creatures you control have "{T}: Add G".',
         },
     ],
 });
@@ -94,7 +94,7 @@ export const infusion = instant({
                     },
                     minCount: 1,
                     maxCount: 1,
-                    description: "creature",
+                    targetName: "creature",
                 },
             ],
             effects: [
@@ -103,11 +103,11 @@ export const infusion = instant({
                     template: {
                         affects: { kind: "target", spec: 0 },
                         duration: "untilEndOfTurn",
-                        modifications: [{ kind: "addAbilities", abilities: [triggered({ trigger: whenThisDies(), effects: [drawCards(1)] })] }],
+                        modifications: [{ kind: "addAbilities", abilities: [triggered({ trigger: whenThisDies(), effects: [drawCards(1)], text: "When this creature dies, draw a card." })] }],
                     },
-                    description: 'Until end of turn, target creature gains "When this creature dies, draw a card."',
                 },
             ],
+            text: 'Until end of turn, target creature gains "When this creature dies, draw a card."',
         },
     ],
 });

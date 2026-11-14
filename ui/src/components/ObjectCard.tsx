@@ -1,90 +1,90 @@
-import { getCharacteristics, manaValue, type GameState, type ObjectId } from "@mtg/engine";
-import { describeAbility, describeCardText, describeContinuousEffect, describeManaCost } from "../describe";
+import { abilityText, getCharacteristics, manaValue, type GameState, type ObjectId } from "@mtg/engine";
+import { describeAllEffects, describeContinuousEffect, describeManaCost } from "../describe";
 import { Bullets, NestedList, type BulletItem } from "./Bullets";
 
 interface ObjectCardProps {
-  readonly state: GameState;
-  readonly id: ObjectId;
-  /** Extra badge in the summary line, e.g. "top". */
-  readonly tag?: string | undefined;
+    readonly state: GameState;
+    readonly id: ObjectId;
+    /** Extra badge in the summary line, e.g. "top". */
+    readonly tag?: string | undefined;
 }
 
 const orDash = (words: readonly string[]): string => (words.length > 0 ? words.join(" ") : "—");
 
 /** One game object as a collapsible element: a summary line, and its properties as bullets when opened. */
 export function ObjectCard({ state, id, tag }: ObjectCardProps) {
-  const obj = state.objects[id];
-  if (!obj) {
-    return (
-      <div className="obj missing" role="alert">
-        Missing object #{id}: a zone lists it, but state.objects does not
-      </div>
-    );
-  }
-
-  const chars = getCharacteristics(state, id);
-  const objectName = chars?.name ?? "Unknown card";
-  const counters = Object.entries(obj.counters);
-  const isCreature = chars?.types.includes("Creature") ?? false;
-  const cardText = chars?.abilities.flatMap((ability) => describeCardText(ability, objectName)) ?? [];
-  const effects = state.continuousEffects.filter((e) => (e.affects.kind === "objects" ? e.affects.ids.includes(id) : obj.zone === "battlefield" && isCreature));
-
-  const items: BulletItem[] = [
-    ["Object ID", `#${id}`],
-    ["Definition", obj.definitionId],
-    ["Owner", obj.owner],
-    ["Controller", obj.controller],
-    ["Zone", obj.zone],
-    ["Timestamp", String(obj.timestamp)],
-    ["Tapped", obj.tapped ? "yes" : "no"],
-    ["Damage", String(obj.damage)],
-    ["Counters", counters.length > 0 ? counters.map(([kind, n]) => `${kind} ×${n}`).join(", ") : "none"],
-  ];
-
-  if (chars) {
-    const subtypes = chars.subtypes.length > 0 ? ` — ${chars.subtypes.join(" ")}` : "";
-    items.push(
-        ["Type line", orDash([...chars.supertypes, ...chars.types]) + subtypes],
-        ["Colors", chars.colors.length > 0 ? chars.colors.join("") : "colorless"],
-        ["Mana cost", describeManaCost(chars.manaCost)],
-        ["Mana value", String(manaValue(chars.manaCost))],
-        ["Power / toughness", chars.power !== null && chars.toughness !== null ? `${chars.power}/${chars.toughness}` : "—"],
-    );
-    if (cardText.length > 0) {
-        items.push(["Card Text", <NestedList key="card-text" items={cardText} />]);
+    const obj = state.objects[id];
+    if (!obj) {
+        return (
+            <div className="obj missing" role="alert">
+                Missing object #{id}: a zone lists it, but state.objects does not
+            </div>
+        );
     }
-    items.push(["Abilities", <NestedList key="abilities" items={chars.abilities.map(describeAbility)} />]);
-    items.push(["Active effects", <NestedList key="effects" items={effects.map((e) => describeContinuousEffect(state, e))} />]);
-  } else {
-    items.push(["Characteristics", "definition not found in state.definitions"]);
-  }
 
-  return (
-    <details className="obj">
-      <summary>
-        <span className="obj-summary-main">
-          <span className="obj-summary-topline">
-            <span className="obj-title">
-              <span className="name">{objectName}</span>
-              <span className="id">#{id}</span>
-            </span>
-            <span className="obj-summary-statuses">
-              {tag !== undefined && <span className="badge accent">{tag}</span>}
-              {chars?.power != null && chars.toughness != null && (
-                <span className="badge">
-                  {chars.power}/{chars.toughness}
+    const chars = getCharacteristics(state, id);
+    const objectName = chars?.name ?? "Unknown card";
+    const counters = Object.entries(obj.counters);
+    const isCreature = chars?.types.includes("Creature") ?? false;
+    const cardText = chars?.abilities.map((ability) => abilityText(ability, objectName)) ?? [];
+    const effects = state.continuousEffects.filter((e) => (e.affects.kind === "objects" ? e.affects.ids.includes(id) : obj.zone === "battlefield" && isCreature));
+
+    const items: BulletItem[] = [
+        ["Object ID", `#${id}`],
+        ["Definition", obj.definitionId],
+        ["Owner", obj.owner],
+        ["Controller", obj.controller],
+        ["Zone", obj.zone],
+        ["Timestamp", String(obj.timestamp)],
+        ["Tapped", obj.tapped ? "yes" : "no"],
+        ["Damage", String(obj.damage)],
+        ["Counters", counters.length > 0 ? counters.map(([kind, n]) => `${kind} ×${n}`).join(", ") : "none"],
+    ];
+
+    if (chars) {
+        const subtypes = chars.subtypes.length > 0 ? ` — ${chars.subtypes.join(" ")}` : "";
+        items.push(
+            ["Type line", orDash([...chars.supertypes, ...chars.types]) + subtypes],
+            ["Colors", chars.colors.length > 0 ? chars.colors.join("") : "colorless"],
+            ["Mana cost", describeManaCost(chars.manaCost)],
+            ["Mana value", String(manaValue(chars.manaCost))],
+            ["Power / toughness", chars.power !== null && chars.toughness !== null ? `${chars.power}/${chars.toughness}` : "—"],
+        );
+        if (cardText.length > 0) {
+            items.push(["Card Text", <NestedList key="card-text" items={cardText} />]);
+        }
+        items.push(["Abilities", <NestedList key="abilities" items={chars.abilities.map(describeAllEffects)} />]);
+        items.push(["Active effects", <NestedList key="effects" items={effects.map((e) => describeContinuousEffect(state, e))} />]);
+    } else {
+        items.push(["Characteristics", "definition not found in state.definitions"]);
+    }
+
+    return (
+        <details className="obj">
+            <summary>
+                <span className="obj-summary-main">
+                    <span className="obj-summary-topline">
+                        <span className="obj-title">
+                            <span className="name">{objectName}</span>
+                            <span className="id">#{id}</span>
+                        </span>
+                        <span className="obj-summary-statuses">
+                            {tag !== undefined && <span className="badge accent">{tag}</span>}
+                            {chars?.power != null && chars.toughness != null && (
+                                <span className="badge">
+                                    {chars.power}/{chars.toughness}
+                                </span>
+                            )}
+                            {obj.tapped && <span className="badge warn">tapped</span>}
+                            {obj.damage > 0 && <span className="badge warn">{obj.damage} damage</span>}
+                            {counters.length > 0 && <span className="badge">counters</span>}
+                            {obj.controller !== obj.owner && <span className="badge warn">controlled by {obj.controller}</span>}
+                        </span>
+                    </span>
+                    {cardText.length > 0 && <span className="obj-card-text">{cardText.join("\n")}</span>}
                 </span>
-              )}
-              {obj.tapped && <span className="badge warn">tapped</span>}
-              {obj.damage > 0 && <span className="badge warn">{obj.damage} damage</span>}
-              {counters.length > 0 && <span className="badge">counters</span>}
-              {obj.controller !== obj.owner && <span className="badge warn">controlled by {obj.controller}</span>}
-            </span>
-          </span>
-          {cardText.length > 0 && <span className="obj-card-text">{cardText.join(" ")}</span>}
-        </span>
-      </summary>
-      <Bullets items={items} />
-    </details>
-  );
+            </summary>
+            <Bullets items={items} />
+        </details>
+    );
 }

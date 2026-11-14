@@ -53,6 +53,7 @@ const targetSpellAbility: AbilityOfKind<"spell"> = {
         { kind: "gainLife", who: { kind: "target", spec: 0 }, amount: 3 },
         { kind: "destroy", target: { kind: "target", spec: 1 } },
     ],
+    text: "",
 };
 
 const targetSpell: CardDefinition = {
@@ -163,6 +164,7 @@ describe("ability resolution", () => {
             effects: [{ kind: "gainLife", who: { kind: "player", who: "controller" }, amount: 1 }],
             activateableZones: ["battlefield"],
             timingRestriction: "instantSpeed",
+            text: "",
         };
         const entryId = source.state.nextId as StackId;
         const sourceLeft = moveObject(source.state, source.newId, "graveyard")!;
@@ -216,6 +218,7 @@ describe("ability resolution", () => {
             targets: [],
             effects: [{ kind: "gainLife", who: { kind: "player", who: "controller" }, amount: 5 }],
             triggerableZones: ["battlefield"],
+            text: "",
         };
         const triggered = putTriggeredAbilityOnStack(source.state, source.newId, ability, undefined, { stillValid: true });
         const responseChangedCondition: GameState = {
@@ -245,6 +248,7 @@ describe("ability resolution", () => {
             targets: [],
             effects: [{ kind: "damage", to: { kind: "player", who: "eachOpponent" }, amount: 1 }],
             triggerableZones: ["battlefield"],
+            text: "",
         };
         const diesCard: CardDefinition = { ...bear, abilities: [ability] };
         const initial = createGame(
@@ -281,6 +285,7 @@ describe("ability resolution", () => {
             targets: [],
             effects: [{ kind: "gainLife", who: { kind: "player", who: "controller" }, amount: { kind: "bound", name: "event.amount" } }],
             triggerableZones: ["battlefield"],
+            text: "",
         };
         const watcher: CardDefinition = { ...bear, id: cardDefId("damage-drawer"), abilities: [ability] };
         const initial = createGame(
@@ -338,6 +343,7 @@ describe("ability resolution", () => {
             ],
             effects: [],
             triggerableZones: ["battlefield"],
+            text: "",
         };
         const watcher: CardDefinition = { ...bear, id: cardDefId("return-watcher"), abilities: [returnAbility] };
         const movedCard: CardDefinition = { ...bear, id: cardDefId("moved-card") };
@@ -382,6 +388,7 @@ describe("ability resolution", () => {
                 { kind: "if", condition: { kind: "flag", name: "mayDraw" }, then: [{ kind: "draw", who: { kind: "player", who: "controller" }, count: 1 }] },
             ],
             triggerableZones: ["battlefield"],
+            text: "",
         };
         const yesInitial = createGame(
             [bear],
@@ -445,6 +452,7 @@ describe("ability resolution", () => {
             ],
             effects: [{ kind: "destroy", target: { kind: "target", spec: 0 } }],
             triggerableZones: ["battlefield"],
+            text: "",
         };
         const initial = createGame(
             [bear],
@@ -477,6 +485,7 @@ describe("ability resolution", () => {
             targets: [],
             effects: [{ kind: "damage", to: { kind: "player", who: "eachOpponent" }, amount: 1 }],
             triggerableZones: ["battlefield"],
+            text: "",
         };
         const secondAbility: AbilityOfKind<"triggered"> = {
             kind: "triggered",
@@ -484,6 +493,7 @@ describe("ability resolution", () => {
             targets: [],
             effects: [{ kind: "gainLife", who: { kind: "player", who: "controller" }, amount: 2 }],
             triggerableZones: ["battlefield"],
+            text: "",
         };
         const firstWatcher: CardDefinition = { ...bear, id: cardDefId("first-watcher"), abilities: [firstAbility] };
         const secondWatcher: CardDefinition = { ...bear, id: cardDefId("second-watcher"), abilities: [secondAbility] };

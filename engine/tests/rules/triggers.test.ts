@@ -47,6 +47,7 @@ const entersAbility: AbilityOfKind<"triggered"> = {
     targets: [],
     effects: [],
     triggerableZones: ["battlefield"],
+    text: "",
 };
 
 function lifeChangedAbility(effects: AbilityOfKind<"triggered">["effects"] = []): AbilityOfKind<"triggered"> {
@@ -56,6 +57,7 @@ function lifeChangedAbility(effects: AbilityOfKind<"triggered">["effects"] = [])
         targets: [],
         effects,
         triggerableZones: ["battlefield"],
+        text: "",
     };
 }
 
@@ -72,6 +74,7 @@ const diesAbility: AbilityOfKind<"triggered"> = {
     targets: [],
     effects: [],
     triggerableZones: ["battlefield"],
+    text: "",
 };
 
 const damageAbility: AbilityOfKind<"triggered"> = {
@@ -80,6 +83,7 @@ const damageAbility: AbilityOfKind<"triggered"> = {
     targets: [],
     effects: [],
     triggerableZones: ["battlefield"],
+    text: "",
 };
 
 function game(definitions: readonly CardDefinition[], aliceDeck: readonly CardDefinition[] = definitions, bobDeck: readonly CardDefinition[] = []): GameState {
@@ -146,6 +150,7 @@ describe("detectTriggers", () => {
             targets: [],
             effects: [],
             triggerableZones: ["battlefield"],
+            text: "",
         };
         const permanent = creature("false-condition", [ability]);
         const source = moveDefinition(game([permanent]), alice, permanent, "battlefield");
@@ -163,6 +168,7 @@ describe("detectTriggers", () => {
             targets: [],
             effects: [],
             triggerableZones: ["battlefield"],
+            text: "",
         };
         const permanent = creature("wrong-zone", [ability]);
         const source = moveDefinition(game([permanent]), alice, permanent, "hand");
@@ -189,6 +195,7 @@ describe("detectTriggers", () => {
             effects: [],
             activateableZones: ["battlefield"],
             timingRestriction: "instantSpeed",
+            text: "",
         };
         const targets: readonly (readonly Target[])[] = [[{ kind: "player", id: bob }]];
         const state: GameState = {
@@ -378,12 +385,14 @@ describe("trigger placement", () => {
     test("asks for and records a target for a targeted trigger", () => {
         const targetedAbility: AbilityOfKind<"triggered"> = {
             ...lifeChangedAbility(),
-            targets: [{
-                filter: { kind: "player", filter: { kind: "anyPlayer" } },
-                minCount: 1,
-                maxCount: 1,
-                description: "player",
-            }],
+            targets: [
+                {
+                    filter: { kind: "player", filter: { kind: "anyPlayer" } },
+                    minCount: 1,
+                    maxCount: 1,
+                    targetName: "player",
+                },
+            ],
         };
         const watcher = creature("targeted-trigger", [targetedAbility]);
         const permanent = moveDefinition(game([watcher]), alice, watcher, "battlefield");
@@ -419,12 +428,14 @@ describe("trigger placement", () => {
     test("does not put a targeted trigger on the stack when there is no legal target", () => {
         const targetedAbility: AbilityOfKind<"triggered"> = {
             ...lifeChangedAbility(),
-            targets: [{
-                filter: { kind: "object", filter: { kind: "hasType", type: "Artifact" } },
-                minCount: 1,
-                maxCount: 1,
-                description: "artifact",
-            }],
+            targets: [
+                {
+                    filter: { kind: "object", filter: { kind: "hasType", type: "Artifact" } },
+                    minCount: 1,
+                    maxCount: 1,
+                    targetName: "artifact",
+                },
+            ],
         };
         const watcher = creature("no-legal-target", [targetedAbility]);
         const permanent = moveDefinition(game([watcher]), alice, watcher, "battlefield");

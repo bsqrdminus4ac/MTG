@@ -37,10 +37,9 @@ export function addContinuousEffect(state: GameState, ctx: EffectContext, effect
                 timestamp,
                 sourceName: ctx.sourceSnapshot.chars.name,
             },
-            ...(effect.description ? { description: effect.description } : {}),
         };
         currentState = { ...currentState, continuousEffects: [...currentState.continuousEffects, lockedEffect] };
-        out.push({type: "continuousEffectCreated", duration: effect.duration, modType: "locked", sourceName: ctx.sourceSnapshot.chars.name, description: effect.description});
+        out.push({ type: "continuousEffectCreated", effect: lockedEffect });
     }
     if (rulesMods.length > 0) {
         const [effectState, rulesId] = nextID<EffectId>(currentState);
@@ -56,10 +55,9 @@ export function addContinuousEffect(state: GameState, ctx: EffectContext, effect
                 timestamp,
                 sourceName: ctx.sourceSnapshot.chars.name,
             },
-            ...(effect.description ? { description: effect.description } : {}),
         };
         currentState = { ...currentState, continuousEffects: [...currentState.continuousEffects, rulesEffect] };
-        out.push({type: "continuousEffectCreated", duration: effect.duration, modType: "rules", sourceName: ctx.sourceSnapshot.chars.name, description: effect.description});
+        out.push({ type: "continuousEffectCreated", effect: rulesEffect });
     }
     return ok(currentState, out);
 }
@@ -68,6 +66,6 @@ export function expireEffects(state: GameState, duration: Duration, matching?: (
     const [expired, remaining] = partition(state.continuousEffects, (e: ContinuousEffect) => e.duration === duration && (!matching || matching(e)));
     return ok(
         { ...state, continuousEffects: remaining },
-        expired.map((e): GameEvent => ({type: "continuousEffectExpired", sourceName: e.sourceName, description: e.description, duration: e.duration})),
+        expired.map((e): GameEvent => ({ type: "continuousEffectExpired", effect: e })),
     );
 }

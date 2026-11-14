@@ -12,7 +12,8 @@ export const visionarySprite: CardDefinition = creature({
         { kind: "keyword", keyword: "flying" },
         triggered({
             trigger: thisEntersTheBattlefield(),
-            effects: [{ kind: "draw", count: 1, who: { kind: "player", who: "controller" }, description: "When <this> enters, draw a card." }],
+            effects: [{ kind: "draw", count: 1, who: { kind: "player", who: "controller" } }],
+            text: "When <this> enters, draw a card.",
         }),
     ],
 });
@@ -38,9 +39,10 @@ export const reclamation: CardDefinition = noncreatureArtifact({
                 },
             },
             effects: [
-                { kind: "gainLife", who: { kind: "player", who: "controller" }, amount: 1, description: "Whenever a creature you control dies, you gain 1 life and draw a card." },
+                { kind: "gainLife", who: { kind: "player", who: "controller" }, amount: 1 },
                 { kind: "draw", count: 1, who: { kind: "player", who: "controller" } },
             ],
+            text: "Whenever a creature you control dies, you gain 1 life and draw a card.",
         }),
     ],
 });
@@ -58,7 +60,6 @@ export const cask: CardDefinition = creature({
                     kind: "damage",
                     amount: 1,
                     to: { kind: "target", spec: 0 },
-                    description: "When <this> dies, it deals 1 damage to up to one target creature and 2 damage to up to one target player.",
                 },
                 { kind: "damage", amount: 2, to: { kind: "target", spec: 1 } },
             ],
@@ -76,10 +77,11 @@ export const cask: CardDefinition = creature({
                             ],
                         },
                     },
-                    description: "creatures",
+                    targetName: "creatures",
                 },
-                { minCount: 0, maxCount: 1, filter: { kind: "player", filter: { kind: "anyPlayer" } }, description: "players" },
+                { minCount: 0, maxCount: 1, filter: { kind: "player", filter: { kind: "anyPlayer" } }, targetName: "players" },
             ],
+            text: "When <this> dies, it deals 1 damage to up to one target creature and 2 damage to up to one target player.",
         }),
     ],
 });

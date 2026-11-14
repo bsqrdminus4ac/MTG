@@ -1,7 +1,7 @@
 import { type ApplyResult, fail } from "../core/result";
 import type { AbilityOfKind, AbilityRef } from "../model/abilities";
 import { snapshotObject } from "../model/characteristics";
-import { describeAbility } from "../model/effects";
+import { abilityText } from "../model/effects";
 import type { ObjectId, PlayerId } from "../model/ids";
 import type { AbilityCast, GameState } from "../model/state";
 import { findActivatableAbility } from "../rules/abilityQueries";
@@ -39,7 +39,7 @@ export function beginActivation(state: GameState, player: PlayerId, source: Obje
         bindings: {},
         rollback,
         sourceSnapshot,
-        events: [{ type: "abilityActivateStart", player, abilitySource: source, sourceName: sourceSnapshot.chars.name, description: describeAbility(ability, sourceSnapshot.chars.name, true) }],
+        events: [{ type: "abilityActivateStart", player, abilitySource: source, sourceName: sourceSnapshot.chars.name, description: abilityText(ability, sourceSnapshot.chars.name) }],
     };
 
     return continueCasting({ ...state, casting });

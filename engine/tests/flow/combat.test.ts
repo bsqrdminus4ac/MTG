@@ -119,6 +119,7 @@ describe("combat damage", () => {
                     },
                     modifications: [{ kind: "removeKeywords" as const, keywords: ["flying" as const] }],
                 },
+                text: "",
             };
             const blockerDefinition = creature("ground-blocker", 2, 2, effectKind === "static" ? [staticAbility] : []);
             const { state: initialState, attacker, blockers } = combatState(flyingAttacker, [blockerDefinition]);

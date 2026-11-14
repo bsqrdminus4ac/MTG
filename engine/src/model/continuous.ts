@@ -70,14 +70,12 @@ export type AffectedSet = Readonly<{ kind: "self" }> | ObjectMatch;
 export interface StaticEffect {
     readonly affects: AffectedSet;
     readonly modifications: Modification[];
-    readonly description?: string;
 }
 /** The template an applyContinuousEffect effect carries. It is definition data only and never lives in state or on an object as a rule. Resolution turns it into a live ContinuousEffect in state.continuousEffects */
 export interface AppliedEffect {
     readonly affects: EffectTarget | ObjectMatch;
     readonly modifications: Modification[];
     readonly duration: Duration;
-    readonly description?: string;
 }
 
 /** A live effect in the game, tied to its source and a timestamp. */
@@ -90,5 +88,4 @@ export interface ContinuousEffect {
     readonly modifications: Modification[];
     readonly duration: Duration;
     readonly sourceName?: string;
-    readonly description?: string;
 }

@@ -5,14 +5,12 @@ import { getCardName, isPermanentType } from "../model/characteristics";
 import { nextID, type PlayerId, type StackId } from "../model/ids";
 import type { GameState, StackEntry } from "../model/state";
 
-//type StackAbility = AbilityOfKind<"spell" | "activated" | "triggered">;
-
 export const getEntryName = (state: GameState, entry: StackEntry): string => {
     if (entry.kind === "spell") return getCardName(state, entry.source);
     return `${entry.sourceSnapshot.chars.name}'s ability`;
 };
 
-const PERMANENT_SPELL: AbilityOfKind<"spell"> = { kind: "spell", targets: [], effects: [] };
+const PERMANENT_SPELL: AbilityOfKind<"spell"> = { kind: "spell", targets: [], effects: [], text: "" };
 
 export function getAbilityForSpell(chars: Characteristics): AbilityOfKind<"spell"> | null {
     const printed = chars.abilities.find((a) => a.kind === "spell");

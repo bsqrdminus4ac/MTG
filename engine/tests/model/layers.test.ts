@@ -70,6 +70,7 @@ function staticPermanent(id: string, modification: Modification): CardDefinition
             },
             modifications: [modification],
         },
+        text: "",
     };
     return {
         id: cardDefId(id),
@@ -300,6 +301,7 @@ describe("characteristic layers", () => {
                 affects: controlledCreaturesExceptSource(),
                 modifications: [{ kind: "modifyPT", power: 1, toughness: 1 }],
             },
+            text: "",
         };
         const lord = creatureDefinition("layers-lord", 2, 2, [staticAbility]);
         let state = newGame([lord, otherCreature], [lord.id, otherCreature.id]);
@@ -411,6 +413,7 @@ describe("characteristic layers", () => {
                 affects: controlledCreaturesExceptSource(),
                 modifications: [{ kind: "addKeywords", keywords: ["flying"] }],
             },
+            text: "",
         };
         const lord = creatureDefinition("layers-flying-lord", 2, 2, [staticAbility]);
         const otherCreature = creatureDefinition("layers-flying-target", 1, 1);

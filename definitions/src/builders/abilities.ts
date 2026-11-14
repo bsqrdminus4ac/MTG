@@ -3,7 +3,6 @@ import {
     YOU,
     type Ability,
     type BindingRef,
-    type CardEffect,
     type Condition,
     type Effect,
     type EventBindingNames,
@@ -25,27 +24,30 @@ export const tapForMana = (mana: ManaType): Ability => ({
     cost: { tap: true },
     isManaAbility: true,
     targets: [],
-    effects: [{ kind: "addMana", mana: { kind: "mana", type: mana }, amount: 1, description: `Tap: Add ${mana}` }],
+    effects: [{ kind: "addMana", mana: { kind: "mana", type: mana }, amount: 1 }],
     activateableZones: ["battlefield"],
     timingRestriction: "instantSpeed",
+    text: `Tap: Add ${mana}.`,
 });
 
 export const manaOfAnyColor = (includeColorless?: boolean): ManaType[] => (includeColorless ? [...COLORS, "C"] : [...COLORS]);
 
 export const drawCards = (amount: number): Effect => ({ kind: "draw", count: amount, who: { kind: "player", who: "controller" } });
 
-export const triggered = (a: { trigger: EventTrigger; effects: CardEffect[]; targets?: TargetSpec[]; triggerableZones?: Zone[] }): Ability => ({
+export const triggered = (a: { trigger: EventTrigger; effects: Effect[]; targets?: TargetSpec[]; triggerableZones?: Zone[]; text: string }): Ability => ({
     kind: "triggered",
     trigger: a.trigger,
     effects: a.effects,
     targets: a.targets ?? [],
     triggerableZones: a.triggerableZones ?? ["battlefield"],
+    text: a.text,
 });
 
-export const staticAbility = (effect: StaticEffect, activeZones?: Zone[]): Ability => ({
+export const staticAbility = (a: { effect: StaticEffect; activeZones?: Zone[]; text: string }): Ability => ({
     kind: "static",
-    effect,
-    activeZones: activeZones ?? ["battlefield"],
+    effect: a.effect,
+    activeZones: a.activeZones ?? ["battlefield"],
+    text: a.text,
 });
 
 export const thisEntersTheBattlefield = (interveningIf?: Condition): EventTrigger =>
@@ -86,11 +88,11 @@ export const discardThenGainLife = (): Ability => ({
             max: 10,
             bindAs: "cardsToDiscard",
             prompt: "Discard any number of cards (the caster gains 1 life for each)",
-            description: "Target player discards any number of cards.",
         },
         { kind: "discard", cards: { kind: "bound", name: "cardsToDiscard" } },
-        { kind: "gainLife", who: YOU, amount: { kind: "bound", name: "cardsToDiscard" }, description: "You gain 1 life for each card discarded this way." },
+        { kind: "gainLife", who: YOU, amount: { kind: "bound", name: "cardsToDiscard" } },
     ],
+    text: "Target player discards any number of cards. You gain 1 life for each card discarded this way.",
 });
 
 export const eachPlayerDiscards = (amount: number): Ability => ({
@@ -113,19 +115,18 @@ export const eachPlayerDiscards = (amount: number): Ability => ({
                 },
                 { kind: "discard", cards: { kind: "bound", name: "picked" } },
             ],
-            description: "Each player discards a card.",
         },
     ],
+    text: "Each player discards a card.",
 });
 
-export const anthem = (filter: ObjectPredicate, power: number, toughness: number, description?: string) =>
-    staticAbility({ ...{ affects: { kind: "matching", filter }, modifications: [{ kind: "modifyPT", power, toughness }] }, ...(description !== undefined && { description }) });
+export const anthem = (filter: ObjectPredicate, power: number, toughness: number, text: string) =>
+    staticAbility({ effect: { affects: { kind: "matching", filter }, modifications: [{ kind: "modifyPT", power, toughness }] }, text });
 
-export const grantKeyword = (filter: ObjectPredicate, keywords: Keyword[], description?: string) =>
-    staticAbility({ ...{ affects: { kind: "matching", filter }, modifications: [{ kind: "addKeywords", keywords }] }, ...(description !== undefined && { description }) });
+export const grantKeyword = (filter: ObjectPredicate, keywords: Keyword[], text: string) =>
+    staticAbility({ effect: { affects: { kind: "matching", filter }, modifications: [{ kind: "addKeywords", keywords }] }, text });
 
-export const thisGets = (power: number, toughness: number, description?: string) =>
-    staticAbility({ ...{ affects: { kind: "self" }, modifications: [{ kind: "modifyPT", power, toughness }] }, ...(description !== undefined && { description }) });
+export const thisGets = (power: number, toughness: number, text: string) => staticAbility({ effect: { affects: { kind: "self" }, modifications: [{ kind: "modifyPT", power, toughness }] }, text });
 
 export const creaturesYouControl = (excludeSource?: boolean): ObjectPredicate => ({
     kind: "all",
