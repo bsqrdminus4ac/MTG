@@ -135,24 +135,24 @@ function describeAppliedEffect(effect: AppliedEffect): string {
   return `${who}: ${describeModifications(effect.modifications)} (${effect.duration})`;
 }
 
-function describeDuration(duration: Duration): string {
-  switch (duration) {
-    case "untilEndOfTurn":
-      return "until end of turn";
-    case "whileSourceOnBattlefield":
-      return "while its source remains on the battlefield";
-    case "permanent":
-      return "permanently";
-    default:
-      return unreachable(duration);
-  }
+export function describeDuration(duration: Duration): string {
+    switch (duration) {
+        case "untilEndOfTurn":
+            return "until end of turn";
+        case "whileSourceOnBattlefield":
+            return "while its source remains on the battlefield";
+        case "permanent":
+            return "permanently";
+        default:
+            return unreachable(duration);
+    }
 }
 
 export function describeContinuousEffect(state: GameState, e: ContinuousEffect): string {
   const who = e.affects.kind === "objects"
     ? e.affects.ids.map((id) => nameOf(state, id)).join(", ")
     : describeObjectPredicate(e.affects.filter);
-  return `${describeModifications(e.modifications)} on ${who} — from ${nameOf(state, e.source)} (timestamp ${e.timestamp}, ${describeDuration(e.duration)})`;
+  return `${describeModifications(e.modifications)} on ${who} — from ${e.sourceName} (timestamp ${e.timestamp}, ${describeDuration(e.duration)})`;
 }
 
 function describeEffectTarget(t: EffectTarget): string {

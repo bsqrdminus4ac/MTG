@@ -1,5 +1,5 @@
-import { bolt, drake, forest } from "@mtg/definitions";
-import { chooseMany, createGame, getCharacteristics, indexChoice, moveObject, orderingDecision, yesNo, type CardDefinition, type DecisionId, type GameState, type StackId } from "@mtg/engine";
+import { bolt, drake, forest, llanowar } from "@mtg/definitions";
+import { chooseMany, createGame, getCharacteristics, indexChoice, moveObject, orderingDecision, yesNo, type CardDefinition, type DecisionId, type EffectId, type GameState, type StackId, type Timestamp } from "@mtg/engine";
 import { act, fireEvent, render, renderHook, screen, waitFor, within } from "@testing-library/react";
 import { StrictMode } from "react";
 import { describe, expect, test, vi } from "vitest";
@@ -161,6 +161,41 @@ describe("zones", () => {
         render(<ObjectCard state={state} id={id} />);
 
         expect(screen.getByText("Flying", { selector: ".obj-card-text" })).toBeTruthy();
+    });
+
+    test("shows applied-effect sources and printed values alongside effective power and toughness", () => {
+        const base = gameWithCards([drake]);
+        const id = must(base.players[ALICE]!.hand.find((id) => base.objects[id]?.definitionId === drake.id));
+        const moved = must(moveObject(base, id, "battlefield"));
+        const state: GameState = {
+            ...moved.state,
+            continuousEffects: [
+                {
+                    id: 900 as EffectId,
+                    source: moved.newId,
+                    controller: ALICE,
+                    timestamp: 901 as Timestamp,
+                    affects: { kind: "objects", ids: [moved.newId] },
+                    modifications: [{ kind: "modifyPT", power: 1, toughness: 1 }],
+                    duration: "untilEndOfTurn",
+                },
+            ],
+        };
+        render(<ObjectCard state={state} id={moved.newId} />);
+
+        expect(screen.getAllByText("3/3 (printed 2/2)")).toHaveLength(2);
+        expect(screen.getByText(/Wind Drake — layer modifyPT — until end of turn/)).toBeTruthy();
+    });
+
+    test("shows the source and duration of an applied static ability", () => {
+        const base = gameWithCards([drake, llanowar]);
+        const drakeId = must(base.players[ALICE]!.hand.find((id) => base.objects[id]?.definitionId === drake.id));
+        const withDrake = must(moveObject(base, drakeId, "battlefield"));
+        const llanowarId = must(withDrake.state.players[ALICE]!.hand.find((id) => withDrake.state.objects[id]?.definitionId === llanowar.id));
+        const withLlanowar = must(moveObject(withDrake.state, llanowarId, "battlefield"));
+        render(<ObjectCard state={withLlanowar.state} id={withDrake.newId} />);
+
+        expect(screen.getByText(/Llanowar Tribe — layer ability — while source's static ability applies/)).toBeTruthy();
     });
 
     test("expand all and collapse all affect every card in that zone only", () => {

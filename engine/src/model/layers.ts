@@ -2,7 +2,7 @@ import { isTrue } from "../core/result";
 import { assertNever } from "../core/util";
 import type { Ability, AbilityRef, GrantOrigin } from "./abilities";
 import type { Characteristics } from "./cardDefinition";
-import { LAYER_OF, LAYER_ORDER, type Layer, type Modification, type ObjectMatch } from "./continuous";
+import { LAYER_OF, LAYER_ORDER, type Duration, type Layer, type Modification, type ObjectMatch } from "./continuous";
 import type { Brand, EffectId, ObjectId, PlayerId, Timestamp } from "./ids";
 import { evalObjectPredicate } from "./objectPredicates";
 import { getAllObjectsInZone, type EvalScope, type GameState, type ObjectSnapshot } from "./state";
@@ -16,25 +16,30 @@ export const refKey = (source: ObjectId, ref: AbilityRef): EffectKey =>
         ? staticKey(source, ref.index)
         : (`g:${source}:${ref.index}:${ref.from.kind === "effect" ? storedKey(ref.from.id) : refKey(ref.from.source, ref.from.ability)}` as EffectKey);
 
-type ModificationInfo = {
+export type ModificationInfo = {
     key: EffectKey;
+    layer: Layer;
     source: ObjectId;
+    sourceName: string;
     controller: PlayerId;
     timestamp: Timestamp;
     modification: Modification;
     affects: Readonly<{ kind: "objects"; ids: ObjectId[] }> | Readonly<{ kind: "self" }> | ObjectMatch;
     grantOrigin: GrantOrigin;
     grantOffset: number;
+    duration?: Duration;
 };
 
 type ActiveModificationInfo = Omit<ModificationInfo, "affects" | "modification"> & { affected: ReadonlySet<ObjectId> };
 
 type CacheData = [Characteristics, { ref: AbilityRef; ability: Ability }[]];
 type CacheInfo = Map<ObjectId, CacheData>;
+type AppliedEffectDetails = Map<ObjectId, ModificationInfo[]>;
 
 const cache = new WeakMap<GameState["objects"], WeakMap<GameState["continuousEffects"], CacheInfo>>();
+const appliedEffectsCache = new WeakMap<GameState["objects"], WeakMap<GameState["continuousEffects"], AppliedEffectDetails>>();
 
-export function getCachedCharacteristics(state: GameState) {
+export function getCachedCharacteristics(state: GameState): CacheInfo {
     let byEffects = cache.get(state.objects);
     if (!byEffects) {
         byEffects = new WeakMap();
@@ -42,7 +47,21 @@ export function getCachedCharacteristics(state: GameState) {
     }
     let result = byEffects.get(state.continuousEffects);
     if (!result) {
-        result = computeCharacteristics(state);
+        [result] = computeCharacteristics(state);
+        byEffects.set(state.continuousEffects, result);
+    }
+    return result;
+}
+
+export function getCurrentlyAppliedEffects(state: GameState): AppliedEffectDetails {
+    let byEffects = appliedEffectsCache.get(state.objects);
+    if (!byEffects) {
+        byEffects = new WeakMap();
+        appliedEffectsCache.set(state.objects, byEffects);
+    }
+    let result = byEffects.get(state.continuousEffects);
+    if (!result) {
+        [, result] = computeCharacteristics(state, true);
         byEffects.set(state.continuousEffects, result);
     }
     return result;
@@ -67,7 +86,7 @@ export function getMatchingObjects(state: GameState, cache: CacheInfo, scope: Ev
     );
 }
 
-function computeCharacteristics(state: GameState): CacheInfo {
+function computeCharacteristics(state: GameState, includeEffectDetails?: boolean): [CacheInfo, AppliedEffectDetails] {
     const chars: CacheInfo = new Map(
         Object.values(state.objects).map((obj) => {
             const printedDef = state.definitions[obj.definitionId];
@@ -76,6 +95,8 @@ function computeCharacteristics(state: GameState): CacheInfo {
             return [obj.id, [characteristics, printedAbilities]];
         }),
     );
+
+    const details: AppliedEffectDetails = new Map();
 
     const startedEffects: Map<EffectKey, ActiveModificationInfo> = new Map();
 
@@ -92,7 +113,11 @@ function computeCharacteristics(state: GameState): CacheInfo {
             for (const objId of affectedObjects) {
                 const oldChars = chars.get(objId);
                 if (!oldChars) continue;
-                chars.set(objId, applyModification(oldChars, effect));
+                let newChars = applyModification(oldChars, effect);
+                chars.set(objId, newChars);
+                if (includeEffectDetails) {
+                    details.set(objId, [...(details.get(objId) || []), effect]);
+                }
             }
         }
         if (layer === "modifyPT") {
@@ -100,7 +125,7 @@ function computeCharacteristics(state: GameState): CacheInfo {
         }
     }
 
-    return chars;
+    return [chars, details];
 }
 
 function getEffectsForLayer(state: GameState, cache: CacheInfo, layer: Layer): ModificationInfo[] {
@@ -110,13 +135,16 @@ function getEffectsForLayer(state: GameState, cache: CacheInfo, layer: Layer): M
             LAYER_OF[modification.kind] === layer
                 ? {
                       key: storedKey(effect.id),
+                      layer,
                       source: effect.source,
+                      sourceName: effect.sourceName,
                       controller: effect.controller,
                       timestamp: effect.timestamp,
                       affects: effect.affects,
                       modification,
                       grantOrigin: { kind: "effect", id: effect.id },
                       grantOffset: offsets[i]!,
+                      duration: effect.duration,
                   }
                 : [],
         );
@@ -137,7 +165,9 @@ function getEffectsForLayer(state: GameState, cache: CacheInfo, layer: Layer): M
                     const key = refKey(objId, abilityInfo.ref);
                     objEffects.push({
                         key,
+                        layer,
                         source: objId,
+                        sourceName: chars.name,
                         controller: obj.controller,
                         timestamp: obj.timestamp,
                         affects: abilityInfo.ability.effect.affects,

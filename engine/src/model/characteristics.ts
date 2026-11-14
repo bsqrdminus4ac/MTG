@@ -1,7 +1,7 @@
 import type { Ability, AbilityRef } from "./abilities";
 import type { Characteristics } from "./cardDefinition";
 import type { ObjectId } from "./ids";
-import { getCachedCharacteristics, refKey } from "./layers";
+import { getCachedCharacteristics, getCurrentlyAppliedEffects, refKey, type ModificationInfo } from "./layers";
 import type { GameState, ObjectSnapshot } from "./state";
 import type { CardType, Keyword } from "./vocabulary";
 
@@ -21,6 +21,10 @@ export function getCharacteristics(state: GameState, id: ObjectId): Characterist
 
 export function getAllAbilities(state: GameState, id: ObjectId): readonly { ref: AbilityRef; ability: Ability }[] {
     return getCachedCharacteristics(state).get(id)?.[1] ?? NO_ABILITIES;
+}
+
+export function getAppliedEffects(state: GameState, id: ObjectId): readonly ModificationInfo[] | undefined {
+    return getCurrentlyAppliedEffects(state).get(id);
 }
 
 export function getAbilityByRef(state: GameState, source: ObjectId, ref: AbilityRef): Ability | undefined {

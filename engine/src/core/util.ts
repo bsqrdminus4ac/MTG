@@ -39,3 +39,7 @@ type OmitUndefined<T> = {
 };
 
 export const omitUndefined = <T extends object>(obj: T): OmitUndefined<T> => Object.fromEntries(Object.entries(obj).filter(([, value]) => value !== undefined)) as OmitUndefined<T>;
+
+export function capitalize(s: string, restLowercase?: boolean): string {
+    return s.charAt(0).toUpperCase() + (restLowercase ? s.slice(1).toLowerCase() : s.slice(1));
+}

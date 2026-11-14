@@ -1,3 +1,4 @@
+import { capitalize } from "../core/util";
 import type { Ability } from "./abilities";
 import type { AppliedEffect } from "./continuous";
 import type { ManaType } from "./mana";
@@ -69,7 +70,7 @@ export type Effect = ControlFlowEffect | PrimitiveEffect | InternalEffect;
 
 export function abilityText(ability: Ability, sourceName: string): string {
     if (ability.kind === "keyword") {
-        return ability.keyword.charAt(0).toUpperCase() + ability.keyword.slice(1).toLowerCase();
+        return capitalize(ability.keyword, true);
     }
     return ability.text.replaceAll("<this>", sourceName);
 }

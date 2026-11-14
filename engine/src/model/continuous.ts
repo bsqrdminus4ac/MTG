@@ -87,5 +87,5 @@ export interface ContinuousEffect {
     readonly affects: Readonly<{ kind: "objects"; ids: ObjectId[] }> | ObjectMatch;
     readonly modifications: Modification[];
     readonly duration: Duration;
-    readonly sourceName?: string;
+    readonly sourceName: string;
 }
