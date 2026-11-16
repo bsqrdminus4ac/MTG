@@ -3,7 +3,7 @@ import { withEntry } from "../core/util";
 import type { AbilityRef, ActivatableAbilityInfo } from "../model/abilities";
 import { snapshotObject } from "../model/characteristics";
 import type { Decision, ResolvedAnswer } from "../model/decisions";
-import { abilityText } from "../model/effects";
+import { abilityText, type EffectContext } from "../model/effects";
 import type { GameEvent } from "../model/events";
 import type { ObjectId, PlayerId } from "../model/ids";
 import { refKey } from "../model/layers";
@@ -13,7 +13,7 @@ import { findActivatableAbility, getAllActivatableAbilities } from "../rules/abi
 import { payAbilityCosts } from "../rules/costs";
 import { detectTriggers } from "../rules/triggers";
 import { payManaOptions } from "./casting";
-import { ask, runFrames, stepFromApply, type EffectContext, type StepResult } from "./effects";
+import { ask, runFrames, stepFromApply, type StepResult } from "./effects";
 import { grantPriority } from "./priority";
 
 export function getAllManaSources(state: GameState, player: PlayerId, excludeSource?: ObjectId): ActivatableAbilityInfo[] {

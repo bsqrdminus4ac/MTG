@@ -3,11 +3,11 @@ import { assertNever, withEntry } from "../core/util";
 import { getCardName } from "../model/characteristics";
 import type { ObjectMatch } from "../model/continuous";
 import { chooseMany, manaChoice, objectChoice, yesNo, type Continuation } from "../model/decisions";
-import type { Effect, EffectTarget, PlayerRef } from "../model/effects";
+import type { Effect, EffectContext, EffectTarget, PlayerRef } from "../model/effects";
 import type { GameEvent } from "../model/events";
 import type { ObjectId, PlayerId } from "../model/ids";
 import type { ManaType } from "../model/mana";
-import { getRemainingPlayersInTurnOrder, type Binding, type Bindings, type EvalScope, type Frame, type GameState, type ObjectSnapshot, type Target } from "../model/state";
+import { getRemainingPlayersInTurnOrder, type Binding, type Bindings, type Frame, type GameState, type Target } from "../model/state";
 import { drawCardResult } from "../model/zones";
 import { getChoiceBinding, getObjectIdsFromBinding } from "../rules/bindings";
 import { evalCondition, resolveAmount } from "../rules/conditions";
@@ -15,14 +15,6 @@ import { addContinuousEffect } from "../rules/continuousEffects";
 import { openDecision } from "../rules/pending";
 import { addManaEffect, damageObject, damagePlayer, destroyPermanent, discardCard, gainLife, loseLife } from "../rules/primitives";
 
-/** Everything an effect can see while its ability resolves. */
-export interface EffectContext extends EvalScope {
-    readonly targets: readonly (readonly Target[])[];
-    readonly legalTargets: readonly (readonly boolean[])[]; // per target index, computed once when resolution starts
-    readonly sourceSnapshot: ObjectSnapshot;
-    readonly sourceDescription: string; // for logging purposes, e.g. "the activated ability of [card name]"
-    readonly resumeAs: "stack" | "mana"; // whether the effect is resolving as part of a stack entry or a mana ability
-}
 
 const getSourceName = (state: GameState, ctx: EffectContext): string => {
     if (ctx.sourceSnapshot) return ctx.sourceSnapshot.chars.name;

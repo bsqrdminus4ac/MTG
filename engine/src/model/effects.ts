@@ -3,7 +3,7 @@ import type { Ability } from "./abilities";
 import type { AppliedEffect } from "./continuous";
 import type { ManaType } from "./mana";
 import type { Comparison, ObjectPredicate, PlayerPredicate, Predicate, StackPredicate } from "./predicates";
-import type { Binding } from "./state";
+import type { Binding, EvalScope, ObjectSnapshot, Target } from "./state";
 import { DAMAGEABLE_TYPES, type PermanentType } from "./vocabulary";
 
 export type BindingRef = { kind: "bound"; name: string };
@@ -89,3 +89,12 @@ type ConditionLeaf = { kind: "flag"; name: string } | { kind: "compare"; left: A
 export type Condition = Predicate<ConditionLeaf>;
 
 export type Amount = number | BindingRef;
+
+/** Everything an effect can see while its ability resolves. */
+export interface EffectContext extends EvalScope {
+    readonly targets: readonly (readonly Target[])[];
+    readonly legalTargets: readonly (readonly boolean[])[]; // per target index, computed once when resolution starts
+    readonly sourceSnapshot: ObjectSnapshot;
+    readonly sourceDescription: string; // for logging purposes, e.g. "the activated ability of [card name]"
+    readonly resumeAs: "stack" | "mana"; // whether the effect is resolving as part of a stack entry or a mana ability
+}

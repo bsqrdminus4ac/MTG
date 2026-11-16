@@ -1,7 +1,7 @@
 import { ok, type ApplyResult } from "../core/result";
 import { partition } from "../core/util";
-import type { EffectContext } from "../flow/effects";
 import type { AppliedEffect, ContinuousEffect, Duration, Modification, ObjectMatch } from "../model/continuous";
+import type { EffectContext } from "../model/effects";
 import type { GameEvent } from "../model/events";
 import { nextID, type EffectId, type ObjectId, type Timestamp } from "../model/ids";
 import { getCachedCharacteristics, getMatchingObjects } from "../model/layers";

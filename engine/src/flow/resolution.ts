@@ -2,6 +2,7 @@ import { fail, isTrue, type ApplyResult } from "../core/result";
 import { withEntry } from "../core/util";
 import { getCharacteristics, isPermanentType, snapshotObject } from "../model/characteristics";
 import type { ResolvedAnswer } from "../model/decisions";
+import type { EffectContext } from "../model/effects";
 import type { GameEvent } from "../model/events";
 import type { Binding, EvalScope, Frame, GameState, ResolutionInProgress } from "../model/state";
 import type { Zone } from "../model/vocabulary";
@@ -10,7 +11,7 @@ import { evalCondition } from "../rules/conditions";
 import { getEntryName } from "../rules/stack";
 import { isTargetLegal } from "../rules/targeting";
 import { detectTriggers } from "../rules/triggers";
-import { ask, runFrames, type EffectContext } from "./effects";
+import { ask, runFrames } from "./effects";
 import { givePriorityToActivePlayer } from "./priority";
 
 export function beginResolution(state: GameState): ApplyResult {
