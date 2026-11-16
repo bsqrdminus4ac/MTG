@@ -43,6 +43,7 @@ describe("card movement snapshots", () => {
             affects: { kind: "objects", ids: [entered.newId] },
             modification: { kind: "modifyPT", power: 1, toughness: 1 },
             duration: "whileSourceOnBattlefield",
+            sourceName: "entered",
         });
         const battlefield = {
             ...effectState,

@@ -142,6 +142,7 @@ describe("combat damage", () => {
                     affects: { kind: "objects", ids: [attacker] },
                     modification: { kind: "removeKeywords", keywords: ["flying"] },
                     duration: "permanent",
+                    sourceName: "blocker",
                 });
                 state = { ...nextState, continuousEffects: [...nextState.continuousEffects, effect] };
             }

@@ -130,6 +130,7 @@ describe("layers", () => {
         affects: { kind: "objects", ids: [newId] },
         modification: { kind: "modifyPT", power: 1, toughness: 1 },
         duration: "untilEndOfTurn",
+        sourceName: "",
     });
     const buffed = { ...nextState, continuousEffects: [buff] };
     expect(getCharacteristics(buffed, newId)).toMatchObject({ power: 3, toughness: 3 });

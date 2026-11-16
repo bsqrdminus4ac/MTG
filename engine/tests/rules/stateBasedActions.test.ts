@@ -54,6 +54,7 @@ function game(lordFirst: boolean): GameState {
         },
         modification: { kind: "modifyPT", power: 1, toughness: 1 },
         duration: "whileSourceOnBattlefield",
+        sourceName: "battlefieldCreature",
     });
     const state: GameState = {
         ...effectState,

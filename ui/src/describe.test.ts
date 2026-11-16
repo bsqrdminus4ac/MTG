@@ -199,6 +199,7 @@ describe("text describers", () => {
             affects: { kind: "matching" as const, filter: { kind: "hasType" as const, type: "Creature" as const } },
             modifications: [{ kind: "modifyPT" as const, power: 3, toughness: 3 }],
             duration: "untilEndOfTurn" as const,
+            sourceName: "Forest",
         };
         expect(
             describeEvent(state, {
@@ -375,6 +376,7 @@ describe("ability references", () => {
                         },
                     ],
                     duration: "permanent",
+                    sourceName: "Forest",
                 },
             ],
         };

@@ -53,6 +53,7 @@ describe("evalPredicate", () => {
             affects: { kind: "objects", ids: [moved.newId] },
             modification: { kind: "setColors", colors: ["B"] },
             duration: "permanent",
+            sourceName: "moved",
         });
         const blackState: GameState = {
             ...effectState,

@@ -178,13 +178,14 @@ describe("zones", () => {
                     affects: { kind: "objects", ids: [moved.newId] },
                     modifications: [{ kind: "modifyPT", power: 1, toughness: 1 }],
                     duration: "untilEndOfTurn",
+                    sourceName: "Wind Drake",
                 },
             ],
         };
         render(<ObjectCard state={state} id={moved.newId} />);
 
         expect(screen.getAllByText("3/3 (printed 2/2)")).toHaveLength(2);
-        expect(screen.getByText(/Wind Drake — layer modifyPT — until end of turn/)).toBeTruthy();
+        expect(screen.getByText(/From Wind Drake \(modifyPT layer\), until end of turn:/)).toBeTruthy();
     });
 
     test("shows the source and duration of an applied static ability", () => {
@@ -195,7 +196,7 @@ describe("zones", () => {
         const withLlanowar = must(moveObject(withDrake.state, llanowarId, "battlefield"));
         render(<ObjectCard state={withLlanowar.state} id={withDrake.newId} />);
 
-        expect(screen.getByText(/Llanowar Tribe — layer ability — while source's static ability applies/)).toBeTruthy();
+        expect(screen.getByText(/From Llanowar Tribe \(ability layer\):/)).toBeTruthy();
     });
 
     test("expand all and collapse all affect every card in that zone only", () => {

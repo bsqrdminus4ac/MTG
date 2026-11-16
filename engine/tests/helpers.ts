@@ -1,7 +1,7 @@
 import { type ContinuousEffect, type Duration, type EffectId, type GameState, type Modification, nextID, type ObjectId, type ObjectMatch, type PlayerId, type Timestamp } from "../src";
 import type { CardDefinition } from "../src/model/cardDefinition";
-import { moveObject } from "../src/model/zones";
 import type { Zone } from "../src/model/vocabulary";
+import { moveObject } from "../src/model/zones";
 
 export function moveDefinition(state: GameState, player: PlayerId, definition: CardDefinition, zone: Zone) {
     const card = state.players[player]?.library.find((id) => state.objects[id]?.definitionId === definition.id);
@@ -13,7 +13,7 @@ export function moveDefinition(state: GameState, player: PlayerId, definition: C
 
 export function makeContinuousEffect(
     state: GameState,
-    overrides: { source: ObjectId; controller: PlayerId; affects: Readonly<{ kind: "objects"; ids: ObjectId[] }> | ObjectMatch; modification: Modification; duration: Duration },
+    overrides: { source: ObjectId; controller: PlayerId; affects: Readonly<{ kind: "objects"; ids: ObjectId[] }> | ObjectMatch; modification: Modification; duration: Duration; sourceName: string },
 ): [nextState: GameState, effect: ContinuousEffect] {
     const [timeState, timestamp] = nextID<Timestamp>(state);
     const [effectState, effectId] = nextID<EffectId>(timeState);
@@ -27,6 +27,7 @@ export function makeContinuousEffect(
             affects: overrides.affects,
             duration: overrides.duration,
             modifications: [overrides.modification],
+            sourceName: overrides.sourceName,
         },
     ];
 }

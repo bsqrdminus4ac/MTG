@@ -132,6 +132,7 @@ describe("characteristic layers", () => {
             affects: { kind: "objects", ids: [entered.newId] },
             modification: { kind: "modifyPT", power: 1, toughness: 2 },
             duration: "permanent",
+            sourceName: "entered",
         });
         const [secondState, secondEffect] = makeContinuousEffect(firstState, {
             source: entered.newId,
@@ -139,10 +140,10 @@ describe("characteristic layers", () => {
             affects: { kind: "objects", ids: [entered.newId] },
             modification: { kind: "modifyPT", power: 2, toughness: 1 },
             duration: "permanent",
+            sourceName: "entered",
         });
 
-        expect(getCharacteristics({ ...secondState, continuousEffects: [firstEffect, secondEffect] }, entered.newId))
-            .toMatchObject({ power: 5, toughness: 5 });
+        expect(getCharacteristics({ ...secondState, continuousEffects: [firstEffect, secondEffect] }, entered.newId)).toMatchObject({ power: 5, toughness: 5 });
     });
 
     test("later setPT effects override earlier ones and modifyPT applies on top", () => {
@@ -154,6 +155,7 @@ describe("characteristic layers", () => {
             affects: { kind: "objects", ids: [entered.newId] },
             modification: { kind: "modifyPT", power: 1, toughness: 2 },
             duration: "permanent",
+            sourceName: "entered",
         });
         const [setState, earlierSetEffect] = makeContinuousEffect(modifiedState, {
             source: entered.newId,
@@ -161,6 +163,7 @@ describe("characteristic layers", () => {
             affects: { kind: "objects", ids: [entered.newId] },
             modification: { kind: "setPT", power: 4, toughness: 5 },
             duration: "permanent",
+            sourceName: "entered",
         });
         const earlierSet = { ...setState, continuousEffects: [modifyEffect, earlierSetEffect] };
         expect(getCharacteristics(earlierSet, entered.newId)).toMatchObject({ power: 5, toughness: 7 });
@@ -171,6 +174,7 @@ describe("characteristic layers", () => {
             affects: { kind: "objects", ids: [entered.newId] },
             modification: { kind: "setPT", power: 7, toughness: 8 },
             duration: "permanent",
+            sourceName: "entered",
         });
         const laterSet = {
             ...laterSetState,
@@ -189,6 +193,7 @@ describe("characteristic layers", () => {
             affects: { kind: "objects", ids: [entered.newId] },
             modification: { kind: "addKeywords", keywords: ["trample"] },
             duration: "permanent",
+            sourceName: "entered",
         });
         const state = { ...effectState, continuousEffects: [effect] };
 
@@ -226,6 +231,7 @@ describe("characteristic layers", () => {
             },
             modification: { kind: "modifyPT", power: 1, toughness: 1 },
             duration: "permanent",
+            sourceName: "",
         });
         const state = { ...effectState, continuousEffects: [effect] };
 
@@ -245,6 +251,7 @@ describe("characteristic layers", () => {
             affects: { kind: "objects", ids: [source.newId] },
             modification: { kind: "modifyPT", power: 2, toughness: 2 },
             duration: "permanent",
+            sourceName: "target",
         });
         const [sourceEffectState, sourceEffect] = makeContinuousEffect(targetEffectState, {
             source: source.newId,
@@ -255,6 +262,7 @@ describe("characteristic layers", () => {
             },
             modification: { kind: "modifyPT", power: 1, toughness: 1 },
             duration: "whileSourceOnBattlefield",
+            sourceName: "source",
         });
         const effectedState = {
             ...sourceEffectState,
@@ -292,7 +300,7 @@ describe("characteristic layers", () => {
         expect(getCharacteristics(movedAnthem.state, aliceCreature.newId)).toMatchObject({ power: 2, toughness: 2 });
     });
 
-    test("\"other creatures you control\" does not buff its own source", () => {
+    test('"other creatures you control" does not buff its own source', () => {
         const otherCreature = creatureDefinition("layers-other-creature", 1, 1);
         const staticAbility: Ability = {
             kind: "static",
@@ -330,9 +338,7 @@ describe("characteristic layers", () => {
         if (!stabilized.result.ok) throw new Error(stabilized.result.error);
 
         expect(stabilized.result.state.objects[creatureInPlay.newId]).toBeUndefined();
-        const creatureDeath = stabilized.result.events.find(
-            (event) => event.type === "cardMoved" && event.oldId === creatureInPlay.newId,
-        );
+        const creatureDeath = stabilized.result.events.find((event) => event.type === "cardMoved" && event.oldId === creatureInPlay.newId);
         expect(creatureDeath).toMatchObject({ type: "cardMoved", from: "battlefield", to: "graveyard" });
         if (creatureDeath?.type !== "cardMoved") throw new Error("Expected the creature to die");
         expect(stabilized.result.state.players[alice]!.graveyard).toContain(creatureDeath.newId);
@@ -364,16 +370,14 @@ describe("characteristic layers", () => {
         let state = entered.state;
         const effects = [];
         for (const kind of order) {
-            const modification: Modification =
-                kind === "setPT"
-                    ? { kind, power: 1, toughness: 1 }
-                    : { kind, power: 1, toughness: 1 };
+            const modification: Modification = kind === "setPT" ? { kind, power: 1, toughness: 1 } : { kind, power: 1, toughness: 1 };
             const [nextState, effect] = makeContinuousEffect(state, {
                 source: entered.newId,
                 controller: alice,
                 affects: { kind: "objects", ids: [entered.newId] },
                 modification,
                 duration: "permanent",
+                sourceName: "entered",
             });
             state = nextState;
             effects.push(effect);
