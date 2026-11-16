@@ -111,7 +111,7 @@ export function describeModification(m: Modification): string {
       case "cantBeBlocked":
           return "can't be blocked" + (m.by ? ` by ${describeObjectPredicate(m.by)}` : "");
       case "cantBeTargeted":
-          return "can't be targeted" + (m.by ? ` by ${m.by.kind === "object" ? describeObjectPredicate(m.by.filter) : describePlayerPredicate(m.by.filter)}` : "");
+          return "can't be targeted" + (m.by ? ` by ${describeObjectPredicate(m.by, "spells or abilities")}` : "");
       case "cantActivateAbilities":
           return `can't activate ${m.excludeManaAbilties ? "non-mana abilities" : "abilities"}`;
       case "cantCast":

@@ -43,3 +43,12 @@ export const omitUndefined = <T extends object>(obj: T): OmitUndefined<T> => Obj
 export function capitalize(s: string, restLowercase?: boolean): string {
     return s.charAt(0).toUpperCase() + (restLowercase ? s.slice(1).toLowerCase() : s.slice(1));
 }
+
+export function addToMapArray<K, V>(map: Map<K, V[]>, key: K, value: V): void {
+    const values = map.get(key);
+    if (values) {
+        values.push(value);
+    } else {
+        map.set(key, [value]);
+    }
+}

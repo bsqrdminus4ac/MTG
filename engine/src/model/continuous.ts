@@ -65,7 +65,7 @@ export type RulesModification =
     | Readonly<{ kind: "cantAttack"; who?: { kind: "object"; filter: ObjectPredicate } | { kind: "player"; filter: PlayerPredicate } }>
     | Readonly<{ kind: "cantBlock"; who?: ObjectPredicate }>
     | Readonly<{ kind: "cantBeBlocked"; by?: ObjectPredicate }>
-    | Readonly<{ kind: "cantBeTargeted"; by?: { kind: "object"; filter: ObjectPredicate } | { kind: "player"; filter: PlayerPredicate } }>
+    | Readonly<{ kind: "cantBeTargeted"; by?: ObjectPredicate }>
     | Readonly<{ kind: "cantActivateAbilities"; excludeManaAbilties?: boolean }>
     | Readonly<{ kind: "cantCast"; what?: ObjectPredicate }>
     | Readonly<{ kind: "cantPlayLands" }>;
@@ -73,6 +73,7 @@ export type RulesModification =
 export type Modification = CharacteristicModification | RulesModification;
 
 export const isCharacteristicMod = (modification: Modification): modification is CharacteristicModification => Object.hasOwn(LAYER_OF, modification.kind);
+export const isRulesModification = (modification: Modification): modification is RulesModification => !Object.hasOwn(LAYER_OF, modification.kind);
 
 export type Duration = "untilEndOfTurn" | "whileSourceOnBattlefield" | "permanent";
 

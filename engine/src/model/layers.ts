@@ -1,5 +1,5 @@
 import { isTrue } from "../core/result";
-import { assertNever } from "../core/util";
+import { addToMapArray, assertNever } from "../core/util";
 import type { Ability, AbilityRef, GrantOrigin } from "./abilities";
 import type { Characteristics } from "./cardDefinition";
 import { isCharacteristicMod, LAYER_OF, LAYER_ORDER, type CharacteristicModification, type Duration, type Layer, type Modification, type ObjectMatch, type PlayerMatch } from "./continuous";
@@ -116,7 +116,7 @@ function computeCharacteristics(state: GameState, includeEffectDetails?: boolean
                 let newChars = applyModification(oldChars, effect);
                 chars.set(objId, newChars);
                 if (includeEffectDetails) {
-                    details.set(objId, [...(details.get(objId) || []), effect]);
+                    addToMapArray(details, objId, effect);
                 }
             }
         }
@@ -154,8 +154,8 @@ function getEffectsForLayer(state: GameState, cache: CacheInfo, layer: Layer): M
     for (const objId of state.battlefield) {
         const [chars, abilities] = cache.get(objId) ?? [undefined, []];
         if (!chars) continue;
-        for (const abilityInfo of abilities.filter((a) => a.ability.kind === "static")) {
-            if (abilityInfo.ability.kind !== "static") continue; // Need to double check so typescript doesn't complain
+        for (const abilityInfo of abilities) {
+            if (abilityInfo.ability.kind !== "static") continue;
             if (!(abilityInfo.ability.activeZones === "all" || abilityInfo.ability.activeZones.includes("battlefield"))) continue;
             const offsets = grantOffsets(abilityInfo.ability.effect.modifications);
             for (const [i, modification] of abilityInfo.ability.effect.modifications.entries()) {
