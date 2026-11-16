@@ -44,7 +44,7 @@ export const giantGrowth = instant({
                 {
                     kind: "applyContinuousEffect",
                     template: {
-                        affects: { kind: "target", spec: 0 },
+                        affects: { kind: "target", target: { kind: "target", spec: 0 } },
                         duration: "untilEndOfTurn",
                         modifications: [{ kind: "modifyPT", power: 3, toughness: 3 }],
                     },
@@ -66,7 +66,7 @@ export const llanowar = creature({
             kind: "static",
             activeZones: ["battlefield"],
             effect: {
-                affects: { kind: "matching", filter: creaturesYouControl() },
+                affects: { kind: "matchingObjects", filter: creaturesYouControl() },
                 modifications: [{ kind: "addAbilities", abilities: [tapForMana("G")] }],
             },
             text: 'Creatures you control have "{T}: Add G".',
@@ -101,7 +101,7 @@ export const infusion = instant({
                 {
                     kind: "applyContinuousEffect",
                     template: {
-                        affects: { kind: "target", spec: 0 },
+                        affects: { kind: "target", target: { kind: "target", spec: 0 } },
                         duration: "untilEndOfTurn",
                         modifications: [{ kind: "addAbilities", abilities: [triggered({ trigger: whenThisDies(), effects: [drawCards(1)], text: "When this creature dies, draw a card." })] }],
                     },

@@ -2,7 +2,7 @@ import type { Ability } from "./abilities";
 import type { EffectTarget } from "./effects";
 import type { EffectId, ObjectId, PlayerId, Timestamp } from "./ids";
 import type { Color } from "./mana";
-import type { ObjectPredicate } from "./predicates";
+import type { ObjectPredicate, PlayerPredicate } from "./predicates";
 import type { CardType, Keyword, Zone } from "./vocabulary";
 
 export type Layer =
@@ -11,7 +11,7 @@ export type Layer =
     | "text" // Layer 3: Text-changing effects
     | "type" // Layer 4: Type, supertype, and subtype changes
     | "color" // Layer 5: Color changes
-    | "ability" // Layer 6: Ability granting and removal, plus rules like "can't block"
+    | "ability" // Layer 6: Ability granting and removal
     | "characteristicDefining" // Layer 7a: */* abilities and others defined by the card
     | "setPT" // Layer 7b: Effects that set power/toughness to a specific value
     | "modifyPT" // Layer 7c: Effects that modify power/toughness, including +1/+1 counters
@@ -20,7 +20,7 @@ export type Layer =
 /** Application order. Within a layer, effects apply in timestamp order. */
 export const LAYER_ORDER: readonly Layer[] = ["copy", "control", "text", "type", "color", "ability", "characteristicDefining", "setPT", "modifyPT", "switchPT"];
 
-export type Modification =
+export type CharacteristicModification =
     // Layer 1
 
     // Layer 2
@@ -47,7 +47,7 @@ export type Modification =
     // Layer 7d
     | Readonly<{ kind: "switchPT" }>;
 
-export const LAYER_OF: Record<Modification["kind"], Layer> = {
+export const LAYER_OF: Record<CharacteristicModification["kind"], Layer> = {
     setTypes: "type",
     addTypes: "type",
     addSubtypes: "type",
@@ -61,19 +61,32 @@ export const LAYER_OF: Record<Modification["kind"], Layer> = {
     switchPT: "switchPT",
 };
 
+export type RulesModification =
+    | Readonly<{ kind: "cantAttack"; who?: { kind: "object"; filter: ObjectPredicate } | { kind: "player"; filter: PlayerPredicate } }>
+    | Readonly<{ kind: "cantBlock"; who?: ObjectPredicate }>
+    | Readonly<{ kind: "cantBeBlocked"; by?: ObjectPredicate }>
+    | Readonly<{ kind: "cantBeTargeted"; by?: { kind: "object"; filter: ObjectPredicate } | { kind: "player"; filter: PlayerPredicate } }>
+    | Readonly<{ kind: "cantActivateAbilities"; excludeManaAbilties?: boolean }>
+    | Readonly<{ kind: "cantCast"; what?: ObjectPredicate }>
+    | Readonly<{ kind: "cantPlayLands" }>;
+
+export type Modification = CharacteristicModification | RulesModification;
+
+export const isCharacteristicMod = (modification: Modification): modification is CharacteristicModification => Object.hasOwn(LAYER_OF, modification.kind);
+
 export type Duration = "untilEndOfTurn" | "whileSourceOnBattlefield" | "permanent";
 
-export type ObjectMatch = Readonly<{ kind: "matching"; filter: ObjectPredicate; zones?: readonly Zone[] }>;
-export type AffectedSet = Readonly<{ kind: "self" }> | ObjectMatch;
+export type ObjectMatch = Readonly<{ kind: "matchingObjects"; filter: ObjectPredicate; zones?: readonly Zone[] }>;
+export type PlayerMatch = Readonly<{ kind: "matchingPlayers"; filter: PlayerPredicate }>;
 
 /**  A static effect tied to the static ability of an object */
 export interface StaticEffect {
-    readonly affects: AffectedSet;
+    readonly affects: Readonly<{ kind: "self" }> | ObjectMatch | PlayerMatch;
     readonly modifications: Modification[];
 }
 /** The template an applyContinuousEffect effect carries. It is definition data only and never lives in state or on an object as a rule. Resolution turns it into a live ContinuousEffect in state.continuousEffects */
 export interface AppliedEffect {
-    readonly affects: EffectTarget | ObjectMatch;
+    readonly affects: { kind: "target"; target: EffectTarget } | ObjectMatch | PlayerMatch;
     readonly modifications: Modification[];
     readonly duration: Duration;
 }
@@ -84,7 +97,7 @@ export interface ContinuousEffect {
     readonly source: ObjectId;
     readonly controller: PlayerId;
     readonly timestamp: Timestamp;
-    readonly affects: Readonly<{ kind: "objects"; ids: ObjectId[] }> | ObjectMatch;
+    readonly affects: Readonly<{ kind: "objects"; ids: ObjectId[] }> | ObjectMatch | PlayerMatch;
     readonly modifications: Modification[];
     readonly duration: Duration;
     readonly sourceName: string;

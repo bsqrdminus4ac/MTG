@@ -114,7 +114,7 @@ describe("combat damage", () => {
                 activeZones: ["battlefield" as const],
                 effect: {
                     affects: {
-                        kind: "matching" as const,
+                        kind: "matchingObjects" as const,
                         filter: { kind: "hasKeyword" as const, keyword: "flying" as const },
                     },
                     modifications: [{ kind: "removeKeywords" as const, keywords: ["flying" as const] }],

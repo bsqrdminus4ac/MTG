@@ -58,7 +58,7 @@ describe("text describers", () => {
     });
 
     test("static abilities describe their affected objects and all modifications", () => {
-        expect(describeAllEffects(gloriousAnthem.abilities[0]!)).toBe("an object that is in battlefield and is a creature and is controlled by you: +1/+1");
+        expect(describeAllEffects(gloriousAnthem.abilities[0]!)).toBe("an object that is in battlefield and is a creature and is controlled by you: get +1/+1");
         expect(describeAllEffects(wingSplicer.abilities[0]!)).toBe("an object that is in battlefield and is a creature and is controlled by you and does not match this object: gains flying");
         expect(
             describeAllEffects({
@@ -73,7 +73,7 @@ describe("text describers", () => {
                 },
                 text: "This creature gets +1/+1 and has vigilance.",
             }),
-        ).toBe("this object: +1/+1, gains vigilance");
+        ).toBe("this object: get +1/+1, gains vigilance");
     });
 
     test("describes effects on triggered abilities", () => {
@@ -196,7 +196,7 @@ describe("text describers", () => {
             source: source.id,
             controller: source.controller,
             timestamp: source.timestamp,
-            affects: { kind: "matching" as const, filter: { kind: "hasType" as const, type: "Creature" as const } },
+            affects: { kind: "matchingObjects" as const, filter: { kind: "hasType" as const, type: "Creature" as const } },
             modifications: [{ kind: "modifyPT" as const, power: 3, toughness: 3 }],
             duration: "untilEndOfTurn" as const,
             sourceName: "Forest",
@@ -206,13 +206,13 @@ describe("text describers", () => {
                 type: "continuousEffectCreated",
                 effect,
             }),
-        ).toBe(`Continuous effect created: +3/+3 on an object that is a creature — from Forest (timestamp ${source.timestamp}, until end of turn)`);
+        ).toBe(`Continuous effect created: get +3/+3 on an object that is a creature — from Forest (timestamp ${source.timestamp}, until end of turn)`);
         expect(
             describeEvent(state, {
                 type: "continuousEffectExpired",
                 effect: { ...effect, duration: "whileSourceOnBattlefield" },
             }),
-        ).toBe(`Continuous effect expired: +3/+3 on an object that is a creature — from Forest (timestamp ${source.timestamp}, while its source remains on the battlefield)`);
+        ).toBe(`Continuous effect expired: get +3/+3 on an object that is a creature — from Forest (timestamp ${source.timestamp}, while its source remains on the battlefield)`);
     });
 
     test("ability text is read from the authored text", () => {

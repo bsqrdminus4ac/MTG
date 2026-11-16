@@ -121,10 +121,10 @@ export const eachPlayerDiscards = (amount: number): Ability => ({
 });
 
 export const anthem = (filter: ObjectPredicate, power: number, toughness: number, text: string) =>
-    staticAbility({ effect: { affects: { kind: "matching", filter }, modifications: [{ kind: "modifyPT", power, toughness }] }, text });
+    staticAbility({ effect: { affects: { kind: "matchingObjects", filter }, modifications: [{ kind: "modifyPT", power, toughness }] }, text });
 
 export const grantKeyword = (filter: ObjectPredicate, keywords: Keyword[], text: string) =>
-    staticAbility({ effect: { affects: { kind: "matching", filter }, modifications: [{ kind: "addKeywords", keywords }] }, text });
+    staticAbility({ effect: { affects: { kind: "matchingObjects", filter }, modifications: [{ kind: "addKeywords", keywords }] }, text });
 
 export const thisGets = (power: number, toughness: number, text: string) => staticAbility({ effect: { affects: { kind: "self" }, modifications: [{ kind: "modifyPT", power, toughness }] }, text });
 

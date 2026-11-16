@@ -1,6 +1,6 @@
 import { ok, type ApplyResult } from "../core/result";
 import { partition } from "../core/util";
-import type { AppliedEffect, ContinuousEffect, Duration, Modification, ObjectMatch } from "../model/continuous";
+import { isCharacteristicMod, type AppliedEffect, type ContinuousEffect, type Duration, type Modification, type ObjectMatch, type PlayerMatch } from "../model/continuous";
 import type { EffectContext } from "../model/effects";
 import type { GameEvent } from "../model/events";
 import { nextID, type EffectId, type ObjectId, type Timestamp } from "../model/ids";
@@ -8,10 +8,14 @@ import { getCachedCharacteristics, getMatchingObjects } from "../model/layers";
 import type { GameState } from "../model/state";
 
 function affectsLockedSet(modification: Modification): boolean {
-    return true; // Currently only characteristics/controller modifications have been implemented, not any rules-changing modifications.
+    return isCharacteristicMod(modification);
 }
 
-export function addContinuousEffect(state: GameState, ctx: EffectContext, effect: Omit<AppliedEffect, "affects"> & { affects: { kind: "objects"; ids: ObjectId[] } | ObjectMatch }): ApplyResult {
+export function addContinuousEffect(
+    state: GameState,
+    ctx: EffectContext,
+    effect: Omit<AppliedEffect, "affects"> & { affects: { kind: "objects"; ids: ObjectId[] } | ObjectMatch | PlayerMatch },
+): ApplyResult {
     if (effect.modifications.length === 0) return ok(state, []);
     if (effect.duration === "whileSourceOnBattlefield" && state.objects[ctx.source]?.zone !== "battlefield") return ok(state, []);
 
@@ -23,7 +27,11 @@ export function addContinuousEffect(state: GameState, ctx: EffectContext, effect
 
     if (lockedMods.length > 0) {
         const affects: { kind: "objects"; ids: ObjectId[] } =
-            effect.affects.kind === "objects" ? effect.affects : { kind: "objects", ids: [...getMatchingObjects(currentState, getCachedCharacteristics(currentState), ctx, effect.affects)] };
+            effect.affects.kind === "matchingPlayers"
+                ? { kind: "objects", ids: [] }
+                : effect.affects.kind === "objects"
+                  ? effect.affects
+                  : { kind: "objects", ids: [...getMatchingObjects(currentState, getCachedCharacteristics(currentState), ctx, effect.affects)] };
         const [effectState, lockedId] = nextID<EffectId>(currentState);
         currentState = effectState;
         const lockedEffect: ContinuousEffect = {

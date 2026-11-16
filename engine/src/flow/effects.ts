@@ -1,7 +1,7 @@
 import { applySequentially, fail, goodResult, type ApplyResult, type Failure, type Result } from "../core/result";
 import { assertNever, withEntry } from "../core/util";
 import { getCardName } from "../model/characteristics";
-import type { ObjectMatch } from "../model/continuous";
+import type { ObjectMatch, PlayerMatch } from "../model/continuous";
 import { chooseMany, manaChoice, objectChoice, yesNo, type Continuation } from "../model/decisions";
 import type { Effect, EffectContext, EffectTarget, PlayerRef } from "../model/effects";
 import type { GameEvent } from "../model/events";
@@ -14,7 +14,6 @@ import { evalCondition, resolveAmount } from "../rules/conditions";
 import { addContinuousEffect } from "../rules/continuousEffects";
 import { openDecision } from "../rules/pending";
 import { addManaEffect, damageObject, damagePlayer, destroyPermanent, discardCard, gainLife, loseLife } from "../rules/primitives";
-
 
 const getSourceName = (state: GameState, ctx: EffectContext): string => {
     if (ctx.sourceSnapshot) return ctx.sourceSnapshot.chars.name;
@@ -190,9 +189,9 @@ export function executeEffect(state: GameState, ctx: EffectContext, effect: Effe
             );
         }
         case "applyContinuousEffect": {
-            let affects: Readonly<{ kind: "objects"; ids: ObjectId[] }> | ObjectMatch;
-            if (effect.template.affects.kind !== "matching") {
-                const targets = resolveEffectTargets(currentState, ctx, effect.template.affects);
+            let affects: Readonly<{ kind: "objects"; ids: ObjectId[] }> | ObjectMatch | PlayerMatch;
+            if (effect.template.affects.kind === "target") {
+                const targets = resolveEffectTargets(currentState, ctx, effect.template.affects.target);
                 if (!targets.ok) return targets;
                 affects = { kind: "objects", ids: targets.value.flatMap((t) => (t.kind === "object" ? t.id : [])) };
             } else {

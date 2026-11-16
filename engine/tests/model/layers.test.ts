@@ -24,24 +24,15 @@ const battlefieldCreatures: ObjectPredicate = {
 
 function controlledCreaturesExceptSource(): ObjectMatch {
     return {
-        kind: "matching",
+        kind: "matchingObjects",
         filter: {
             kind: "all",
-            of: [
-                battlefieldCreatures,
-                { kind: "controlledBy", who: "you" },
-                { kind: "not", of: { kind: "isSource" } },
-            ],
+            of: [battlefieldCreatures, { kind: "controlledBy", who: "you" }, { kind: "not", of: { kind: "isSource" } }],
         },
     };
 }
 
-function creatureDefinition(
-    id: string,
-    power = 2,
-    toughness = 2,
-    abilities: Ability[] = [],
-): CardDefinition {
+function creatureDefinition(id: string, power = 2, toughness = 2, abilities: Ability[] = []): CardDefinition {
     return {
         id: cardDefId(id),
         name: id,
@@ -62,7 +53,7 @@ function staticPermanent(id: string, modification: Modification): CardDefinition
         activeZones: ["battlefield"],
         effect: {
             affects: {
-                kind: "matching",
+                kind: "matchingObjects",
                 filter: {
                     kind: "all",
                     of: [battlefieldCreatures, { kind: "controlledBy", who: "you" }],
@@ -86,11 +77,7 @@ function staticPermanent(id: string, modification: Modification): CardDefinition
     };
 }
 
-function newGame(
-    definitions: readonly CardDefinition[],
-    aliceDeck: readonly CardDefinition["id"][],
-    bobDeck: readonly CardDefinition["id"][] = [],
-): GameState {
+function newGame(definitions: readonly CardDefinition[], aliceDeck: readonly CardDefinition["id"][], bobDeck: readonly CardDefinition["id"][] = []): GameState {
     return createGame(definitions, [
         { id: alice, deck: aliceDeck },
         { id: bob, deck: bobDeck },
@@ -226,7 +213,7 @@ describe("characteristic layers", () => {
             source: creatureOnBattlefield.newId,
             controller: alice,
             affects: {
-                kind: "matching",
+                kind: "matchingObjects",
                 filter: battlefieldCreatures,
             },
             modification: { kind: "modifyPT", power: 1, toughness: 1 },
@@ -257,7 +244,7 @@ describe("characteristic layers", () => {
             source: source.newId,
             controller: alice,
             affects: {
-                kind: "matching",
+                kind: "matchingObjects",
                 filter: battlefieldCreatures,
             },
             modification: { kind: "modifyPT", power: 1, toughness: 1 },
@@ -403,9 +390,7 @@ describe("characteristic layers", () => {
         const returnedFive = moveObject(inGraveyard.state, inGraveyard.newId, "battlefield");
         if (!returnedFive) throw new Error("Expected permanent to return to the battlefield");
 
-        expect(returnedFive.state.objects[returnedFive.newId]!.timestamp).toBeGreaterThan(
-            returnedFive.state.objects[newerThree.newId]!.timestamp,
-        );
+        expect(returnedFive.state.objects[returnedFive.newId]!.timestamp).toBeGreaterThan(returnedFive.state.objects[newerThree.newId]!.timestamp);
         expect(getCharacteristics(returnedFive.state, target.newId)).toMatchObject({ power: 5, toughness: 5 });
     });
 
@@ -432,7 +417,10 @@ describe("characteristic layers", () => {
 
     test("10,000 characteristic reads across 40 objects use the cache", () => {
         const creature = creatureDefinition("layers-cache-creature");
-        let state = newGame([creature], Array.from({ length: 40 }, () => creature.id));
+        let state = newGame(
+            [creature],
+            Array.from({ length: 40 }, () => creature.id),
+        );
         for (let i = 0; i < 40; i++) state = enterFromLibrary(state).state;
         const ids = state.battlefield;
 

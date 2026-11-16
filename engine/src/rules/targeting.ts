@@ -3,9 +3,8 @@ import { assertNever } from "../core/util";
 import { getCharacteristics, hasKeyword, snapshotObject } from "../model/characteristics";
 import { objectChoice, playerChoice, type Choice } from "../model/decisions";
 import type { TargetFilter, TargetSpec } from "../model/effects";
-import { evalObjectPredicate } from "../model/objectPredicates";
+import { evalObjectPredicate, evalPlayerPredicate, evalStackPredicate } from "../model/evalPredicates";
 import type { EvalScope, GameState, Target } from "../model/state";
-import { evalPlayerPredicate, evalStackPredicate } from "./predicates";
 
 export function canBeTargetedBy(state: GameState, scope: EvalScope, target: Target): boolean {
     if (target.kind === "object") {

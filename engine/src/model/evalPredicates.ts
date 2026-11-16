@@ -1,28 +1,62 @@
 import { goodResult, isTrue, type Result } from "../core/result";
 import { assertNever } from "../core/util";
-import { snapshotObject } from "../model/characteristics";
-import type { EventOfType, GameEvent } from "../model/events";
-import type { PlayerId } from "../model/ids";
-import { evalObjectPredicate } from "../model/objectPredicates";
-import {
-    compareNumbers,
-    evalPredicate,
-    type EventLeaf,
-    type EventLeaves,
-    type EventPredicate,
-    type ObjectPredicate,
-    type PlayerLeaf,
-    type PlayerPredicate,
-    type StackLeaf,
-    type StackPredicate,
-} from "../model/predicates";
-import type { EvalScope, GameState, ObjectSnapshot, StackEntry } from "../model/state";
+import { snapshotObject } from "./characteristics";
+import type { EventOfType, GameEvent } from "./events";
+import type { PlayerId } from "./ids";
+import { compareNumbers, isCombinator, type EventLeaf, type EventLeaves, type EventPredicate, type ObjectLeaf, type ObjectPredicate, type PlayerLeaf, type PlayerPredicate, type Predicate, type StackLeaf, type StackPredicate } from "./predicates";
+import type { EvalScope, GameState, ObjectSnapshot, StackEntry } from "./state";
+
+export function evalPredicate<T extends { kind: string }>(predicate: Predicate<T>, evalFunc: (leaf: T) => Result<boolean>): Result<boolean> {
+    if (!isCombinator(predicate)) return evalFunc(predicate);
+    switch (predicate.kind) {
+        case "not":
+            const inner = evalPredicate(predicate.of, evalFunc);
+            return inner.ok ? goodResult(!inner.value) : inner;
+        case "all":
+        case "any": {
+            const values: boolean[] = [];
+            for (const sub of predicate.of) {
+                // evaluate every one; no short-circuit (see below)
+                const v = evalPredicate(sub, evalFunc);
+                if (!v.ok) return v;
+                values.push(v.value);
+            }
+            return goodResult(predicate.kind === "all" ? values.every(Boolean) : values.some(Boolean));
+        }
+    }
+}
+
+export const evalObjectPredicate = (scope: EvalScope, obj: ObjectSnapshot, p: ObjectPredicate) => evalPredicate(p, (leaf) => evalObjectLeaf(scope, obj, leaf));
 
 export const evalPlayerPredicate = (state: GameState, scope: EvalScope, player: PlayerId, p: PlayerPredicate) => evalPredicate(p, (leaf) => evalPlayerLeaf(state, scope, player, leaf));
 
 export const evalStackPredicate = (state: GameState, scope: EvalScope, entry: StackEntry, p: StackPredicate) => evalPredicate(p, (leaf) => evalStackLeaf(state, scope, entry, leaf));
 
 export const evalEventPredicate = (state: GameState, scope: EvalScope, event: GameEvent, p: EventPredicate) => evalPredicate(p, (leaf) => evalEventLeaf(state, scope, event, leaf));
+
+
+export function evalObjectLeaf(scope: EvalScope, obj: ObjectSnapshot, predicate: ObjectLeaf): Result<boolean> {
+    switch (predicate.kind) {
+        case "hasType":
+            return goodResult(obj.chars.types.includes(predicate.type));
+        case "hasColor":
+            return goodResult(obj.chars.colors.includes(predicate.color));
+        case "hasSupertype":
+            return goodResult(obj.chars.supertypes.includes(predicate.type));
+        case "hasSubtype":
+            return goodResult(obj.chars.subtypes.includes(predicate.type));
+        case "hasKeyword":
+            return goodResult(obj.chars.abilities.some((a) => a.kind === "keyword" && a.keyword === predicate.keyword));
+        case "controlledBy":
+            return goodResult((predicate.who === "you") === (obj.controller === scope.controller));
+        case "inZone":
+            return goodResult(obj.zone === predicate.zone);
+        case "isSource":
+            return goodResult(obj.id === scope.source);
+        default:
+            return assertNever(predicate);
+    }
+}
 
 function evalPlayerLeaf(state: GameState, scope: EvalScope, player: PlayerId, predicate: PlayerLeaf): Result<boolean> {
     switch (predicate.kind) {

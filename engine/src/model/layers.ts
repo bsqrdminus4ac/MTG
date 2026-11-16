@@ -2,9 +2,9 @@ import { isTrue } from "../core/result";
 import { assertNever } from "../core/util";
 import type { Ability, AbilityRef, GrantOrigin } from "./abilities";
 import type { Characteristics } from "./cardDefinition";
-import { LAYER_OF, LAYER_ORDER, type Duration, type Layer, type Modification, type ObjectMatch } from "./continuous";
+import { isCharacteristicMod, LAYER_OF, LAYER_ORDER, type CharacteristicModification, type Duration, type Layer, type Modification, type ObjectMatch, type PlayerMatch } from "./continuous";
+import { evalObjectPredicate } from "./evalPredicates";
 import type { Brand, EffectId, ObjectId, PlayerId, Timestamp } from "./ids";
-import { evalObjectPredicate } from "./objectPredicates";
 import { getAllObjectsInZone, type EvalScope, type GameState, type ObjectSnapshot } from "./state";
 import type { Keyword } from "./vocabulary";
 
@@ -23,8 +23,8 @@ export type ModificationInfo = {
     sourceName: string;
     controller: PlayerId;
     timestamp: Timestamp;
-    modification: Modification;
-    affects: Readonly<{ kind: "objects"; ids: ObjectId[] }> | Readonly<{ kind: "self" }> | ObjectMatch;
+    modification: CharacteristicModification;
+    affects: Readonly<{ kind: "objects"; ids: ObjectId[] }> | Readonly<{ kind: "self" }> | ObjectMatch | PlayerMatch;
     grantOrigin: GrantOrigin;
     grantOffset: number;
     duration?: Duration;
@@ -131,23 +131,23 @@ function computeCharacteristics(state: GameState, includeEffectDetails?: boolean
 function getEffectsForLayer(state: GameState, cache: CacheInfo, layer: Layer): ModificationInfo[] {
     const continuousEffects: ModificationInfo[] = state.continuousEffects.flatMap((effect) => {
         const offsets = grantOffsets(effect.modifications);
-        return effect.modifications.flatMap((modification, i) =>
-            LAYER_OF[modification.kind] === layer
-                ? {
-                      key: storedKey(effect.id),
-                      layer,
-                      source: effect.source,
-                      sourceName: effect.sourceName,
-                      controller: effect.controller,
-                      timestamp: effect.timestamp,
-                      affects: effect.affects,
-                      modification,
-                      grantOrigin: { kind: "effect", id: effect.id },
-                      grantOffset: offsets[i]!,
-                      duration: effect.duration,
-                  }
-                : [],
-        );
+        return effect.modifications.flatMap((modification, i) => {
+            if (!isCharacteristicMod(modification)) return [];
+            if (LAYER_OF[modification.kind] !== layer) return [];
+            return {
+                key: storedKey(effect.id),
+                layer,
+                source: effect.source,
+                sourceName: effect.sourceName,
+                controller: effect.controller,
+                timestamp: effect.timestamp,
+                affects: effect.affects,
+                modification,
+                grantOrigin: { kind: "effect", id: effect.id },
+                grantOffset: offsets[i]!,
+                duration: effect.duration,
+            };
+        });
     });
 
     const objEffects: ModificationInfo[] = [];
@@ -159,6 +159,7 @@ function getEffectsForLayer(state: GameState, cache: CacheInfo, layer: Layer): M
             if (!(abilityInfo.ability.activeZones === "all" || abilityInfo.ability.activeZones.includes("battlefield"))) continue;
             const offsets = grantOffsets(abilityInfo.ability.effect.modifications);
             for (const [i, modification] of abilityInfo.ability.effect.modifications.entries()) {
+                if (!isCharacteristicMod(modification)) continue;
                 const obj = state.objects[objId];
                 if (!obj) continue;
                 if (LAYER_OF[modification.kind] === layer) {
@@ -204,7 +205,7 @@ function getAffectedObjects(state: GameState, cache: CacheInfo, effect: Modifica
             return new Set([effect.source]);
         case "objects":
             return new Set(effect.affects.ids);
-        case "matching":
+        case "matchingObjects":
             return getMatchingObjects(
                 state,
                 cache,
@@ -215,6 +216,10 @@ function getAffectedObjects(state: GameState, cache: CacheInfo, effect: Modifica
                 },
                 effect.affects,
             );
+        case "matchingPlayers":
+            return new Set();
+        default:
+            return assertNever(effect.affects);
     }
 }
 

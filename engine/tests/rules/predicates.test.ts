@@ -1,8 +1,8 @@
 import { describe, expect, test } from "vitest";
 import type { CardDefinition } from "../../src/model/cardDefinition";
 import { snapshotObject } from "../../src/model/characteristics";
+import { evalObjectPredicate } from "../../src/model/evalPredicates";
 import { cardDefId, playerId } from "../../src/model/ids";
-import { evalObjectPredicate } from "../../src/model/objectPredicates";
 import type { ObjectPredicate } from "../../src/model/predicates";
 import type { GameState } from "../../src/model/state";
 import { moveObject } from "../../src/model/zones";

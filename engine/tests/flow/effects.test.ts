@@ -192,11 +192,7 @@ const creatureTarget = {
     maxCount: 1,
 };
 
-function targetedContinuousSpell(
-    id: string,
-    name: string,
-    modifications: Extract<Effect, { kind: "applyContinuousEffect" }>["template"]["modifications"],
-): CardDefinition {
+function targetedContinuousSpell(id: string, name: string, modifications: Extract<Effect, { kind: "applyContinuousEffect" }>["template"]["modifications"]): CardDefinition {
     const ability: AbilityOfKind<"spell"> = {
         kind: "spell",
         targets: [creatureTarget],
@@ -204,7 +200,7 @@ function targetedContinuousSpell(
             {
                 kind: "applyContinuousEffect",
                 template: {
-                    affects: { kind: "target", spec: 0 },
+                    affects: { kind: "target", target: { kind: "target", spec: 0 } },
                     modifications,
                     duration: "untilEndOfTurn",
                 },
@@ -226,11 +222,7 @@ function targetedContinuousSpell(
     };
 }
 
-function untargetedContinuousSpell(
-    id: string,
-    name: string,
-    modifications: Extract<Effect, { kind: "applyContinuousEffect" }>["template"]["modifications"],
-): CardDefinition {
+function untargetedContinuousSpell(id: string, name: string, modifications: Extract<Effect, { kind: "applyContinuousEffect" }>["template"]["modifications"]): CardDefinition {
     const ability: AbilityOfKind<"spell"> = {
         kind: "spell",
         targets: [],
@@ -239,7 +231,7 @@ function untargetedContinuousSpell(
                 kind: "applyContinuousEffect",
                 template: {
                     affects: {
-                        kind: "matching",
+                        kind: "matchingObjects",
                         filter: {
                             kind: "all",
                             of: [
@@ -423,7 +415,7 @@ describe("resolved continuous effects", () => {
                     kind: "static",
                     activeZones: ["battlefield"],
                     effect: {
-                        affects: { kind: "matching", filter: { kind: "hasType", type: "Creature" } },
+                        affects: { kind: "matchingObjects", filter: { kind: "hasType", type: "Creature" } },
                         modifications: [{ kind: "setPT", power: 4, toughness: 4 }],
                     },
                     text: "",

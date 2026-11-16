@@ -82,30 +82,44 @@ export function describePool(pool: ManaPool): string {
 
 export function describeModification(m: Modification): string {
   switch (m.kind) {
-    case "modifyPT":
-      return `${signed(m.power)}/${signed(m.toughness)}`;
-    case "setPT":
-      return `base ${m.power}/${m.toughness}`;
-    case "setTypes":
-      return `becomes ${m.types.join(" and ")}`;
-    case "addTypes":
-      return `also becomes ${m.types.join(" and ")}`;
-    case "addSubtypes":
-      return `gains ${m.types.length === 1 ? "subtype" : "subtypes"} ${m.types.join(" and ")}`;
-    case "setColors":
-      return `becomes ${m.colors.length > 0 ? m.colors.join("") : "colorless"}`;
-    case "addColors":
-      return `gains ${m.colors.join("")} color${m.colors.length === 1 ? "" : "s"}`;
-    case "addKeywords":
-      return `gains ${m.keywords.join(" and ")}`;
-    case "addAbilities":
-      return `gains "${m.abilities.map((a) => abilityText(a, "<this>")).join('" and "')}"`;
-    case "removeKeywords":
-      return `loses ${m.keywords.join(" and ")}`;
-    case "switchPT":
-      return "switches power and toughness";
-    default:
-      return unreachable(m);
+      case "modifyPT":
+          return `get ${signed(m.power)}/${signed(m.toughness)}`;
+      case "setPT":
+          return `has base ${m.power}/${m.toughness}`;
+      case "setTypes":
+          return `becomes ${m.types.join(" and ")}`;
+      case "addTypes":
+          return `also becomes ${m.types.join(" and ")}`;
+      case "addSubtypes":
+          return `gains ${m.types.length === 1 ? "subtype" : "subtypes"} ${m.types.join(" and ")}`;
+      case "setColors":
+          return `becomes ${m.colors.length > 0 ? m.colors.join("") : "colorless"}`;
+      case "addColors":
+          return `gains ${m.colors.join("")} color${m.colors.length === 1 ? "" : "s"}`;
+      case "addKeywords":
+          return `gains ${m.keywords.join(" and ")}`;
+      case "addAbilities":
+          return `gains "${m.abilities.map((a) => abilityText(a, "<this>")).join('" and "')}"`;
+      case "removeKeywords":
+          return `loses ${m.keywords.join(" and ")}`;
+      case "switchPT":
+          return "switches power and toughness";
+      case "cantAttack":
+          return "can't attack" + (m.who ? ` ${m.who.kind === "object" ? describeObjectPredicate(m.who.filter) : describePlayerPredicate(m.who.filter)}` : "");
+      case "cantBlock":
+          return "can't block" + (m.who ? ` ${describeObjectPredicate(m.who)}` : "");
+      case "cantBeBlocked":
+          return "can't be blocked" + (m.by ? ` by ${describeObjectPredicate(m.by)}` : "");
+      case "cantBeTargeted":
+          return "can't be targeted" + (m.by ? ` by ${m.by.kind === "object" ? describeObjectPredicate(m.by.filter) : describePlayerPredicate(m.by.filter)}` : "");
+      case "cantActivateAbilities":
+          return `can't activate ${m.excludeManaAbilties ? "non-mana abilities" : "abilities"}`;
+      case "cantCast":
+          return "can't cast " + (m.what ? describeObjectPredicate(m.what, "spell") : "");
+      case "cantPlayLands":
+          return "can't play lands";
+      default:
+          return unreachable(m);
   }
 }
 
@@ -124,14 +138,18 @@ export function describeAllEffects(ability: Ability): string {
 }
 
 function describeStaticEffect(effect: StaticEffect): string {
-    const who = effect.affects.kind === "self" ? "this object" : describeObjectPredicate(effect.affects.filter);
+    const who =
+        effect.affects.kind === "self" ? "this object" : effect.affects.kind === "matchingObjects" ? describeObjectPredicate(effect.affects.filter) : describePlayerPredicate(effect.affects.filter);
     return `${who}: ${describeModifications(effect.modifications)}`;
 }
 
 function describeAppliedEffect(effect: AppliedEffect): string {
-  const who = effect.affects.kind === "matching"
-    ? describeObjectPredicate(effect.affects.filter)
-    : describeEffectTarget(effect.affects);
+  const who =
+      effect.affects.kind === "matchingObjects"
+          ? describeObjectPredicate(effect.affects.filter)
+          : effect.affects.kind === "matchingPlayers"
+            ? describePlayerPredicate(effect.affects.filter)
+            : describeEffectTarget(effect.affects.target);
   return `${who}: ${describeModifications(effect.modifications)} (${effect.duration})`;
 }
 
@@ -149,9 +167,12 @@ export function describeDuration(duration: Duration): string {
 }
 
 export function describeContinuousEffect(state: GameState, e: ContinuousEffect): string {
-  const who = e.affects.kind === "objects"
-    ? e.affects.ids.map((id) => nameOf(state, id)).join(", ")
-    : describeObjectPredicate(e.affects.filter);
+  const who =
+      e.affects.kind === "objects"
+          ? e.affects.ids.map((id) => nameOf(state, id)).join(", ")
+          : e.affects.kind === "matchingObjects"
+            ? describeObjectPredicate(e.affects.filter)
+            : describePlayerPredicate(e.affects.filter);
   return `${describeModifications(e.modifications)} on ${who} — from ${e.sourceName} (timestamp ${e.timestamp}, ${describeDuration(e.duration)})`;
 }
 
@@ -274,9 +295,9 @@ function describeCondition(condition: Condition): string {
     }
 }
 
-function describeObjectPredicate(predicate: ObjectPredicate): string {
-    if (predicate.kind === "isSource") return "this object";
-    return `an object that ${describeObjectCondition(predicate)}`;
+function describeObjectPredicate(predicate: ObjectPredicate, objectWord = "object"): string {
+    if (predicate.kind === "isSource") return `this ${objectWord}`;
+    return `a${objectWord.startsWith("o") ? "n" : ""} ${objectWord} that ${describeObjectCondition(predicate)}`;
 }
 
 function describeObjectCondition(predicate: ObjectPredicate): string {

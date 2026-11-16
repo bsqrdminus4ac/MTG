@@ -43,7 +43,7 @@ function game(lordFirst: boolean): GameState {
         source: lordOnBattlefield.newId,
         controller: alice,
         affects: {
-            kind: "matching",
+            kind: "matchingObjects",
             filter: {
                 kind: "all",
                 of: [

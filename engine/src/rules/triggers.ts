@@ -2,12 +2,12 @@ import { isTrue, ok, type ApplyResult } from "../core/result";
 import { snapshotObject } from "../model/characteristics";
 import type { ChoiceValue } from "../model/decisions";
 import { abilityText } from "../model/effects";
+import { evalEventPredicate } from "../model/evalPredicates";
 import type { GameEvent } from "../model/events";
 import { nextID, type PlayerId, type TriggerId } from "../model/ids";
 import { isTriggerEvent, type TriggerEvent, type TriggerGameEvent } from "../model/predicates";
 import type { Bindings, EvalScope, GameState, ObjectSnapshot, PendingTrigger, Target } from "../model/state";
 import { evalCondition } from "./conditions";
-import { evalEventPredicate } from "./predicates";
 
 export function describeTrigger(state: GameState, trigger: PendingTrigger): string {
     const abilityDesc = abilityText(trigger.ability, trigger.lki.chars.name);
