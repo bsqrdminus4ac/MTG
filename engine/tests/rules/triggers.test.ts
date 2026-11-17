@@ -28,7 +28,7 @@ const bob = playerId("bob");
 const creature = (id: string, abilities: readonly AbilityOfKind<"triggered">[] = []): CardDefinition => ({
     id: cardDefId(id),
     name: id,
-    manaCost: { generic: 0, pips: [] },
+    cost: [{ kind: "mana", cost: { generic: 0, pips: [] } }],
     colors: [],
     supertypes: [],
     types: ["Creature"],
@@ -190,7 +190,7 @@ describe("detectTriggers", () => {
         if (!sourceLki) throw new Error("Missing resolving source snapshot");
         const resolvingAbility: AbilityOfKind<"activated"> = {
             kind: "activated",
-            cost: {},
+            cost: [],
             targets: [],
             effects: [],
             activateableZones: ["battlefield"],

@@ -13,7 +13,7 @@ const alice = playerId("alice");
 const bear: CardDefinition = {
     id: cardDefId("bear"),
     name: "Grizzly Bears",
-    manaCost: { generic: 1, pips: ["G"] },
+    cost: [{ kind: "mana", cost: { generic: 1, pips: ["G"] } }],
     colors: ["G"],
     supertypes: [],
     types: ["Creature"],

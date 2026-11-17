@@ -20,7 +20,7 @@ const bob = playerId("bob");
 const bear: CardDefinition = {
     id: cardDefId("bear"),
     name: "Grizzly Bears",
-    manaCost: { generic: 1, pips: ["G"] as const },
+    cost: [{ kind: "mana", cost: { generic: 1, pips: ["G"] as const } }],
     colors: ["G"] as const,
     supertypes: [],
     types: ["Creature"] as const,
@@ -33,7 +33,7 @@ const bear: CardDefinition = {
 const planeswalker: CardDefinition = {
     id: cardDefId("planeswalker"),
     name: "Test Planeswalker",
-    manaCost: { generic: 2, pips: ["U"] },
+    cost: [{ kind: "mana", cost: { generic: 2, pips: ["U"] } }],
     colors: ["U"],
     supertypes: [],
     types: ["Planeswalker"],
@@ -211,7 +211,7 @@ function targetedContinuousSpell(id: string, name: string, modifications: Extrac
     return {
         id: cardDefId(id),
         name,
-        manaCost: { generic: 0, pips: [] },
+        cost: [{ kind: "mana", cost: { generic: 0, pips: [] } }],
         colors: [],
         supertypes: [],
         types: ["Instant"],
@@ -251,7 +251,7 @@ function untargetedContinuousSpell(id: string, name: string, modifications: Extr
     return {
         id: cardDefId(id),
         name,
-        manaCost: { generic: 0, pips: [] },
+        cost: [{ kind: "mana", cost: { generic: 0, pips: [] } }],
         colors: [],
         supertypes: [],
         types: ["Instant"],
@@ -403,7 +403,7 @@ describe("resolved continuous effects", () => {
         const anthem: CardDefinition = {
             id: cardDefId("set-anthem"),
             name: "Set Anthem",
-            manaCost: { generic: 0, pips: [] },
+            cost: [{ kind: "mana", cost: { generic: 0, pips: [] } }],
             colors: [],
             supertypes: [],
             types: ["Enchantment"],

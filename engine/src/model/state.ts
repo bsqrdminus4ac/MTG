@@ -1,3 +1,4 @@
+import type { TotalCost } from "../rules/costs";
 import type { AbilityOfKind } from "./abilities";
 import type { CardDefinition, Characteristics } from "./cardDefinition";
 import type { ContinuousEffect } from "./continuous";
@@ -5,7 +6,7 @@ import type { ChoiceValue, Decision } from "./decisions";
 import type { Effect } from "./effects";
 import type { GameEvent } from "./events";
 import type { CardDefId, ObjectId, PlayerId, StackId, Timestamp, TriggerId } from "./ids";
-import type { ManaCost, ManaPool } from "./mana";
+import type { ManaPool } from "./mana";
 import type { Step, Zone } from "./vocabulary";
 
 /** A card (or token) in some zone. Everything mutable about it lives here, not on the definition. */
@@ -127,7 +128,7 @@ interface CastProgress {
     card: ObjectId; // still in hand until commit
     targets: readonly (readonly Target[])[];
     targetSpecsSelected: readonly boolean[];
-    cost: ManaCost | null; // total cost, determined after targets
+    cost: TotalCost | null; // total cost, determined after targets
     bindings: Bindings;
     rollback: GameState; // state before casting began
     events: readonly GameEvent[]; // buffered until commit

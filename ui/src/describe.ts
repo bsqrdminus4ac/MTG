@@ -13,6 +13,7 @@ import {
     type Condition,
     type ContinuousEffect,
     type Cost,
+    combineManaCosts,
     type Decision,
     type Duration,
     type Effect,
@@ -71,6 +72,16 @@ export function describeManaCost(cost: ManaCost | null): string {
   if (cost === null) return "—";
   const generic = cost.generic > 0 || cost.pips.length === 0 ? `{${cost.generic}}` : "";
   return generic + cost.pips.map((p) => `{${p}}`).join("");
+}
+
+export function manaCostFromCost(cost: Cost | null): ManaCost | null {
+    let manaCost: ManaCost | null = null;
+    for (const component of cost ?? []) {
+        if (component.kind === "mana") {
+            manaCost = manaCost === null ? component.cost : combineManaCosts(manaCost, component.cost);
+        }
+    }
+    return manaCost;
 }
 
 export function describePool(pool: ManaPool): string {
@@ -518,11 +529,21 @@ export function describeEffectChoice(e: Extract<Effect, { kind: "choose" }>): st
 }
 
 export function describeCost(c: Cost): string {
-  const parts: string[] = [];
-  if (c.mana !== undefined) parts.push(describeManaCost(c.mana));
-  if (c.tap) parts.push("{T}");
-  if (c.sacrificeSelf) parts.push("sacrifice this");
-  return parts.length > 0 ? parts.join(", ") : "no cost";
+    const parts: string[] = [];
+    for (const component of c) {
+        switch (component.kind) {
+            case "mana":
+                parts.push(describeManaCost(component.cost));
+                break;
+            case "tapSelf":
+                parts.push("{T}");
+                break;
+            case "sacrificeSelf":
+                parts.push("sacrifice this");
+                break;
+        }
+    }
+    return parts.length > 0 ? parts.join(", ") : "no cost";
 }
 
 const describeTargetSpecs = (specs?: TargetSpec[]): string => {
@@ -619,7 +640,7 @@ export function describeAction(state: GameState, a: Action): string {
       case "castSpell": {
           const chars = getCharacteristics(state, a.card);
           if (!chars) return "";
-          const cost = describeManaCost(chars.manaCost);
+          const cost = describeManaCost(manaCostFromCost(chars.cost));
           const spell = getAbilityForSpell(chars);
           const text = spell && spell.text !== "" ? spell.text : "";
           return cost === "" ? text : cost + (text === "" ? "" : `: ${text}`);

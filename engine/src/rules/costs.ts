@@ -1,44 +1,51 @@
 import { applySequentially, fail, ok, type ApplyResult } from "../core/result";
-import { assertNever, withEntry } from "../core/util";
+import { withEntry } from "../core/util";
 import type { AbilityOfKind } from "../model/abilities";
-import type { Characteristics } from "../model/cardDefinition";
+import { getCharacteristics } from "../model/characteristics";
+import type { NonManaCost } from "../model/costs";
 import type { ObjectId, PlayerId } from "../model/ids";
-import { payMana, type ManaCost } from "../model/mana";
-import type { GameState, ObjectSnapshot } from "../model/state";
+import { combineManaCosts, payMana, type ManaCost } from "../model/mana";
+import type { GameState, ObjectSnapshot, Target } from "../model/state";
 import { sacrificePermanent, tapPermanent } from "./primitives";
 
-// No real logic for now, could add logic around target decisions changing costs later
-export function calculateFinalCost(state: GameState, player: PlayerId, chars: Characteristics | null, ability: AbilityOfKind<"spell" | "activated">): ManaCost | null {
-    switch (ability.kind) {
-        case "spell": {
-            return chars?.manaCost ?? null;
-        }
-        case "activated": {
-            return ability.cost.mana ?? null;
-        }
-        default:
-            return assertNever(ability);
+export type TotalCost = Readonly<{
+    mana: ManaCost | null;
+    components: readonly NonManaCost[];
+    changes: readonly { source: ObjectId; sourceName: string }[]; // which effects altered it
+}>;
+
+export function calculateFinalCost(state: GameState, player: PlayerId, source: ObjectId, ability: AbilityOfKind<"spell" | "activated">, targets?: readonly (readonly Target[])[]): TotalCost {
+    const allCosts = ability.kind === "spell" ? getCharacteristics(state, source)?.cost : ability.cost;
+    if (!allCosts) return { mana: null, components: [], changes: [] };
+
+    const nonMana: NonManaCost[] = [];
+    let mana: ManaCost | null = null;
+    for (const cost of allCosts) {
+        if (cost.kind === "mana") mana = combineManaCosts(mana, cost.cost);
+        else nonMana.push(cost);
     }
+    // Eventually, check cost modification rules here? Or maybe they just get factored into characteristics. Though that would only work for spells not activated abilities.
+
+    return { mana, components: nonMana, changes: [] };
 }
 
-export function paySpellCosts(state: GameState, player: PlayerId, source: ObjectId, ability: AbilityOfKind<"spell">, manaCost: ManaCost): ApplyResult {
-    return payManaCost(state, player, manaCost);
-}
-
-export function payAbilityCosts(state: GameState, player: PlayerId, sourceSnapshot: ObjectSnapshot, ability: AbilityOfKind<"activated">): ApplyResult {
+export function payCosts(state: GameState, player: PlayerId, sourceSnapshot: ObjectSnapshot, ability: AbilityOfKind<"spell" | "activated">, cost: TotalCost): ApplyResult {
     let steps: ((state: GameState) => ApplyResult)[] = [];
-    if (ability.cost.mana) {
-        const currentCost = ability.cost.mana;
+    if (cost.mana) {
+        const currentCost = cost.mana;
         steps.push((currentState: GameState) => payManaCost(currentState, player, currentCost));
     }
-    if (ability.cost.tap) {
-        steps.push((currentState: GameState) => tapPermanent(currentState, sourceSnapshot.id));
-    }
-    if (ability.cost.sacrificeSelf) {
-        steps.push((currentState: GameState) => sacrificePermanent(currentState, sourceSnapshot.id, sourceSnapshot, `the ${ability.kind} ability of ${sourceSnapshot.chars.name}`));
+    for (const c of cost.components) {
+        if (c.kind === "tapSelf" && ability.kind === "activated") {
+            steps.push((currentState: GameState) => tapPermanent(currentState, sourceSnapshot.id));
+        } else if (c.kind === "sacrificeSelf" && ability.kind === "activated") {
+            steps.push((currentState: GameState) => sacrificePermanent(currentState, sourceSnapshot.id, sourceSnapshot, `the ${ability.kind} ability of ${sourceSnapshot.chars.name}`));
+        }
     }
     return applySequentially(state, steps);
 }
+
+
 
 function payManaCost(state: GameState, player: PlayerId, cost: ManaCost): ApplyResult {
     const p  = state.players[player];

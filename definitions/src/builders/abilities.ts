@@ -4,6 +4,7 @@ import {
     type Ability,
     type BindingRef,
     type Condition,
+    type CostComponent,
     type Effect,
     type EventBindingNames,
     type EventPredicate,
@@ -19,9 +20,12 @@ import {
 
 export const fromEvent = <K extends keyof EventBindingNames>(_event: K, name: EventBindingNames[K]): BindingRef => ({ kind: "bound", name });
 
+export const tapThis: CostComponent = { kind: "tapSelf" };
+export const sacrificeThis: CostComponent = { kind: "sacrificeSelf" };
+
 export const tapForMana = (mana: ManaType): Ability => ({
     kind: "activated",
-    cost: { tap: true },
+    cost: [tapThis],
     isManaAbility: true,
     targets: [],
     effects: [{ kind: "addMana", mana: { kind: "mana", type: mana }, amount: 1 }],

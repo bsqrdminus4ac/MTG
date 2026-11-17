@@ -12,7 +12,7 @@ import { drawCard } from "../../src/model/zones";
 const alice = playerId("alice");
 const bob = playerId("bob");
 
-const base = { manaCost: null, colors: [], supertypes: [], subtypes: [], power: null, toughness: null, abilities: [] } as const;
+const base = { cost: null, colors: [], supertypes: [], subtypes: [], power: null, toughness: null, abilities: [] } as const;
 const forest: CardDefinition = { ...base, id: cardDefId("forest"), name: "Forest", types: ["Land"] };
 const bear: CardDefinition = {
   ...base, id: cardDefId("bear"), name: "Grizzly Bears", types: ["Creature"], power: 2, toughness: 2,

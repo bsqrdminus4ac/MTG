@@ -1,15 +1,9 @@
 import type { StaticEffect } from "./continuous";
+import type { Cost } from "./costs";
 import type { Condition, Effect, TargetSpec } from "./effects";
 import type { EffectId, ObjectId } from "./ids";
-import type { ManaCost } from "./mana";
 import type { EventLeaves, Predicate, TriggerEvent } from "./predicates";
 import type { Keyword, Zone } from "./vocabulary";
-
-export type Cost = Readonly<{
-    mana?: ManaCost;
-    tap?: boolean;
-    sacrificeSelf?: boolean;
-}>;
 
 export type Ability =
     | Readonly<{ kind: "keyword"; keyword: Keyword }>

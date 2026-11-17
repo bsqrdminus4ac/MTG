@@ -8,7 +8,7 @@ import { type ObjectId, type PlayerId } from "../model/ids";
 import { canPayMana } from "../model/mana";
 import type { CastingInProgress, EvalScope, GameState, Target } from "../model/state";
 import { moveObject } from "../model/zones";
-import { calculateFinalCost, payAbilityCosts, paySpellCosts } from "../rules/costs";
+import { calculateFinalCost, payCosts } from "../rules/costs";
 import { openDecision } from "../rules/pending";
 import { getAbilityForSpell, pushStackEntry, type NewStackEntry } from "../rules/stack";
 import { buildTargetOptions, buildTargetPrompt, getLegalTargets } from "../rules/targeting";
@@ -144,12 +144,10 @@ export function commitCast(state: GameState): ApplyResult {
 }
 
 export function payCastingCost(state: GameState, casting: CastingInProgress): ApplyResult {
-    if (casting.kind === "spell") {
-        return casting.cost ? paySpellCosts(state, casting.player, casting.card, casting.ability, casting.cost) : fail("Spells require a mana cost to cast, even if the cost is 0");
-    } else if (casting.kind === "activated") {
-        return payAbilityCosts(state, casting.player, casting.sourceSnapshot, casting.ability);
-    }
-    return assertNever(casting);
+    if (!casting.cost) return ok(state, []);
+    const snapshot = casting.kind === "spell" ? snapshotObject(state, casting.card) : casting.sourceSnapshot;
+    if (!snapshot) return fail("Unable to locate spell");
+    return payCosts(state, casting.player, snapshot, casting.ability, casting.cost);
 }
 
 export function selectTargetOptions(state: GameState): ApplyResult {
@@ -215,10 +213,9 @@ export function payManaOptions(state: GameState): ApplyResult {
     const casting = state.casting;
     const player = casting.player;
     const card = casting.card;
-    const chars = getCharacteristics(state, casting.card);
-    const cost = casting.cost ?? calculateFinalCost(state, player, chars, casting.ability);
+    const cost = casting.cost ?? calculateFinalCost(state, player, card, casting.ability, casting.targets);
     const castName = getCastName(state, casting);
-    if (!cost) {
+    if (!cost.mana) {
         if (casting.kind === "spell") return fail("Invalid mana cost for spell");
         else {
             const decisionState = openDecision(state, (id) =>
@@ -242,7 +239,7 @@ export function payManaOptions(state: GameState): ApplyResult {
     } else {
         prompt = `Pay mana to activate ${castName}?`;
     }
-    if (canPayMana(p.manaPool, cost)) {
+    if (canPayMana(p.manaPool, cost.mana)) {
         const decisionState = openDecision(nextState, (id) =>
             yesNo({
                 id: id,

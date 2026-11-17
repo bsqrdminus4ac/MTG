@@ -1,5 +1,5 @@
 import type { CardDefinition } from "@mtg/engine";
-import { tapForMana } from "../builders/abilities";
+import { tapForMana, tapThis } from "../builders/abilities";
 import { land } from "../builders/defineCard";
 
 export const plains = land({
@@ -44,7 +44,7 @@ export const grove = land({
         {
             kind: "activated",
             activateableZones: ["battlefield"],
-            cost: { tap: true },
+            cost: [tapThis],
             timingRestriction: "instantSpeed",
             isManaAbility: true,
             targets: [],
@@ -72,7 +72,7 @@ export const confluence = land({
         {
             kind: "activated",
             activateableZones: ["battlefield"],
-            cost: { tap: true },
+            cost: [tapThis],
             timingRestriction: "instantSpeed",
             isManaAbility: true,
             targets: [],

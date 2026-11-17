@@ -36,7 +36,7 @@ function creatureDefinition(id: string, power = 2, toughness = 2, abilities: Abi
     return {
         id: cardDefId(id),
         name: id,
-        manaCost: { generic: 0, pips: [] },
+        cost: [{ kind: "mana", cost: { generic: 0, pips: [] } }],
         colors: [],
         supertypes: [],
         types: ["Creature"],
@@ -66,7 +66,7 @@ function staticPermanent(id: string, modification: Modification): CardDefinition
     return {
         id: cardDefId(id),
         name: id,
-        manaCost: { generic: 0, pips: [] },
+        cost: [{ kind: "mana", cost: { generic: 0, pips: [] } }],
         colors: [],
         supertypes: [],
         types: ["Enchantment"],
@@ -99,7 +99,7 @@ describe("characteristic layers", () => {
 
         expect(getCharacteristics(state, id)).toEqual({
             name: creature.name,
-            manaCost: creature.manaCost,
+            cost: creature.cost,
             colors: creature.colors,
             supertypes: creature.supertypes,
             types: creature.types,
@@ -196,7 +196,7 @@ describe("characteristic layers", () => {
         const artifact: CardDefinition = {
             id: cardDefId("layers-filtered-artifact"),
             name: "Layers Filtered Artifact",
-            manaCost: { generic: 1, pips: [] },
+            cost: [{ kind: "mana", cost: { generic: 1, pips: [] } }],
             colors: [],
             supertypes: [],
             types: ["Artifact"],

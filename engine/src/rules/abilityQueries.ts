@@ -26,7 +26,7 @@ export function canActivateAbility(state: GameState, player: PlayerId, source: G
     if (!ability.activateableZones.includes(source.zone)) return false;
     if (ability.timingRestriction === "sorcerySpeed" && !canPlaySorcerySpeed(state, player)) return false;
     if (ability.timingRestriction === "instantSpeed" && !canPlayInstantSpeed(state, player)) return false;
-    if (ability.cost.tap) {
+    if (ability.cost.some((c) => c.kind === "tapSelf")) {
         if (source.tapped) return false;
         if (hasCardType(state, source.id, "Creature") && source.turnEnteredZone === state.turn.number && !hasKeyword(state, source.id, "haste")) return false;
     }

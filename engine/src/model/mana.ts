@@ -35,6 +35,11 @@ export interface ManaCost {
     readonly pips: readonly ManaType[];
 }
 
+export function combineManaCosts(a: ManaCost | null, b: ManaCost | null): ManaCost | null {
+    if (!a && !b) return null;
+    return { generic: (a?.generic ?? 0) + (b?.generic ?? 0), pips: [...(a?.pips ?? []), ...(b?.pips ?? [])].sort((x, y) => MANA_TYPES.indexOf(x) - MANA_TYPES.indexOf(y)) };
+}
+
 export const colorIdentity = (cost: ManaCost): Color[] => [...new Set(cost.pips.flatMap((c) => (c === "C" ? [] : c)))];
 
 

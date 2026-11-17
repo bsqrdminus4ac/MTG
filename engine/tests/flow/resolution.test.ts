@@ -18,7 +18,7 @@ const bob = playerId("bob");
 const bear: CardDefinition = {
     id: cardDefId("bear"),
     name: "Grizzly Bears",
-    manaCost: { generic: 1, pips: ["G"] },
+    cost: [{ kind: "mana", cost: { generic: 1, pips: ["G"] } }],
     colors: ["G"],
     supertypes: [],
     types: ["Creature"],
@@ -59,7 +59,7 @@ const targetSpellAbility: AbilityOfKind<"spell"> = {
 const targetSpell: CardDefinition = {
     id: cardDefId("target-spell"),
     name: "Target Spell",
-    manaCost: { generic: 0, pips: [] },
+    cost: [{ kind: "mana", cost: { generic: 0, pips: [] } }],
     colors: [],
     supertypes: [],
     types: ["Instant"],
@@ -158,7 +158,7 @@ describe("ability resolution", () => {
 
         const ability: AbilityOfKind<"activated"> = {
             kind: "activated",
-            cost: {},
+            cost: [],
             isManaAbility: false,
             targets: [],
             effects: [{ kind: "gainLife", who: { kind: "player", who: "controller" }, amount: 1 }],

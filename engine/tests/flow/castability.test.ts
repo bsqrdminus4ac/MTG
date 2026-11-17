@@ -17,7 +17,7 @@ const oneGeneric = { generic: 1, pips: [] };
 const creature: CardDefinition = {
     id: cardDefId("castability-creature"),
     name: "Test Creature",
-    manaCost: freeCost,
+    cost: [{ kind: "mana", cost: freeCost }],
     colors: [],
     supertypes: [],
     types: ["Creature"],
@@ -37,7 +37,7 @@ const hexproofCreature: CardDefinition = {
 const creatureOnlySpell: CardDefinition = {
     id: cardDefId("castability-destroy-creature"),
     name: "Destroy Creature",
-    manaCost: freeCost,
+    cost: [{ kind: "mana", cost: freeCost }],
     colors: [],
     supertypes: [],
     types: ["Instant"],
@@ -97,7 +97,7 @@ const unaffordableSpell: CardDefinition = {
     ...optionalTargetSpell,
     id: cardDefId("castability-unaffordable-spell"),
     name: "Unaffordable Spell",
-    manaCost: oneGeneric,
+    cost: [{ kind: "mana", cost: oneGeneric }],
     abilities: [{ kind: "spell", targets: [], effects: [], text: "" }],
 };
 
@@ -124,7 +124,7 @@ const stackSpell: CardDefinition = {
 
 const unaffordableAbility: AbilityOfKind<"activated"> = {
     kind: "activated",
-    cost: { mana: oneGeneric },
+    cost: [{ kind: "mana", cost: oneGeneric }],
     isManaAbility: false,
     targets: [],
     effects: [],
@@ -142,7 +142,7 @@ const unaffordableAbilitySource: CardDefinition = {
 
 const selfManaAbility: AbilityOfKind<"activated"> = {
     kind: "activated",
-    cost: { mana: oneGeneric, tap: true },
+    cost: [{ kind: "mana", cost: oneGeneric }, { kind: "tapSelf" }],
     isManaAbility: false,
     targets: [],
     effects: [],
@@ -153,7 +153,7 @@ const selfManaAbility: AbilityOfKind<"activated"> = {
 
 const ownManaSourceAbility: AbilityOfKind<"activated"> = {
     kind: "activated",
-    cost: { tap: true },
+    cost: [{ kind: "tapSelf" }],
     isManaAbility: true,
     targets: [],
     effects: [{ kind: "addMana", mana: { kind: "mana", type: "G" }, amount: 1 }],
@@ -187,7 +187,7 @@ const multipleChoiceManaSource: CardDefinition = {
         {
             kind: "activated",
             activateableZones: ["battlefield"],
-            cost: { tap: true },
+            cost: [{ kind: "tapSelf" }],
             timingRestriction: "instantSpeed",
             isManaAbility: true,
             targets: [],
@@ -222,7 +222,7 @@ const redBlackSpell: CardDefinition = {
     ...optionalTargetSpell,
     id: cardDefId("castability-red-black-spell"),
     name: "Red Black Spell",
-    manaCost: { generic: 0, pips: ["R", "B"] },
+    cost: [{ kind: "mana", cost: { generic: 0, pips: ["R", "B"] } }],
     abilities: [{ kind: "spell", targets: [], effects: [], text: "" }],
 };
 
@@ -230,7 +230,7 @@ const whiteSpell: CardDefinition = {
     ...redBlackSpell,
     id: cardDefId("castability-white-spell"),
     name: "White Spell",
-    manaCost: { generic: 0, pips: ["W"] },
+    cost: [{ kind: "mana", cost: { generic: 0, pips: ["W"] } }],
 };
 
 const redSpell: CardDefinition = {

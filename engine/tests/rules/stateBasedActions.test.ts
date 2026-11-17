@@ -13,7 +13,7 @@ const bob = playerId("bob");
 const lord: CardDefinition = {
     id: cardDefId("sba-test-lord"),
     name: "SBA Test Lord",
-    manaCost: { generic: 0, pips: [] },
+    cost: [{ kind: "mana", cost: { generic: 0, pips: [] } }],
     colors: [],
     supertypes: [],
     types: ["Creature"],

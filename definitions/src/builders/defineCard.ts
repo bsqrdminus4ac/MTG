@@ -1,8 +1,11 @@
-import { type Ability, type CardDefinition, type CardType, type Color, type ManaCost, type Supertype, cardDefId, colorIdentity, parseCost } from "@mtg/engine";
+import { type Ability, type CardDefinition, type CardType, type Color, type CostComponent, type ManaCost, type NonManaCost, type Supertype, cardDefId, colorIdentity, parseCost } from "@mtg/engine";
+
+export const mana = (cost: ManaCost | string): CostComponent => ({ kind: "mana", cost: typeof cost === "string" ? parseCost(cost) : cost });
 
 export const creature = (c: {
     name: string;
     cost: ManaCost | string;
+    additionalCosts?: NonManaCost[];
     subtypes?: string[];
     power: number;
     toughness: number;
@@ -15,7 +18,7 @@ export const creature = (c: {
     return {
         id: cardDefId(c.name),
         name: c.name,
-        manaCost,
+        cost: [{ kind: "mana", cost: manaCost }, ...(c.additionalCosts ?? [])],
         colors: c.colors ?? colorIdentity(manaCost), // derived from the cost pips, overridable
         supertypes: c.isLegendary ? ["Legendary"] : [],
         types: ["Creature", ...(c.additionalTypes ?? [])],
@@ -29,7 +32,7 @@ export const creature = (c: {
 export const land = (c: { name: string; subtypes?: string[]; abilities: Ability[]; isBasic?: boolean; isLegendary?: boolean; isSnow?: boolean }): CardDefinition => ({
     id: cardDefId(c.name),
     name: c.name,
-    manaCost: null,
+    cost: null,
     colors: [],
     supertypes: [c.isBasic && "Basic", c.isLegendary && "Legendary", c.isSnow && "Snow"].filter((x): x is Supertype => !!x),
     types: ["Land"],
@@ -39,12 +42,20 @@ export const land = (c: { name: string; subtypes?: string[]; abilities: Ability[
     abilities: c.abilities,
 });
 
-export const instant = (c: { name: string; cost: ManaCost | string; subtypes?: string[]; abilities: Ability[]; colors?: Color[]; isLegendary?: boolean }): CardDefinition => {
+export const instant = (c: {
+    name: string;
+    cost: ManaCost | string;
+    additionalCosts?: NonManaCost[];
+    subtypes?: string[];
+    abilities: Ability[];
+    colors?: Color[];
+    isLegendary?: boolean;
+}): CardDefinition => {
     const manaCost = typeof c.cost === "string" ? parseCost(c.cost) : c.cost;
     return {
         id: cardDefId(c.name),
         name: c.name,
-        manaCost,
+        cost: [{ kind: "mana", cost: manaCost }, ...(c.additionalCosts ?? [])],
         colors: c.colors ?? colorIdentity(manaCost), // derived from the cost pips, overridable
         supertypes: c.isLegendary ? ["Legendary"] : [],
         types: ["Instant"],
@@ -55,12 +66,20 @@ export const instant = (c: { name: string; cost: ManaCost | string; subtypes?: s
     };
 };
 
-export const sorcery = (c: { name: string; cost: ManaCost | string; subtypes?: string[]; abilities: Ability[]; colors?: Color[]; isLegendary?: boolean }): CardDefinition => {
+export const sorcery = (c: {
+    name: string;
+    cost: ManaCost | string;
+    additionalCosts?: NonManaCost[];
+    subtypes?: string[];
+    abilities: Ability[];
+    colors?: Color[];
+    isLegendary?: boolean;
+}): CardDefinition => {
     const manaCost = typeof c.cost === "string" ? parseCost(c.cost) : c.cost;
     return {
         id: cardDefId(c.name),
         name: c.name,
-        manaCost,
+        cost: [{ kind: "mana", cost: manaCost }, ...(c.additionalCosts ?? [])],
         colors: c.colors ?? colorIdentity(manaCost), // derived from the cost pips, overridable
         supertypes: c.isLegendary ? ["Legendary"] : [],
         types: ["Sorcery"],
@@ -74,6 +93,7 @@ export const sorcery = (c: { name: string; cost: ManaCost | string; subtypes?: s
 export const noncreatureArtifact = (c: {
     name: string;
     cost: ManaCost | string;
+    additionalCosts?: NonManaCost[];
     subtypes?: string[];
     abilities: Ability[];
     colors?: Color[];
@@ -84,7 +104,7 @@ export const noncreatureArtifact = (c: {
     return {
         id: cardDefId(c.name),
         name: c.name,
-        manaCost,
+        cost: [{ kind: "mana", cost: manaCost }, ...(c.additionalCosts ?? [])],
         colors: c.colors ?? colorIdentity(manaCost), // derived from the cost pips, overridable
         supertypes: c.isLegendary ? ["Legendary"] : [],
         types: ["Artifact", ...(c.additionalTypes ?? [])],
@@ -98,6 +118,7 @@ export const noncreatureArtifact = (c: {
 export const enchantment = (c: {
     name: string;
     cost: ManaCost | string;
+    additionalCosts?: NonManaCost[];
     subtypes?: string[];
     abilities: Ability[];
     colors?: Color[];
@@ -108,7 +129,7 @@ export const enchantment = (c: {
     return {
         id: cardDefId(c.name),
         name: c.name,
-        manaCost,
+        cost: [{ kind: "mana", cost: manaCost }, ...(c.additionalCosts ?? [])],
         colors: c.colors ?? colorIdentity(manaCost), // derived from the cost pips, overridable
         supertypes: c.isLegendary ? ["Legendary"] : [],
         types: ["Enchantment", ...(c.additionalTypes ?? [])],

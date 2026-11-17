@@ -1,5 +1,5 @@
 import { abilityText, capitalize, getAppliedEffects, getCharacteristics, manaValue, type Characteristics, type GameState, type ModificationInfo, type ObjectId } from "@mtg/engine";
-import { describeAllEffects, describeContinuousEffect, describeDuration, describeManaCost, describeModification } from "../describe";
+import { describeAllEffects, describeContinuousEffect, describeDuration, describeManaCost, describeModification, manaCostFromCost } from "../describe";
 import { Bullets, NestedList, type BulletItem } from "./Bullets";
 
 interface ObjectCardProps {
@@ -63,8 +63,8 @@ export function ObjectCard({ state, id, tag }: ObjectCardProps) {
         items.push(
             ["Type line", withPrintedValue(typeLine(chars), printed ? typeLine(printed) : typeLine(chars))],
             ["Colors", withPrintedValue(colors(chars), printed ? colors(printed) : colors(chars))],
-            ["Mana cost", describeManaCost(chars.manaCost)],
-            ["Mana value", String(manaValue(chars.manaCost))],
+            ["Mana cost", describeManaCost(manaCostFromCost(chars.cost))],
+            ["Mana value", String(manaValue(manaCostFromCost(chars.cost)))],
             ["Power / toughness", withPrintedValue(effectivePT, printedPT)],
         );
         if (cardText.length > 0) {

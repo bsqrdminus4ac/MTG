@@ -3,7 +3,7 @@ import { instant } from "../builders/defineCard";
 
 export const bolt = instant({
     name: "Lightning Bolt",
-    cost: { generic: 0, pips: ["R"] },
+    cost: "R",
     abilities: [
         {
             kind: "spell",

@@ -19,7 +19,7 @@ const bob = playerId("bob");
 const elf: CardDefinition = {
     id: cardDefId("elf"),
     name: "Elf",
-    manaCost: null,
+    cost: null,
     colors: ["G"],
     supertypes: [],
     types: ["Creature"],

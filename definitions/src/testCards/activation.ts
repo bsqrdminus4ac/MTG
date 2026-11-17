@@ -1,10 +1,10 @@
 import { anyTarget, type CardDefinition } from "@mtg/engine";
-import { drawCards, tapForMana } from "../builders/abilities";
-import { creature, land, noncreatureArtifact } from "../builders/defineCard";
+import { drawCards, sacrificeThis, tapForMana, tapThis } from "../builders/abilities";
+import { creature, land, mana, noncreatureArtifact } from "../builders/defineCard";
 
 export const pyroAdept = creature({
     name: "Pyro Adept",
-    cost: { generic: 0, pips: ["R"] },
+    cost: "R",
     power: 0,
     toughness: 1,
     subtypes: ["Wizard"],
@@ -12,7 +12,7 @@ export const pyroAdept = creature({
         {
             kind: "activated",
             activateableZones: ["battlefield"],
-            cost: { tap: true },
+            cost: [tapThis],
             targets: [{ filter: anyTarget(), minCount: 1, maxCount: 1 }],
             timingRestriction: "instantSpeed",
             effects: [
@@ -29,12 +29,12 @@ export const pyroAdept = creature({
 
 export const clockworkScribe = noncreatureArtifact({
     name: "Clockwork Scribe",
-    cost: { generic: 1, pips: [] },
+    cost: "1",
     abilities: [
         {
             kind: "activated",
             activateableZones: ["battlefield"],
-            cost: { tap: true, mana: { generic: 1, pips: [] } },
+            cost: [tapThis, mana("1")],
             timingRestriction: "instantSpeed",
             targets: [],
             effects: [drawCards(1)],
@@ -45,7 +45,7 @@ export const clockworkScribe = noncreatureArtifact({
 
 export const arcaneElf = creature({
     name: "Arcane Elf",
-    cost: { generic: 0, pips: ["G"] },
+    cost: "G",
     power: 1,
     toughness: 1,
     subtypes: ["Elf"],
@@ -54,7 +54,7 @@ export const arcaneElf = creature({
         {
             kind: "activated",
             activateableZones: ["battlefield"],
-            cost: { mana: { generic: 1, pips: ["G"] }, tap: true },
+            cost: [mana("1G"), tapThis],
             targets: [],
             timingRestriction: "instantSpeed",
             effects: [{ kind: "gainLife", amount: 2, who: { kind: "player", who: "controller" } }],
@@ -65,12 +65,12 @@ export const arcaneElf = creature({
 
 export const scrapIdol = noncreatureArtifact({
     name: "Scrap Idol",
-    cost: { generic: 1, pips: [] },
+    cost: "1",
     abilities: [
         {
             kind: "activated",
             activateableZones: ["battlefield"],
-            cost: { sacrificeSelf: true },
+            cost: [sacrificeThis],
             targets: [],
             timingRestriction: "instantSpeed",
             effects: [{ kind: "gainLife", amount: 3, who: { kind: "player", who: "controller" } }],
@@ -81,7 +81,7 @@ export const scrapIdol = noncreatureArtifact({
 
 export const scrapShooter = creature({
     name: "Scrap Shooter",
-    cost: { generic: 2, pips: [] },
+    cost: "2",
     power: 2,
     toughness: 2,
     additionalTypes: ["Artifact"],
@@ -89,7 +89,7 @@ export const scrapShooter = creature({
         {
             kind: "activated",
             activateableZones: ["battlefield"],
-            cost: { sacrificeSelf: true },
+            cost: [sacrificeThis],
             targets: [
                 {
                     filter: {
@@ -116,12 +116,12 @@ export const scrapShooter = creature({
 
 export const treasureChest = noncreatureArtifact({
     name: "Treasure Chest",
-    cost: { generic: 1, pips: [] },
+    cost: "1",
     abilities: [
         {
             kind: "activated",
             activateableZones: ["battlefield"],
-            cost: { tap: true, sacrificeSelf: true },
+            cost: [tapThis, sacrificeThis],
             isManaAbility: true,
             targets: [],
             timingRestriction: "instantSpeed",
@@ -137,7 +137,7 @@ export const painfulPeak = land({
         {
             kind: "activated",
             activateableZones: ["battlefield"],
-            cost: { tap: true },
+            cost: [tapThis],
             targets: [],
             timingRestriction: "instantSpeed",
             isManaAbility: true,
@@ -156,7 +156,7 @@ export const dustyFilter = land({
         {
             kind: "activated",
             activateableZones: ["battlefield"],
-            cost: { tap: true, mana: { generic: 1, pips: [] } },
+            cost: [tapThis, mana("1")],
             targets: [],
             timingRestriction: "instantSpeed",
             isManaAbility: true,

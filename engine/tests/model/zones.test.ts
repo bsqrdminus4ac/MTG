@@ -12,7 +12,7 @@ const bob = playerId("bob");
 const creature: CardDefinition = {
     id: cardDefId("zones-test-creature"),
     name: "Zones Test Creature",
-    manaCost: { generic: 0, pips: [] },
+    cost: [{ kind: "mana", cost: { generic: 0, pips: [] } }],
     colors: [],
     supertypes: [],
     types: ["Creature"],

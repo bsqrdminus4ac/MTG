@@ -365,7 +365,7 @@ describe("ability references", () => {
                             abilities: [
                                 {
                                     kind: "activated",
-                                    cost: { tap: true },
+                                    cost: [{ kind: "tapSelf" }],
                                     targets: [],
                                     effects: [{ kind: "gainLife", who: { kind: "player", who: "controller" }, amount: 1 }],
                                     activateableZones: ["battlefield"],

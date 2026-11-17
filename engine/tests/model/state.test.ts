@@ -11,7 +11,7 @@ const charlie = playerId("charlie");
 const bear: CardDefinition = {
     id: cardDefId("bear"),
     name: "Grizzly Bears",
-    manaCost: null,
+    cost: null,
     colors: [],
     supertypes: [],
     types: ["Creature"],

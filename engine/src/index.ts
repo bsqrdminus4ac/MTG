@@ -6,6 +6,7 @@ export * from "./model/actions";
 export * from "./model/cardDefinition";
 export * from "./model/characteristics";
 export * from "./model/continuous";
+export * from "./model/costs";
 export * from "./model/decisions";
 export * from "./model/effects";
 export * from "./model/events";

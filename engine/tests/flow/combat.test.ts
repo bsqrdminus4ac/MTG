@@ -17,7 +17,7 @@ const bob = playerId("bob");
 const creature = (id: string, power: number, toughness: number, abilities: CardDefinition["abilities"] = []): CardDefinition => ({
     id: cardDefId(id),
     name: id,
-    manaCost: { generic: 0, pips: [] },
+    cost: [{ kind: "mana", cost: { generic: 0, pips: [] } }],
     colors: [],
     supertypes: [],
     types: ["Creature"],
@@ -113,7 +113,7 @@ describe("combat damage", () => {
             const restrictionSpell: CardDefinition = {
                 id: cardDefId("no-attacks-this-turn"),
                 name: "No Attacks This Turn",
-                manaCost: { generic: 0, pips: [] },
+                cost: [{ kind: "mana", cost: { generic: 0, pips: [] } }],
                 colors: [],
                 supertypes: [],
                 types: ["Instant"],

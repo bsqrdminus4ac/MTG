@@ -10,7 +10,7 @@ import { refKey } from "../model/layers";
 import { canPayMana, type ManaCost, type ManaPool } from "../model/mana";
 import type { Binding, Frame, GameState, ManaResolutionInProgress } from "../model/state";
 import { findActivatableAbility, getAllActivatableAbilities } from "../rules/abilityQueries";
-import { payAbilityCosts } from "../rules/costs";
+import { calculateFinalCost, payCosts } from "../rules/costs";
 import { detectTriggers } from "../rules/triggers";
 import { payManaOptions } from "./casting";
 import { ask, runFrames, stepFromApply, type StepResult } from "./effects";
@@ -90,7 +90,7 @@ export function activateManaAbility(state: GameState, player: PlayerId, source: 
     if (!sourceSnapshot) return fail("That object is gone");
 
     // Mana abilities don't use the stack (CR 605). We just resolve it immediately.
-    const payResult = payAbilityCosts(state, player, sourceSnapshot, ability);
+    const payResult = payCosts(state, player, sourceSnapshot, ability, calculateFinalCost(state, player, source, ability));
     if (!payResult.ok) return fail(payResult.error);
 
     const resolving: ManaResolutionInProgress = {
