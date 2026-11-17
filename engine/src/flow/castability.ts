@@ -5,6 +5,7 @@ import type { ObjectId, PlayerId } from "../model/ids";
 import type { EvalScope, GameState } from "../model/state";
 import { findActivatableAbility } from "../rules/abilityQueries";
 import { calculateFinalCost } from "../rules/costs";
+import { cantCastDueToRestriction } from "../rules/restrictions";
 import { getAbilityForSpell } from "../rules/stack";
 import { hasEnoughTargets } from "../rules/targeting";
 import { canCastSpellNow } from "../rules/timing";
@@ -21,11 +22,14 @@ export function checkCastable(state: GameState, player: PlayerId, card: ObjectId
     // 1. timing (cheap)
     if (!canCastSpellNow(state, player, chars)) return badResult("You can't cast that card now");
 
-    // 2. targets (iterates objects)
+    // 2. restrictions
+    if (cantCastDueToRestriction(state, player, card)) return badResult("An ability prevents you from casting that card right now");
+
+    // 3. targets (iterates objects)
     const scope: EvalScope = { controller: player, source: card, bindings: {} };
     if (!hasEnoughTargets(state, scope, spell.targets)) return badResult("There aren't enough legal targets");
 
-    // 3. mana (recursive search, so last)
+    // 4. mana (recursive search, so last)
     const cost = calculateFinalCost(state, player, chars, spell);
     if (!cost || !couldHaveManaToPayCost(state, player, cost, {}, card)) return badResult("You can't pay for that");
     return goodResult(null);

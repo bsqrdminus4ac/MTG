@@ -233,6 +233,40 @@ const whiteSpell: CardDefinition = {
     manaCost: { generic: 0, pips: ["W"] },
 };
 
+const redSpell: CardDefinition = {
+    ...instant,
+    id: cardDefId("castability-red-spell"),
+    name: "Red Spell",
+    colors: ["R"],
+};
+
+const whiteColorSpell: CardDefinition = {
+    ...instant,
+    id: cardDefId("castability-white-color-spell"),
+    name: "White Color Spell",
+    colors: ["W"],
+};
+
+const redSpellRestrictionSource: CardDefinition = {
+    ...creature,
+    id: cardDefId("castability-red-spell-restriction"),
+    name: "Red Spell Restriction",
+    types: ["Enchantment"],
+    power: null,
+    toughness: null,
+    abilities: [
+        {
+            kind: "static",
+            activeZones: ["battlefield"],
+            text: "Opponents can't cast red spells.",
+            effect: {
+                affects: { kind: "matchingPlayers", filter: { kind: "opponent" } },
+                modifications: [{ kind: "cantCast", what: { kind: "hasColor", color: "R" } }],
+            },
+        },
+    ],
+};
+
 function game(definitions: readonly CardDefinition[], aliceDeck: readonly CardDefinition[], bobDeck: readonly CardDefinition[] = [creature]): GameState {
     return createGame(
         [creature, ...definitions],
@@ -273,6 +307,19 @@ describe("castability and activatability options", () => {
         const hexproofOnBattlefield = moveDefinition(inHand.state, bob, hexproofCreature, "battlefield");
 
         expect(offersCast(atPrecombatMain(hexproofOnBattlefield.state), inHand.newId)).toBe(false);
+    });
+
+    test("a static ability prevents casting only spells matching its color restriction", () => {
+        let state = game([redSpellRestrictionSource, redSpell, whiteColorSpell], [redSpell, whiteColorSpell], [redSpellRestrictionSource]);
+        const redSpellInHand = moveDefinition(state, alice, redSpell, "hand");
+        state = redSpellInHand.state;
+        const whiteSpellInHand = moveDefinition(state, alice, whiteColorSpell, "hand");
+        state = whiteSpellInHand.state;
+        const restrictionSource = moveDefinition(state, bob, redSpellRestrictionSource, "battlefield");
+        const mainPhase = atPrecombatMain(restrictionSource.state);
+
+        expect(offersCast(mainPhase, redSpellInHand.newId)).toBe(false);
+        expect(offersCast(mainPhase, whiteSpellInHand.newId)).toBe(true);
     });
 
     test("offers an up-to-one-target spell when there are no legal targets", () => {

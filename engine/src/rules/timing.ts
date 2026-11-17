@@ -1,12 +1,20 @@
 import type { Characteristics } from "../model/cardDefinition";
 import type { PlayerId } from "../model/ids";
 import type { GameState } from "../model/state";
+import { cantPlayLandDueToRestriction } from "./restrictions";
 
 /** Sorcery-speed land drop timing. Doesn't yet account for effects that allow extra land drops. */
 export function canPlayLand(state: GameState, player: PlayerId): boolean {
     const p = state.players[player];
     const { activePlayer, step } = state.turn;
-    return p !== undefined && player === activePlayer && (step === "precombatMain" || step === "postcombatMain") && state.stack.length === 0 && p.landsPlayedThisTurn < 1;
+    return (
+        p !== undefined &&
+        player === activePlayer &&
+        (step === "precombatMain" || step === "postcombatMain") &&
+        state.stack.length === 0 &&
+        p.landsPlayedThisTurn < 1 &&
+        !cantPlayLandDueToRestriction(state, player)
+    );
 }
 
 export function canPlaySorcerySpeed(state: GameState, player: PlayerId): boolean {

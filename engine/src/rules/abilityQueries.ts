@@ -4,6 +4,7 @@ import type { Characteristics } from "../model/cardDefinition";
 import { getAbilityByRef, getAllAbilities, getCharacteristics, hasCardType, hasKeyword } from "../model/characteristics";
 import type { ObjectId, PlayerId } from "../model/ids";
 import type { GameObject, GameState } from "../model/state";
+import { cantActivateAbilityDueToRestriction } from "./restrictions";
 import { canPlayInstantSpeed, canPlaySorcerySpeed } from "./timing";
 
 export function findActivatableAbility(state: GameState, player: PlayerId, source: ObjectId, abilityRef: AbilityRef): Result<{ chars: Characteristics; ability: AbilityOfKind<"activated"> }> {
@@ -29,6 +30,7 @@ export function canActivateAbility(state: GameState, player: PlayerId, source: G
         if (source.tapped) return false;
         if (hasCardType(state, source.id, "Creature") && source.turnEnteredZone === state.turn.number && !hasKeyword(state, source.id, "haste")) return false;
     }
+    if (cantActivateAbilityDueToRestriction(state, source.id, ability)) return false;
     return true;
 }
 

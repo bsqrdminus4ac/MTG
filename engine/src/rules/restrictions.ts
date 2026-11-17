@@ -21,7 +21,7 @@ type RestrictionInfo = Map<RulesModification["kind"], RestrictionData[]>;
 
 const restrictionCache = new WeakMap<GameState["objects"], WeakMap<GameState["continuousEffects"], RestrictionInfo>>();
 
-export function cantAttackDueToRestriction(state: GameState, attacker: ObjectId, target: AttackableTarget): boolean {
+export function cantAttackDueToRestriction(state: GameState, attacker: ObjectId, target?: AttackableTarget): boolean {
     const restrictions = getActiveRestrictions(state).get("cantAttack");
     if (!restrictions) return false;
     for (const restriction of restrictions) {
@@ -29,11 +29,11 @@ export function cantAttackDueToRestriction(state: GameState, attacker: ObjectId,
         if (restrictionAffectsObject(state, attacker, restriction)) {
             const targetFilter = restriction.restriction.who;
             if (!targetFilter) return true;
-            if (targetFilter.kind === "object" && target.kind === "object") {
+            if (targetFilter.kind === "object" && target?.kind === "object") {
                 const targetSnapshot = snapshotObject(state, target.id);
                 if (!targetSnapshot) continue;
                 if (isTrue(evalObjectPredicate({ source: restriction.source, controller: restriction.controller, bindings: {} }, targetSnapshot, targetFilter.filter))) return true;
-            } else if (targetFilter.kind === "player" && target.kind === "player") {
+            } else if (targetFilter.kind === "player" && target?.kind === "player") {
                 if (isTrue(evalPlayerPredicate(state, { source: restriction.source, controller: restriction.controller, bindings: {} }, target.id, targetFilter.filter))) return true;
             }
         }

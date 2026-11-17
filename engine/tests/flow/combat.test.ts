@@ -1,10 +1,11 @@
 import { describe, expect, test } from "vitest";
 import { submitAnswer } from "../../src/engine";
-import { beginDeclareBlockers, processCombatDamage, startCombatDamage } from "../../src/flow/combat";
+import { beginCombat, beginDeclareBlockers, processCombatDamage, startCombatDamage } from "../../src/flow/combat";
+import { beginResolution } from "../../src/flow/resolution";
 import type { CardDefinition } from "../../src/model/cardDefinition";
 import { hasKeyword, snapshotObject } from "../../src/model/characteristics";
 import type { GameEvent } from "../../src/model/events";
-import { cardDefId, playerId, type ObjectId } from "../../src/model/ids";
+import { cardDefId, nextID, playerId, type ObjectId, type StackId } from "../../src/model/ids";
 import type { GameState } from "../../src/model/state";
 import { moveObject } from "../../src/model/zones";
 import { createGame } from "../../src/setup";
@@ -106,7 +107,159 @@ describe("combat damage", () => {
         ]);
     });
 
+    describe("declare attackers", () => {
+        test("a resolved spell preventing creatures from attacking also restricts creatures that enter later that turn", () => {
+            const lateCreature = creature("late-creature", 2, 2, [{ kind: "keyword", keyword: "haste" }]);
+            const restrictionSpell: CardDefinition = {
+                id: cardDefId("no-attacks-this-turn"),
+                name: "No Attacks This Turn",
+                manaCost: { generic: 0, pips: [] },
+                colors: [],
+                supertypes: [],
+                types: ["Instant"],
+                subtypes: [],
+                power: null,
+                toughness: null,
+                abilities: [
+                    {
+                        kind: "spell",
+                        targets: [],
+                        effects: [
+                            {
+                                kind: "applyContinuousEffect",
+                                template: {
+                                    affects: {
+                                        kind: "matchingObjects",
+                                        filter: {
+                                            kind: "all",
+                                            of: [
+                                                { kind: "inZone", zone: "battlefield" },
+                                                { kind: "hasType", type: "Creature" },
+                                            ],
+                                        },
+                                    },
+                                    modifications: [{ kind: "cantAttack" }],
+                                    duration: "untilEndOfTurn",
+                                },
+                            },
+                        ],
+                        text: "Creatures can't attack this turn.",
+                    },
+                ],
+            };
+            const spellAbility = restrictionSpell.abilities[0];
+            if (spellAbility?.kind !== "spell") throw new Error("Expected a spell ability");
+            const initialState = createGame([restrictionSpell, lateCreature], [
+                { id: alice, deck: [restrictionSpell.id, lateCreature.id] },
+                { id: bob, deck: [] },
+            ]);
+            const spellCard = initialState.players[alice]?.library.find((id) => initialState.objects[id]?.definitionId === restrictionSpell.id);
+            if (spellCard === undefined) throw new Error("Expected the restriction spell in Alice's library");
+            const spellOnStack = moveObject(initialState, spellCard, "stack");
+            if (spellOnStack === null) throw new Error("Expected the spell to move to the stack");
+            const [stackState, stackId] = nextID<StackId>(spellOnStack.state);
+            const spellState: GameState = {
+                ...stackState,
+                stack: [
+                    {
+                        kind: "spell",
+                        id: stackId,
+                        controller: alice,
+                        source: spellOnStack.newId,
+                        targets: [],
+                        ability: spellAbility,
+                        bindings: {},
+                    },
+                ],
+                priority: null,
+            };
+
+            const resolved = beginResolution(spellState);
+
+            expect(resolved.ok).toBe(true);
+            if (!resolved.ok) return;
+            const lateCreatureCard = resolved.state.players[alice]?.library.find((id) => resolved.state.objects[id]?.definitionId === lateCreature.id);
+            if (lateCreatureCard === undefined) throw new Error("Expected the late creature in Alice's library");
+            const creatureOnBattlefield = mustMoveToBattlefield(resolved.state, lateCreatureCard);
+            const state: GameState = {
+                ...creatureOnBattlefield.state,
+                turn: { ...creatureOnBattlefield.state.turn, activePlayer: alice, step: "declareAttackers" },
+                combat: null,
+                pending: null,
+            };
+
+            const result = beginCombat(state);
+
+            expect(result.ok).toBe(true);
+            if (!result.ok) return;
+            expect(result.state.combat).toBeNull();
+            expect(result.state.pending).toBeNull();
+        });
+
+        test("a creature with a static ability that prevents attacking is not offered as an attacker", () => {
+            const attackerDefinition = creature("restricted-attacker", 2, 2, [
+                { kind: "keyword", keyword: "haste" },
+                {
+                    kind: "static",
+                    activeZones: ["battlefield"],
+                    text: "This creature can't attack.",
+                    effect: {
+                        affects: { kind: "self" },
+                        modifications: [{ kind: "cantAttack" }],
+                    },
+                },
+            ]);
+            const { state: initialState } = combatState(attackerDefinition);
+            const state: GameState = {
+                ...initialState,
+                turn: { ...initialState.turn, step: "declareAttackers" },
+                combat: null,
+                pending: null,
+            };
+
+            const result = beginCombat(state);
+
+            expect(result.ok).toBe(true);
+            if (!result.ok) return;
+            expect(result.state.combat).toBeNull();
+            expect(result.state.pending).toBeNull();
+        });
+    });
+
     describe("declare blockers", () => {
+        test("a creature with a static ability that prevents blocking can't block", () => {
+            const restrictedBlocker = creature("restricted-blocker", 2, 2, [
+                {
+                    kind: "static",
+                    activeZones: ["battlefield"],
+                    text: "This creature can't block.",
+                    effect: {
+                        affects: { kind: "self" },
+                        modifications: [{ kind: "cantBlock" }],
+                    },
+                },
+            ]);
+            const { state: initialState, attacker, blockers } = combatState(creature("attacker", 2, 2), [restrictedBlocker]);
+            const blocker = blockers[0]!;
+            const state: GameState = {
+                ...initialState,
+                turn: { ...initialState.turn, step: "declareBlockers" },
+                combat: {
+                    rollback: null,
+                    attackers: {
+                        [attacker]: { id: attacker, attackTarget: { kind: "player", id: bob } },
+                    },
+                },
+            };
+
+            const result = beginDeclareBlockers(state);
+
+            expect(result.ok).toBe(true);
+            if (!result.ok) return;
+            expect(result.state.combat?.attackers[attacker]?.blockedBy).toBeUndefined();
+            expect(result.events.some((event) => event.type === "blockDeclared" && event.blockerLki.id === blocker)).toBe(false);
+        });
+
         test.each(["static", "continuous"] as const)("a creature whose flying is removed by a %s effect can be blocked without flying or reach", (effectKind) => {
             const flyingAttacker = creature("flying-attacker", 2, 2, [{ kind: "keyword", keyword: "flying" }]);
             const staticAbility = {

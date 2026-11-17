@@ -1,24 +1,14 @@
 import { goodResult, type Result } from "../core/result";
 import { assertNever } from "../core/util";
-import { getCharacteristics, hasKeyword, snapshotObject } from "../model/characteristics";
+import { getCharacteristics, snapshotObject } from "../model/characteristics";
 import { objectChoice, playerChoice, type Choice } from "../model/decisions";
 import type { TargetFilter, TargetSpec } from "../model/effects";
 import { evalObjectPredicate, evalPlayerPredicate, evalStackPredicate } from "../model/evalPredicates";
 import type { EvalScope, GameState, Target } from "../model/state";
-
-export function canBeTargetedBy(state: GameState, scope: EvalScope, target: Target): boolean {
-    if (target.kind === "object") {
-        const obj = state.objects[target.id];
-        if (!obj) return false;
-        if (obj.controller !== scope.controller) {
-            if (hasKeyword(state, target.id, "hexproof")) return false;
-        }
-    }
-    return true;
-}
+import { cantBeTargetedByDueToRestriction } from "./restrictions";
 
 export function isTargetLegal(state: GameState, scope: EvalScope, target: Target, filter: TargetFilter): Result<boolean> {
-    if (!canBeTargetedBy(state, scope, target)) return goodResult(false);
+    if (target.kind === "object" && cantBeTargetedByDueToRestriction(state, target.id, scope.source)) return goodResult(false);
     return matchesFilter(state, scope, target, filter);
 }
 
@@ -57,7 +47,7 @@ export function getLegalTargets(state: GameState, scope: EvalScope, spec: Target
     const candidates = collectTargets(state, scope, spec.filter);
     if (!candidates.ok) return candidates;
     for (const t of candidates.value) {
-        if (!canBeTargetedBy(state, scope, t)) continue;
+        if (t.kind === "object" && cantBeTargetedByDueToRestriction(state, t.id, scope.source)) continue;
         const key = targetKey(t);
         if (seen.has(key)) continue;
         seen.add(key);

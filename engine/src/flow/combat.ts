@@ -7,6 +7,7 @@ import type { ObjectId, PlayerId } from "../model/ids";
 import type { AttackableTarget, CombatInfo, CombatInProgress, GameState, ObjectSnapshot } from "../model/state";
 import { openDecision } from "../rules/pending";
 import { damageObject, damagePlayer, tapPermanent } from "../rules/primitives";
+import { cantAttackDueToRestriction, cantBeBlockedByDueToRestriction, cantBlockDueToRestriction } from "../rules/restrictions";
 import { givePriorityToActivePlayer } from "./priority";
 
 export const isAttacking = (state: GameState, object: ObjectId): boolean => state.combat !== null && state.combat.attackers[object]?.attackTarget !== undefined;
@@ -31,10 +32,10 @@ export function beginCombat(state: GameState): ApplyResult {
             creaturesThatCanAttack.push(objId);
         }
     }
+    const creaturesWithLegalTargets = creaturesThatCanAttack.filter((c) => getAttackableTargets(state, c).length > 0);
+    if (creaturesWithLegalTargets.length === 0) return ok(state, []);
 
-    if (creaturesThatCanAttack.length === 0) return ok(state, []);
-
-    const options: Choice[] = creaturesThatCanAttack.map((obj) => objectChoice(obj, getCardName(state, obj)));
+    const options: Choice[] = creaturesWithLegalTargets.map((obj) => objectChoice(obj, getCardName(state, obj)));
     const combatProgress: CombatInProgress = { rollback: state, attackers: {} };
     return ok(
         openDecision({ ...state, combat: combatProgress }, (id) =>
@@ -193,18 +194,19 @@ function canCreatureAttack(state: GameState, creature: ObjectId): boolean {
 }
 
 function getAttackableTargets(state: GameState, creature: ObjectId): AttackableTarget[] {
+    if (cantAttackDueToRestriction(state, creature)) return [];
     const targets: AttackableTarget[] = [];
     for (const objId of state.battlefield) {
         const obj = state.objects[objId];
         if (!obj) continue;
         if (obj.controller === state.turn.activePlayer) continue;
         if (!hasCardType(state, objId, "Planeswalker")) continue;
-        //TODO: Check attack target restrictions
+        if (cantAttackDueToRestriction(state, creature, { kind: "object", id: objId })) continue;
         targets.push({ kind: "object", id: objId });
     }
     for (const player of Object.values(state.players)) {
         if (player.id === state.turn.activePlayer) continue;
-        //TODO: Check attack target restrictions
+        if (cantAttackDueToRestriction(state, creature, { kind: "player", id: player.id })) continue;
         targets.push({ kind: "player", id: player.id });
     }
     return targets;
@@ -364,7 +366,6 @@ function getBlockableAttackers(state: GameState, blocker: ObjectId): ObjectId[] 
 }
 
 function canBlockThisAttacker(state: GameState, blocker: ObjectId, attacker: CombatInfo): boolean {
-    // Just sanity checks for now, will hook in restriction checks later
     const blockObj = state.objects[blocker];
     const attackObj = state.objects[attacker.id];
     if (!blockObj) return false;
@@ -373,7 +374,8 @@ function canBlockThisAttacker(state: GameState, blocker: ObjectId, attacker: Com
     if (blockObj.tapped) return false;
     if (!hasCardType(state, blocker, "Creature") || !hasCardType(state, attacker.id, "Creature")) return false;
     if (blockObj.controller === attackObj.controller) return false;
-    if (hasKeyword(state, attacker.id, "flying") && !(hasKeyword(state, blocker, "flying") || hasKeyword(state, blocker, "reach"))) return false;
+    if (cantBlockDueToRestriction(state, blocker, attacker.id)) return false;
+    if (cantBeBlockedByDueToRestriction(state, attacker.id, blocker)) return false;
     return true;
 }
 
@@ -502,7 +504,7 @@ function dealSingleCombatDamage(
     hasTrample: boolean,
     isLastBlocker: boolean,
 ): [result: ApplyResult, damageLeft: number] {
-    if (blocker && isStillValidBlocker(state, attacker.id, blocker.id, attackTarget)) {
+    if (blocker && isStillValidBlocker(state, blocker.id, attackTarget)) {
         const blockerToughness = blocker.chars.toughness ?? 0;
         const damageToDeal = !hasTrample && isLastBlocker ? attackerDamageLeft : blockerToughness;
         const damageBlockerDeals = blocker.chars.power ?? 0;
@@ -512,18 +514,25 @@ function dealSingleCombatDamage(
     return [ok(state, []), attackerDamageLeft];
 }
 
-function isStillValidBlocker(state: GameState, attacker: ObjectId, blocker: ObjectId, attackTarget: AttackableTarget): boolean {
+function isStillValidBlocker(state: GameState, blocker: ObjectId, attackTarget: AttackableTarget): boolean {
     const obj = state.objects[blocker];
     if (!obj) return false;
     if (obj.zone !== "battlefield") return false;
     if (!hasCardType(state, blocker, "Creature")) return false;
     if (obj.controller !== (attackTarget.kind === "object" ? state.objects[attackTarget.id]?.controller : attackTarget.id)) return false;
-    //TODO: Re-evaluate block restrictions before damage
     return true;
 }
 
 function isStillLegalTarget(state: GameState, attacker: ObjectId, target: AttackableTarget): boolean {
-    //TODO: Re-evaluate target legality before damage
+    if (target.kind === "object") {
+        const obj = state.objects[target.id];
+        if (!obj) return false;
+        if (obj.zone !== "battlefield") return false;
+        if (obj.controller === state.objects[attacker]?.controller) return false;
+        if (!hasCardType(state, target.id, "Planeswalker")) return false;
+    } else {
+        if (state.objects[attacker]?.controller === target.id) return false;
+    }
     return true;
 }
 
