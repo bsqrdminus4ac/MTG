@@ -30,7 +30,7 @@ export function canActivateAbility(state: GameState, player: PlayerId, source: G
         if (source.tapped) return false;
         if (hasCardType(state, source.id, "Creature") && source.turnEnteredZone === state.turn.number && !hasKeyword(state, source.id, "haste")) return false;
     }
-    if (cantActivateAbilityDueToRestriction(state, source.id, ability)) return false;
+    if (cantActivateAbilityDueToRestriction(state, player, source.id, ability)) return false;
     return true;
 }
 

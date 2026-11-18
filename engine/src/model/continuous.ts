@@ -1,7 +1,7 @@
 import type { Ability } from "./abilities";
 import type { EffectTarget } from "./effects";
 import type { EffectId, ObjectId, PlayerId, Timestamp } from "./ids";
-import type { Color } from "./mana";
+import type { Color, ManaCost } from "./mana";
 import type { ObjectPredicate, PlayerPredicate } from "./predicates";
 import type { CardType, Keyword, Zone } from "./vocabulary";
 
@@ -61,14 +61,26 @@ export const LAYER_OF: Record<CharacteristicModification["kind"], Layer> = {
     switchPT: "switchPT",
 };
 
-export type RulesModification =
+export type ObjectRulesModification =
     | Readonly<{ kind: "cantAttack"; who?: { kind: "object"; filter: ObjectPredicate } | { kind: "player"; filter: PlayerPredicate } }>
     | Readonly<{ kind: "cantBlock"; who?: ObjectPredicate }>
     | Readonly<{ kind: "cantBeBlocked"; by?: ObjectPredicate }>
-    | Readonly<{ kind: "cantBeTargeted"; by?: ObjectPredicate }>
-    | Readonly<{ kind: "cantActivateAbilities"; excludeManaAbilties?: boolean }>
+    | Readonly<{ kind: "cantBeTargeted"; by?: ObjectPredicate }>;
+
+export type PlayerRulesModification =
+    | Readonly<{ kind: "cantActivateAbilities"; what?: ObjectPredicate; includeManaAbilities?: boolean }>
     | Readonly<{ kind: "cantCast"; what?: ObjectPredicate }>
-    | Readonly<{ kind: "cantPlayLands" }>;
+    | Readonly<{ kind: "cantPlayLands" }>
+    | Readonly<{
+          kind: "modifyCost";
+          costOf: "spell" | "activated";
+          what?: ObjectPredicate;
+          increase?: ManaCost;
+          reduce?: ManaCost;
+          includeManaAbilities?: boolean;
+      }>;
+
+export type RulesModification = ObjectRulesModification | PlayerRulesModification;
 
 export type Modification = CharacteristicModification | RulesModification;
 

@@ -5,6 +5,7 @@ import { getAllAbilities, getCardName, snapshotObject } from "../model/character
 import { isRulesModification, type ObjectMatch, type PlayerMatch, type RulesModification } from "../model/continuous";
 import { evalObjectPredicate, evalPlayerPredicate } from "../model/evalPredicates";
 import type { ObjectId, PlayerId } from "../model/ids";
+import { combineManaCosts, subtractManaCosts, type ManaCost } from "../model/mana";
 import type { AttackableTarget, GameState } from "../model/state";
 import type { Keyword } from "../model/vocabulary";
 
@@ -101,12 +102,18 @@ export function cantCastDueToRestriction(state: GameState, player: PlayerId, car
     return false;
 }
 
-export function cantActivateAbilityDueToRestriction(state: GameState, source: ObjectId, ability: AbilityOfKind<"activated">): boolean {
+export function cantActivateAbilityDueToRestriction(state: GameState, player: PlayerId, source: ObjectId, ability: AbilityOfKind<"activated">): boolean {
     const restrictions = getActiveRestrictions(state).get("cantActivateAbilities");
     if (!restrictions) return false;
     for (const restriction of restrictions) {
-        if (restriction.restriction.kind === "cantActivateAbilities" && restrictionAffectsObject(state, source, restriction) && !(restriction.restriction.excludeManaAbilties && ability.isManaAbility))
-            return true;
+        if (restriction.restriction.kind !== "cantActivateAbilities") continue;
+        if (restrictionAffectsPlayer(state, player, restriction)) {
+            if (!restriction.restriction.includeManaAbilities && ability.isManaAbility) continue;
+            if (!restriction.restriction.what) return true;
+            const sourceSnapshot = snapshotObject(state, source);
+            if (!sourceSnapshot) continue;
+            if (isTrue(evalObjectPredicate({ source: restriction.source, controller: restriction.controller, bindings: {} }, sourceSnapshot, restriction.restriction.what))) return true;
+        }
     }
     return false;
 }
@@ -116,10 +123,35 @@ export function cantPlayLandDueToRestriction(state: GameState, player: PlayerId)
     if (!restrictions) return false;
     for (const restriction of restrictions) {
         if (restriction.restriction.kind === "cantPlayLands" && restrictionAffectsPlayer(state, player, restriction)) {
-           return true;
+            return true;
         }
     }
     return false;
+}
+
+export function getTotalCostModifications(state: GameState, player: PlayerId, source: ObjectId, ability: AbilityOfKind<"spell" | "activated">, startingCost: ManaCost | null): ManaCost | null {
+    const restrictions = getActiveRestrictions(state).get("modifyCost");
+    if (!restrictions) return startingCost;
+    const sourceSnapshot = snapshotObject(state, source);
+    const increases: ManaCost[] = [];
+    const reductions: ManaCost[] = [];
+    for (const restriction of restrictions) {
+        if (restriction.restriction.kind !== "modifyCost") continue;
+        if (restriction.restriction.costOf !== ability.kind) continue;
+        if (!restriction.restriction.includeManaAbilities && ability.kind === "activated" && ability.isManaAbility) continue;
+        if (
+            restrictionAffectsPlayer(state, player, restriction) &&
+            (!restriction.restriction.what ||
+                (sourceSnapshot && isTrue(evalObjectPredicate({ source: restriction.source, controller: restriction.controller, bindings: {} }, sourceSnapshot, restriction.restriction.what))))
+        ) {
+            if (restriction.restriction.increase) increases.push(restriction.restriction.increase);
+            if (restriction.restriction.reduce) reductions.push(restriction.restriction.reduce);
+        }
+    }
+    let currentCost = startingCost;
+    currentCost = increases.reduce((total, next) => combineManaCosts(total, next), currentCost);
+    currentCost = reductions.reduce((total, next) => subtractManaCosts(total, next), currentCost);
+    return currentCost;
 }
 
 export function getActiveRestrictions(state: GameState): RestrictionInfo {

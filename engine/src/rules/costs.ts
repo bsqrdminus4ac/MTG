@@ -7,6 +7,7 @@ import type { ObjectId, PlayerId } from "../model/ids";
 import { combineManaCosts, payMana, type ManaCost } from "../model/mana";
 import type { GameState, ObjectSnapshot, Target } from "../model/state";
 import { sacrificePermanent, tapPermanent } from "./primitives";
+import { getTotalCostModifications } from "./restrictions";
 
 export type TotalCost = Readonly<{
     mana: ManaCost | null;
@@ -24,7 +25,7 @@ export function calculateFinalCost(state: GameState, player: PlayerId, source: O
         if (cost.kind === "mana") mana = combineManaCosts(mana, cost.cost);
         else nonMana.push(cost);
     }
-    // Eventually, check cost modification rules here? Or maybe they just get factored into characteristics. Though that would only work for spells not activated abilities.
+    mana = getTotalCostModifications(state, player, source, ability, mana);
 
     return { mana, components: nonMana, changes: [] };
 }

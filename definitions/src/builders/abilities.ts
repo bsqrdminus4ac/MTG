@@ -1,5 +1,7 @@
 import {
     COLORS,
+    omitUndefined,
+    parseCost,
     YOU,
     type Ability,
     type BindingRef,
@@ -10,8 +12,11 @@ import {
     type EventPredicate,
     type EventTrigger,
     type Keyword,
+    type ManaCost,
     type ManaType,
+    type Modification,
     type ObjectPredicate,
+    type PlayerMatch,
     type StaticEffect,
     type Step,
     type TargetSpec,
@@ -132,6 +137,14 @@ export const grantKeyword = (filter: ObjectPredicate, keywords: Keyword[], text:
 
 export const thisGets = (power: number, toughness: number, text: string) => staticAbility({ effect: { affects: { kind: "self" }, modifications: [{ kind: "modifyPT", power, toughness }] }, text });
 
+export const allCreatures = (): ObjectPredicate => ({
+    kind: "all",
+    of: [
+        { kind: "inZone", zone: "battlefield" },
+        { kind: "hasType", type: "Creature" },
+    ],
+});
+
 export const creaturesYouControl = (excludeSource?: boolean): ObjectPredicate => ({
     kind: "all",
     of: [
@@ -143,3 +156,20 @@ export const creaturesYouControl = (excludeSource?: boolean): ObjectPredicate =>
 });
 
 export const whenThisDies = (): EventTrigger => ({ event: "cardMoved", when: { kind: "cardMoved", from: "battlefield", to: "graveyard", object: { kind: "isSource" } } });
+
+export const affectsAllPlayers: PlayerMatch = { kind: "matchingPlayers", filter: { kind: "anyPlayer" } };
+export const affectsYou: PlayerMatch = { kind: "matchingPlayers", filter: { kind: "you" } };
+
+export const costsMore = (costOf: "spell" | "activated", amount: ManaCost | string, what?: ObjectPredicate, includeManaAbilities?: boolean): Modification => ({
+    kind: "modifyCost",
+    costOf,
+    increase: parseCost(amount),
+    ...omitUndefined({ what, includeManaAbilities }),
+});
+
+export const costsLess = (costOf: "spell" | "activated", amount: ManaCost | string, what?: ObjectPredicate, includeManaAbilities?: boolean): Modification => ({
+    kind: "modifyCost",
+    costOf,
+    reduce: parseCost(amount),
+    ...omitUndefined({ what, includeManaAbilities }),
+});

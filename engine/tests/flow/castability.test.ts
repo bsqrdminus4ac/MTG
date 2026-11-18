@@ -267,6 +267,56 @@ const redSpellRestrictionSource: CardDefinition = {
     ],
 };
 
+const costReductionSource: CardDefinition = {
+    ...creature,
+    id: cardDefId("castability-cost-reduction"),
+    name: "Cost Reduction",
+    types: ["Enchantment"],
+    power: null,
+    toughness: null,
+    abilities: [
+        {
+            kind: "static",
+            activeZones: ["battlefield"],
+            text: "Your spells and activated abilities cost less.",
+            effect: {
+                affects: { kind: "matchingPlayers", filter: { kind: "you" } },
+                modifications: [
+                    { kind: "modifyCost", costOf: "spell", reduce: oneGeneric },
+                    { kind: "modifyCost", costOf: "activated", reduce: oneGeneric },
+                ],
+            },
+        },
+    ],
+};
+
+const costIncreaseSource: CardDefinition = {
+    ...costReductionSource,
+    id: cardDefId("castability-cost-increase"),
+    name: "Cost Increase",
+    abilities: [
+        {
+            kind: "static",
+            activeZones: ["battlefield"],
+            text: "Your spells and activated abilities cost more.",
+            effect: {
+                affects: { kind: "matchingPlayers", filter: { kind: "you" } },
+                modifications: [
+                    { kind: "modifyCost", costOf: "spell", increase: oneGeneric },
+                    { kind: "modifyCost", costOf: "activated", increase: oneGeneric },
+                ],
+            },
+        },
+    ],
+};
+
+const freeAbilitySource: CardDefinition = {
+    ...unaffordableAbilitySource,
+    id: cardDefId("castability-free-ability"),
+    name: "Free Ability Source",
+    abilities: [{ ...unaffordableAbility, cost: [] }],
+};
+
 function game(definitions: readonly CardDefinition[], aliceDeck: readonly CardDefinition[], bobDeck: readonly CardDefinition[] = [creature]): GameState {
     return createGame(
         [creature, ...definitions],
@@ -336,6 +386,44 @@ describe("castability and activatability options", () => {
 
         expect(offersCast(atPrecombatMain(abilitySource.state), spell.newId)).toBe(false);
         expect(offersActivation(abilitySource.state, abilitySource.newId, { kind: "printed", index: 0 })).toBe(false);
+    });
+
+    test("offers spells and activated abilities made affordable by cost-reduction abilities", () => {
+        let state = game(
+            [costReductionSource, unaffordableSpell, unaffordableAbilitySource],
+            [costReductionSource, unaffordableSpell, unaffordableAbilitySource],
+        );
+        const spell = moveDefinition(state, alice, unaffordableSpell, "hand");
+        state = spell.state;
+        const abilitySource = moveDefinition(state, alice, unaffordableAbilitySource, "battlefield");
+        state = abilitySource.state;
+
+        expect(offersCast(atPrecombatMain(state), spell.newId)).toBe(false);
+        expect(offersActivation(state, abilitySource.newId, { kind: "printed", index: 0 })).toBe(false);
+
+        const reducer = moveDefinition(state, alice, costReductionSource, "battlefield");
+
+        expect(offersCast(atPrecombatMain(reducer.state), spell.newId)).toBe(true);
+        expect(offersActivation(reducer.state, abilitySource.newId, { kind: "printed", index: 0 })).toBe(true);
+    });
+
+    test("does not offer spells and activated abilities made unaffordable by cost-increasing abilities", () => {
+        let state = game(
+            [costIncreaseSource, instant, freeAbilitySource],
+            [costIncreaseSource, instant, freeAbilitySource],
+        );
+        const spell = moveDefinition(state, alice, instant, "hand");
+        state = spell.state;
+        const abilitySource = moveDefinition(state, alice, freeAbilitySource, "battlefield");
+        state = abilitySource.state;
+
+        expect(offersCast(atPrecombatMain(state), spell.newId)).toBe(true);
+        expect(offersActivation(state, abilitySource.newId, { kind: "printed", index: 0 })).toBe(true);
+
+        const increaser = moveDefinition(state, alice, costIncreaseSource, "battlefield");
+
+        expect(offersCast(atPrecombatMain(increaser.state), spell.newId)).toBe(false);
+        expect(offersActivation(increaser.state, abilitySource.newId, { kind: "printed", index: 0 })).toBe(false);
     });
 
     test("offers instants but not sorceries during combat or while the stack is non-empty", () => {

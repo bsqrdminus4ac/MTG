@@ -1,5 +1,6 @@
 import {
     abilityText,
+    combineManaCosts,
     getAbilityByRef,
     getCharacteristics,
     type Ability,
@@ -13,7 +14,6 @@ import {
     type Condition,
     type ContinuousEffect,
     type Cost,
-    combineManaCosts,
     type Decision,
     type Duration,
     type Effect,
@@ -124,11 +124,27 @@ export function describeModification(m: Modification): string {
       case "cantBeTargeted":
           return "can't be targeted" + (m.by ? ` by ${describeObjectPredicate(m.by, "spells or abilities")}` : "");
       case "cantActivateAbilities":
-          return `can't activate ${m.excludeManaAbilties ? "non-mana abilities" : "abilities"}`;
+          return `can't activate ${m.includeManaAbilities ? "abilities" : "non-mana abilities"}` + (m.what ? ` of ${describeObjectPredicate(m.what)}` : "");
       case "cantCast":
           return "can't cast " + (m.what ? describeObjectPredicate(m.what, "spell") : "");
       case "cantPlayLands":
           return "can't play lands";
+      case "modifyCost": {
+          const subject = m.costOf === "spell" ? "spells" : "activated abilities";
+          const source = m.what
+              ? m.costOf === "spell"
+                  ? ` whose source ${describeObjectCondition(m.what)}`
+                  : ` of ${describeObjectPredicate(m.what)}`
+              : "";
+          const action = m.costOf === "spell" ? "cast" : "activate";
+          const manaAbilities = m.costOf === "activated" && !m.includeManaAbilities ? " (excluding mana abilities)" : "";
+          const changes = [
+              ...(m.increase ? [`cost ${describeManaCost(m.increase)} more to ${action}`] : []),
+              ...(m.reduce ? [`cost ${describeManaCost(m.reduce)} less to ${action}`] : []),
+          ];
+          if (changes.length === 0) return `${subject}${source} have no cost modification`;
+          return `${subject}${source}${manaAbilities} ${changes.join(" and ")}`;
+      }
       default:
           return unreachable(m);
   }

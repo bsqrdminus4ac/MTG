@@ -55,6 +55,23 @@ describe("text describers", () => {
         expect(describeModification({ kind: "addAbilities", abilities: [forest.abilities[0]!] })).toBe('gains "Tap: Add G."');
         expect(describeModification({ kind: "removeKeywords", keywords: ["flying"] })).toBe("loses flying");
         expect(describeModification({ kind: "switchPT" })).toBe("switches power and toughness");
+        expect(
+            describeModification({
+                kind: "modifyCost",
+                costOf: "spell",
+                what: { kind: "hasType", type: "Creature" },
+                increase: { generic: 1, pips: [] },
+                reduce: { generic: 0, pips: ["G"] },
+            }),
+        ).toBe("spells whose source is a creature cost {1} more to cast and cost {G} less to cast");
+        expect(
+            describeModification({
+                kind: "modifyCost",
+                costOf: "activated",
+                increase: { generic: 2, pips: [] },
+                includeManaAbilities: true,
+            }),
+        ).toBe("activated abilities cost {2} more to activate");
     });
 
     test("static abilities describe their affected objects and all modifications", () => {

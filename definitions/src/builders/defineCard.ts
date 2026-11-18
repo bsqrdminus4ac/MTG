@@ -14,7 +14,7 @@ export const creature = (c: {
     isLegendary?: boolean;
     additionalTypes?: CardType[];
 }): CardDefinition => {
-    const manaCost = typeof c.cost === "string" ? parseCost(c.cost) : c.cost;
+    const manaCost = parseCost(c.cost);
     return {
         id: cardDefId(c.name),
         name: c.name,
@@ -51,7 +51,7 @@ export const instant = (c: {
     colors?: Color[];
     isLegendary?: boolean;
 }): CardDefinition => {
-    const manaCost = typeof c.cost === "string" ? parseCost(c.cost) : c.cost;
+    const manaCost = parseCost(c.cost);
     return {
         id: cardDefId(c.name),
         name: c.name,
@@ -75,7 +75,7 @@ export const sorcery = (c: {
     colors?: Color[];
     isLegendary?: boolean;
 }): CardDefinition => {
-    const manaCost = typeof c.cost === "string" ? parseCost(c.cost) : c.cost;
+    const manaCost = parseCost(c.cost);
     return {
         id: cardDefId(c.name),
         name: c.name,
@@ -100,7 +100,7 @@ export const noncreatureArtifact = (c: {
     isLegendary?: boolean;
     additionalTypes?: CardType[];
 }): CardDefinition => {
-    const manaCost = typeof c.cost === "string" ? parseCost(c.cost) : c.cost;
+    const manaCost = parseCost(c.cost);
     return {
         id: cardDefId(c.name),
         name: c.name,
@@ -125,7 +125,7 @@ export const enchantment = (c: {
     isLegendary?: boolean;
     additionalTypes?: CardType[];
 }): CardDefinition => {
-    const manaCost = typeof c.cost === "string" ? parseCost(c.cost) : c.cost;
+    const manaCost = parseCost(c.cost);
     return {
         id: cardDefId(c.name),
         name: c.name,

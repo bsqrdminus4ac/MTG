@@ -10,7 +10,8 @@ export function isManaType(ch: string): ch is ManaType {
     return (MANA_TYPES as readonly string[]).includes(ch.toUpperCase());
 }
 
-export const parseCost = (c: string): ManaCost => {
+export const parseCost = (c: string | ManaCost): ManaCost => {
+    if (typeof c !== "string") return c;
     const match = /^(\d*)([A-Za-z]*)$/i.exec(c);
     if (!match) throw new Error(`Bad format: ${c}`);
     const n = match[1];
@@ -38,6 +39,24 @@ export interface ManaCost {
 export function combineManaCosts(a: ManaCost | null, b: ManaCost | null): ManaCost | null {
     if (!a && !b) return null;
     return { generic: (a?.generic ?? 0) + (b?.generic ?? 0), pips: [...(a?.pips ?? []), ...(b?.pips ?? [])].sort((x, y) => MANA_TYPES.indexOf(x) - MANA_TYPES.indexOf(y)) };
+}
+
+export function subtractManaCosts(a: ManaCost | null, b: ManaCost | null, allowNegatives?: boolean): ManaCost | null {
+    if (!a) return null;
+    if (!b) return a;
+    const generic = a.generic - b.generic;
+    const removals = new Map<ManaType, number>();
+    for (const pip of b.pips) {
+        removals.set(pip, (removals.get(pip) ?? 0) + 1);
+    }
+    const pips = a.pips.filter((pip) => {
+        const remaining = removals.get(pip) ?? 0;
+        if (remaining === 0) return true;
+        removals.set(pip, remaining - 1);
+        return false;
+    });
+
+    return { generic: allowNegatives ? generic : Math.max(0, generic), pips };
 }
 
 export const colorIdentity = (cost: ManaCost): Color[] => [...new Set(cost.pips.flatMap((c) => (c === "C" ? [] : c)))];
