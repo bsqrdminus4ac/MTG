@@ -30,7 +30,7 @@ export function checkCastable(state: GameState, player: PlayerId, card: ObjectId
     if (!hasEnoughTargets(state, scope, spell.targets)) return badResult("There aren't enough legal targets");
 
     // 4. mana (recursive search, so last)
-    const cost = calculateFinalCost(state, player, card, spell);
+    const cost = calculateFinalCost(state, scope, spell);
     if (!cost.mana || !couldHaveManaToPayCost(state, player, cost.mana, {}, card)) return badResult("You can't pay for that");
     return goodResult(null);
 }
@@ -42,7 +42,7 @@ export function checkActivatable(state: GameState, player: PlayerId, source: Obj
     const scope: EvalScope = { controller: player, source, bindings: {} };
     if (!hasEnoughTargets(state, scope, abilityInfo.value.ability.targets)) return badResult("There aren't enough legal targets");
 
-    const cost = calculateFinalCost(state, player, source, abilityInfo.value.ability);
+    const cost = calculateFinalCost(state, scope, abilityInfo.value.ability);
     if (cost.mana && !couldHaveManaToPayCost(state, player, cost.mana, {}, source)) return badResult("You can't pay for that");
     return goodResult(null);
 }

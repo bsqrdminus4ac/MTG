@@ -6,6 +6,7 @@ import {
     describeAction,
     describeAllEffects,
     describeChoiceValue,
+    describeCost,
     describeEffect,
     describeEvent,
     describeEventPredicate,
@@ -21,6 +22,23 @@ describe("text describers", () => {
         expect(describeManaCost({ generic: 1, pips: ["G"] })).toBe("{1}{G}");
         expect(describeManaCost({ generic: 0, pips: ["R"] })).toBe("{R}");
         expect(describeManaCost({ generic: 0, pips: [] })).toBe("{0}");
+    });
+
+    test("cost components", () => {
+        expect(describeCost({ kind: "mana", cost: { generic: 1, pips: ["G"] } })).toBe("{1}{G}");
+        expect(describeCost({ kind: "tapSelf" })).toBe("{T}");
+        expect(describeCost({ kind: "sacrificeSelf" })).toBe("sacrifice this");
+        expect(describeCost({ kind: "payLife", amount: 2 })).toBe("pay 2 life");
+        expect(describeCost({ kind: "sacrifice", amount: 2 })).toBe("sacrifice 2 permanents");
+        expect(describeCost({ kind: "discard", amount: 1 })).toBe("discard 1 card");
+        expect(
+            describeCost({
+                kind: "optional",
+                bindAs: "extra",
+                prompt: "pay an additional cost",
+                cost: [{ kind: "payLife", amount: 2 }],
+            }),
+        ).toBe("optional pay an additional cost (pay 2 life)");
     });
 
     test("mana pools only list what is in them", () => {

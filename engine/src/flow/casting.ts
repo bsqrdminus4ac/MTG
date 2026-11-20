@@ -147,7 +147,7 @@ export function payCastingCost(state: GameState, casting: CastingInProgress): Ap
     if (!casting.cost) return ok(state, []);
     const snapshot = casting.kind === "spell" ? snapshotObject(state, casting.card) : casting.sourceSnapshot;
     if (!snapshot) return fail("Unable to locate spell");
-    return payCosts(state, casting.player, snapshot, casting.ability, casting.cost);
+    return payCosts(state, casting.player, snapshot, casting.ability, casting.cost, []);
 }
 
 export function selectTargetOptions(state: GameState): ApplyResult {
@@ -213,7 +213,8 @@ export function payManaOptions(state: GameState): ApplyResult {
     const casting = state.casting;
     const player = casting.player;
     const card = casting.card;
-    const cost = casting.cost ?? calculateFinalCost(state, player, card, casting.ability, casting.targets);
+    const scope: EvalScope = { controller: player, source: card, bindings: casting.bindings }; // TODO: Convert selected targets into target.# bindings for costs to refer to
+    const cost = casting.cost ?? calculateFinalCost(state, scope, casting.ability);
     const castName = getCastName(state, casting);
     if (!cost.mana) {
         if (casting.kind === "spell") return fail("Invalid mana cost for spell");

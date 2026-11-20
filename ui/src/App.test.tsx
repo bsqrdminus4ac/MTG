@@ -5,7 +5,7 @@ import { StrictMode } from "react";
 import { describe, expect, test, vi } from "vitest";
 import { App, ProgressState } from "./App";
 import { DecisionPanel } from "./components/DecisionPanel";
-import { ObjectCard } from "./components/ObjectCard";
+import { CostDisplay, ObjectCard } from "./components/ObjectCard";
 import { StackPanel } from "./components/StackPanel";
 import { ALICE, BOB, newDemoGame } from "./demo";
 import { useGame } from "./useGame";
@@ -139,6 +139,37 @@ describe("zones", () => {
         expect(bullets).toContain("Zonehand");
         expect(bullets).toContain("Tappedno");
         expect(bullets.some((b) => b?.startsWith("Abilities"))).toBe(true);
+    });
+
+    test("shows the full cost components instead of only mana", () => {
+        const card: CardDefinition = {
+            ...forest,
+            cost: [
+                { kind: "mana", cost: { generic: 1, pips: ["G"] } },
+                { kind: "sacrificeSelf" },
+            ],
+        };
+        const state = gameWithCards([card]);
+        const id = must(state.players[ALICE]!.hand.find((objectId) => state.objects[objectId]?.definitionId === card.id));
+        render(<ObjectCard state={state} id={id} />);
+
+        const cost = must(screen.getByText("Mana cost").closest("li"));
+        expect(cost.textContent).toBe("Mana cost{1}{G}, sacrifice this");
+    });
+
+    test("compares changed cost components individually and italicizes added components", () => {
+        render(
+            <CostDisplay
+                cost={[
+                    { kind: "mana", cost: { generic: 2, pips: ["G"] } },
+                    { kind: "sacrificeSelf" },
+                ]}
+                printedCost={[{ kind: "mana", cost: { generic: 1, pips: ["G"] } }]}
+            />,
+        );
+
+        expect(screen.getByText("(printed {1}{G})", { selector: "small" })).toBeTruthy();
+        expect(screen.getByText("sacrifice this", { selector: "em" })).toBeTruthy();
     });
 
     test("shows authored effect text under Card Text and replaces the this placeholder", () => {

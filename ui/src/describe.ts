@@ -14,6 +14,7 @@ import {
     type Condition,
     type ContinuousEffect,
     type Cost,
+    type CostComponent,
     type Decision,
     type Duration,
     type Effect,
@@ -70,8 +71,8 @@ export const nameOfStackEntry = (state: GameState, id: StackId, includeId?: bool
 
 export function describeManaCost(cost: ManaCost | null): string {
   if (cost === null) return "—";
-  const generic = cost.generic > 0 || cost.pips.length === 0 ? `{${cost.generic}}` : "";
-  return generic + cost.pips.map((p) => `{${p}}`).join("");
+  const generic = cost.generic > 0 || cost.pips.length === 0 ? `${cost.generic}` : "";
+  return generic + cost.pips.map((p) => `${p}`).join("");
 }
 
 export function manaCostFromCost(cost: Cost | null): ManaCost | null {
@@ -158,7 +159,7 @@ export function describeAllEffects(ability: Ability): string {
     if (ability.kind === "keyword") return ability.keyword;
     if (ability.kind === "static") return describeStaticEffect(ability.effect);
     return ability.effects.map((e) => {
-        const cost = ability.kind === "activated" ? describeCost( ability.cost) : "";
+        const cost = ability.kind === "activated" ? ability.cost.map(describeCost).join(", ") || "no cost" : "";
         const effect = describeEffect(e);
         return cost === "" ? effect : `${cost} → ${effect}`;
     }).join(". ");
@@ -544,22 +545,33 @@ export function describeEffectChoice(e: Extract<Effect, { kind: "choose" }>): st
     return `Choice: ${e.prompt}`; // Too complicated to piece apart full choice settings on client
 }
 
-export function describeCost(c: Cost): string {
-    const parts: string[] = [];
-    for (const component of c) {
-        switch (component.kind) {
-            case "mana":
-                parts.push(describeManaCost(component.cost));
-                break;
-            case "tapSelf":
-                parts.push("{T}");
-                break;
-            case "sacrificeSelf":
-                parts.push("sacrifice this");
-                break;
+export function describeCost(component: CostComponent): string {
+    switch (component.kind) {
+        case "mana":
+            return describeManaCost(component.cost);
+        case "tapSelf":
+            return "{T}";
+        case "sacrificeSelf":
+            return "sacrifice this";
+        case "payLife":
+            return `pay ${describeAmount(component.amount)} life`;
+        case "sacrifice": {
+            const noun = component.amount === 1 ? "permanent" : "permanents";
+            const restriction = component.what ? ` matching ${describeObjectPredicate(component.what)}` : "";
+            return `sacrifice ${describeAmount(component.amount)} ${noun}${restriction}`;
         }
+        case "discard": {
+            const noun = component.amount === 1 ? "card" : "cards";
+            const restriction = component.what ? ` matching ${describeObjectPredicate(component.what)}` : "";
+            return `discard ${describeAmount(component.amount)} ${noun}${restriction}`;
+        }
+        case "optional": {
+            const cost = component.cost.map(describeCost).join(", ") || "no cost";
+            return `optional ${component.prompt} (${cost})`;
+        }
+        default:
+            return unreachable(component);
     }
-    return parts.length > 0 ? parts.join(", ") : "no cost";
 }
 
 const describeTargetSpecs = (specs?: TargetSpec[]): string => {

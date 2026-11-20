@@ -1,5 +1,5 @@
-import { abilityText, capitalize, getAppliedEffects, getCharacteristics, manaValue, type Characteristics, type GameState, type ModificationInfo, type ObjectId } from "@mtg/engine";
-import { describeAllEffects, describeContinuousEffect, describeDuration, describeManaCost, describeModification, manaCostFromCost } from "../describe";
+import { abilityText, capitalize, getAppliedEffects, getCharacteristics, manaValue, type Characteristics, type Cost, type GameState, type ModificationInfo, type ObjectId } from "@mtg/engine";
+import { describeAllEffects, describeContinuousEffect, describeCost, describeDuration, describeModification, manaCostFromCost } from "../describe";
 import { Bullets, NestedList, type BulletItem } from "./Bullets";
 
 interface ObjectCardProps {
@@ -23,6 +23,66 @@ function describeAppliedEffect(effect: ModificationInfo): string {
         duration = effect.duration ? describeDuration(effect.duration) : "";
     }
     return `From ${effect.sourceName} (${effect.layer} layer)${duration === "" ? "" : `, ${duration}`}: ${describeModification(effect.modification)}`;
+}
+
+function costComponentDescriptions(cost: Cost | null): string[] {
+    if (cost === null) return ["—"];
+    return cost.length > 0 ? cost.map(describeCost) : ["no cost"];
+}
+
+export function CostDisplay({ cost, printedCost }: { readonly cost: Cost | null; readonly printedCost: Cost | null }) {
+    const effectiveParts = costComponentDescriptions(cost);
+    const printedParts = costComponentDescriptions(printedCost);
+    const usedPrinted = new Set<number>();
+    const parts: { readonly description: string; readonly printed: string | null; readonly added: boolean }[] = [];
+
+    for (const description of effectiveParts) {
+        const exactMatch = printedParts.findIndex((part, index) => part === description && !usedPrinted.has(index));
+        if (exactMatch >= 0) {
+            usedPrinted.add(exactMatch);
+            parts.push({ description, printed: null, added: false });
+        } else {
+            parts.push({ description, printed: null, added: true });
+        }
+    }
+
+    let nextUnmatchedPrinted = 0;
+    for (const [index, part] of parts.entries()) {
+        if (!part.added) continue;
+        while (nextUnmatchedPrinted < printedParts.length && usedPrinted.has(nextUnmatchedPrinted)) {
+            nextUnmatchedPrinted++;
+        }
+        if (nextUnmatchedPrinted < printedParts.length) {
+            const printedDescription = printedParts[nextUnmatchedPrinted];
+            if (printedDescription !== undefined) {
+                parts[index] = {
+                    description: part.description,
+                    printed: printedDescription,
+                    added: false,
+                };
+                usedPrinted.add(nextUnmatchedPrinted);
+                nextUnmatchedPrinted++;
+            }
+        }
+    }
+
+    const rendered = parts.map((part, index) => (
+        <span key={index}>
+            {index > 0 && ", "}
+            {part.added ? <em>{part.description}</em> : part.description}
+            {part.printed !== null && <small> (printed {part.printed})</small>}
+        </span>
+    ));
+    for (let index = 0; index < printedParts.length; index++) {
+        if (!usedPrinted.has(index)) {
+            rendered.push(
+                <span key={`printed-${index}`}>
+                    {rendered.length > 0 && ", "}—<small> (printed {printedParts[index]})</small>
+                </span>,
+            );
+        }
+    }
+    return <>{rendered}</>;
 }
 
 /** One game object as a collapsible element: a summary line, and its properties as bullets when opened. */
@@ -63,7 +123,7 @@ export function ObjectCard({ state, id, tag }: ObjectCardProps) {
         items.push(
             ["Type line", withPrintedValue(typeLine(chars), printed ? typeLine(printed) : typeLine(chars))],
             ["Colors", withPrintedValue(colors(chars), printed ? colors(printed) : colors(chars))],
-            ["Mana cost", describeManaCost(manaCostFromCost(chars.cost))],
+            ["Cost", <CostDisplay key="mana-cost" cost={chars.cost} printedCost={printed ? printed.cost : chars.cost} />],
             ["Mana value", String(manaValue(manaCostFromCost(chars.cost)))],
             ["Power / toughness", withPrintedValue(effectivePT, printedPT)],
         );
