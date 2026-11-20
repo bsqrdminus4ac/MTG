@@ -39,8 +39,10 @@ export function beginActivation(state: GameState, player: PlayerId, source: Obje
         bindings: {},
         rollback,
         sourceSnapshot,
-        events: [{ type: "abilityActivateStart", player, abilitySource: source, sourceName: sourceSnapshot.chars.name, description: abilityText(ability, sourceSnapshot.chars.name) }],
+        events: [],
     };
 
-    return continueCasting({ ...state, casting });
+    return continueCasting({ ...state, casting }, [
+        { type: "abilityActivateStart", player, abilitySource: source, sourceName: sourceSnapshot.chars.name, description: abilityText(ability, sourceSnapshot.chars.name) },
+    ]);
 }

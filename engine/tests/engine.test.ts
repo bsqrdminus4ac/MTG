@@ -6,6 +6,7 @@ import type { CardDefinition } from "../src/model/cardDefinition";
 import { getCharacteristics, snapshotObject } from "../src/model/characteristics";
 import { anyTarget, permanentOfType, type TargetFilter } from "../src/model/effects";
 import { cardDefId, playerId, type StackId } from "../src/model/ids";
+import { getCachedCharacteristics, getMatchingObjects } from "../src/model/layers";
 import type { GameState, StackEntry, Target } from "../src/model/state";
 import { drawCard, moveObject } from "../src/model/zones";
 import { getLegalTargets } from "../src/rules/targeting";
@@ -312,6 +313,8 @@ describe("spell targeting", () => {
             card: moved.newId,
         });
         if (!cast.ok) throw new Error(cast.error);
+        const stackId = cast.state.casting?.card;
+        if (stackId === undefined) throw new Error("Expected the spell to be in progress");
         const decision = cast.state.pending;
         if (!decision) throw new Error("Expected a target decision");
 
@@ -324,12 +327,125 @@ describe("spell targeting", () => {
         if (!canceled.ok) throw new Error(canceled.error);
         expect(canceled.state.casting).toBeNull();
         expect(canceled.state.players[alice]?.hand).toContain(moved.newId);
+        expect(canceled.state.objects[moved.newId]?.zone).toBe("hand");
+        expect(canceled.state.objects[stackId]).toBeUndefined();
+        expect(canceled.events.filter((event) => event.type === "cardMoved")).toEqual([]);
         expect(canceled.events).toContainEqual({
             type: "spellCastCancelled",
             player: alice,
             card: moved.newId,
             cardName: "Target Spell",
         });
+    });
+
+    test("the spell card stays in the stack zone during targeting and payment", () => {
+        const g = createGame(
+            [bear, targetSpell],
+            [
+                { id: alice, deck: [targetSpell.id] },
+                { id: bob, deck: [bear.id] },
+            ],
+        );
+        const card = g.players[alice]!.library[0]!;
+        const moved = moveObject(g, card, "hand")!;
+        const cast = applyAction(moved.state, {
+            type: "castSpell",
+            player: alice,
+            card: moved.newId,
+        });
+        if (!cast.ok) throw new Error(cast.error);
+        const stackId = cast.state.casting?.card;
+        if (stackId === undefined) throw new Error("Expected the spell to be in progress");
+
+        expect(cast.state.objects[stackId]?.zone).toBe("stack");
+        expect(cast.state.players[alice]?.hand).not.toContain(moved.newId);
+
+        const targetDecision = cast.state.pending;
+        if (!targetDecision || targetDecision.kind !== "choose") throw new Error("Expected a target decision");
+        const payment = submitAnswer(cast.state, {
+            player: alice,
+            decision: targetDecision.id,
+            answer: { kind: "choose", selected: ["player:bob"] },
+        });
+        if (!payment.ok) throw new Error(payment.error);
+
+        expect(payment.state.objects[stackId]?.zone).toBe("stack");
+        expect(payment.state.pending?.kind).toBe("yesNo");
+    });
+
+    test("committing a spell leaves exactly one stack entry for its card", () => {
+        const g = createGame(
+            [bear, targetSpell],
+            [
+                { id: alice, deck: [targetSpell.id] },
+                { id: bob, deck: [bear.id] },
+            ],
+        );
+        const card = g.players[alice]!.library[0]!;
+        const moved = moveObject(g, card, "hand")!;
+        const cast = applyAction(moved.state, {
+            type: "castSpell",
+            player: alice,
+            card: moved.newId,
+        });
+        if (!cast.ok) throw new Error(cast.error);
+        const stackId = cast.state.casting?.card;
+        const targetDecision = cast.state.pending;
+        if (stackId === undefined || !targetDecision || targetDecision.kind !== "choose") {
+            throw new Error("Expected the spell to be awaiting target selection");
+        }
+
+        const payment = submitAnswer(cast.state, {
+            player: alice,
+            decision: targetDecision.id,
+            answer: { kind: "choose", selected: ["player:bob"] },
+        });
+        if (!payment.ok) throw new Error(payment.error);
+        const payDecision = payment.state.pending;
+        if (!payDecision || payDecision.kind !== "yesNo") throw new Error("Expected a payment decision");
+
+        const committed = submitAnswer(payment.state, {
+            player: alice,
+            decision: payDecision.id,
+            answer: { kind: "yesNo", value: true },
+        });
+        if (!committed.ok) throw new Error(committed.error);
+
+        expect(committed.state.stack.filter((entry) => entry.kind === "spell" && entry.source === stackId)).toHaveLength(1);
+        expect(committed.state.objects[stackId]?.zone).toBe("stack");
+    });
+
+    test('a matching-objects filter with zones ["stack"] sees the spell during targeting', () => {
+        const g = createGame(
+            [bear, targetSpell],
+            [
+                { id: alice, deck: [targetSpell.id] },
+                { id: bob, deck: [bear.id] },
+            ],
+        );
+        const card = g.players[alice]!.library[0]!;
+        const moved = moveObject(g, card, "hand")!;
+        const cast = applyAction(moved.state, {
+            type: "castSpell",
+            player: alice,
+            card: moved.newId,
+        });
+        if (!cast.ok) throw new Error(cast.error);
+        const stackId = cast.state.casting?.card;
+        if (stackId === undefined) throw new Error("Expected the spell to be in progress");
+
+        const matching = getMatchingObjects(
+            cast.state,
+            getCachedCharacteristics(cast.state),
+            { controller: alice, source: stackId, bindings: {} },
+            {
+                kind: "matchingObjects",
+                filter: { kind: "hasType", type: "Instant" },
+                zones: ["stack"],
+            },
+        );
+
+        expect(matching.has(stackId)).toBe(true);
     });
 
     test("replaying a targeting answer from the same state does not duplicate its target", () => {

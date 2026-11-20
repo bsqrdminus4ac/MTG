@@ -125,7 +125,7 @@ export interface CombatInfo {
 
 interface CastProgress {
     player: PlayerId;
-    card: ObjectId; // still in hand until commit
+    card: ObjectId; // Moved to the stack as the spell cast starts
     targets: readonly (readonly Target[])[];
     targetSpecsSelected: readonly boolean[];
     cost: TotalCost | null; // total cost, determined after targets
@@ -137,6 +137,7 @@ interface CastProgress {
 export type SpellCast = CastProgress & {
     kind: "spell";
     ability: AbilityOfKind<"spell">;
+    originalCard: ObjectId;
 };
 
 export type AbilityCast = CastProgress & {
@@ -231,6 +232,6 @@ export function getAllObjectsInZone(state: GameState, zone: Zone): readonly Obje
         case "library":
             return Object.values(state.players).flatMap((p) => p.library);
         case "stack":
-            return state.stack.flatMap((entry) => (entry.kind === "spell" ? entry.source : []));
+            return [...state.stack.flatMap((entry) => (entry.kind === "spell" ? entry.source : [])), ...(state.casting?.kind === "spell" ? [state.casting.card] : [])];
     }
 }

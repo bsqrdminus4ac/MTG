@@ -2,7 +2,6 @@ import { type ApplyResult, fail, ok } from "../core/result";
 import { withEntry } from "../core/util";
 import { getCardName, getCharacteristics } from "../model/characteristics";
 import { type PriorityOption, priorityDecision } from "../model/decisions";
-import { abilityText } from "../model/effects";
 import type { GameEvent } from "../model/events";
 import type { ObjectId, PlayerId } from "../model/ids";
 import { refKey } from "../model/layers";
@@ -92,12 +91,11 @@ export function priorityOptions(state: GameState, player: PlayerId): readonly Pr
     options.push(
         ...getAllActivatableAbilities(state, player)
             .filter(({ source, ref }) => checkActivatable(state, player, source, ref).ok)
-            .map(({ source, ability, ref }): PriorityOption => {
+            .map(({ source, ref }): PriorityOption => {
                 const sourceName = getCardName(state, source);
-                const cardText = abilityText(ability, sourceName);
                 return {
                     id: `activate:${refKey(source, ref)}`,
-                    label: `Activate ${sourceName}'s ability`,
+                    label: `Activate ${sourceName}'s ability (#${source})`,
                     action: {
                         type: "activateAbility",
                         player,
@@ -112,7 +110,7 @@ export function priorityOptions(state: GameState, player: PlayerId): readonly Pr
         ...getCastableSpells(state, player).map(
             (card): PriorityOption => ({
                 id: `cast:${card}`,
-                label: `Cast ${getCharacteristics(state, card)?.name}`,
+                label: `Cast ${getCardName(state, card, true)}`,
                 action: { type: "castSpell", player, card },
             }),
         ),

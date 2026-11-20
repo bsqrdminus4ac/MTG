@@ -153,8 +153,8 @@ describe("zones", () => {
         const id = must(state.players[ALICE]!.hand.find((objectId) => state.objects[objectId]?.definitionId === card.id));
         render(<ObjectCard state={state} id={id} />);
 
-        const cost = must(screen.getByText("Mana cost").closest("li"));
-        expect(cost.textContent).toBe("Mana cost{1}{G}, sacrifice this");
+        const cost = must(screen.getByText("Cost").closest("li"));
+        expect(cost.textContent).toBe("Cost1G, sacrifice this");
     });
 
     test("compares changed cost components individually and italicizes added components", () => {
@@ -168,7 +168,7 @@ describe("zones", () => {
             />,
         );
 
-        expect(screen.getByText("(printed {1}{G})", { selector: "small" })).toBeTruthy();
+        expect(screen.getByText("(printed 1G)", { selector: "small" })).toBeTruthy();
         expect(screen.getByText("sacrifice this", { selector: "em" })).toBeTruthy();
     });
 

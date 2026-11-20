@@ -110,7 +110,7 @@ function collectTargets(state: GameState, scope: EvalScope, filter: TargetFilter
 }
 export function buildTargetPrompt(sourceName: string, spec: TargetSpec): string {
     let prompt = "Select ";
-    const targetDesc = spec.targetName ?? ` target ${spec.filter.kind}s`;
+    const targetDesc = spec.targetName ?? buildTargetFilterKind(spec.filter, spec.minCount !== 1 || spec.maxCount !== 1);
     if (spec.minCount === 1 && spec.maxCount === 1) {
         prompt += `the ${targetDesc} to target `;
     } else if (spec.minCount === spec.maxCount) {
@@ -120,6 +120,13 @@ export function buildTargetPrompt(sourceName: string, spec: TargetSpec): string 
     }
     prompt += `for ${sourceName}`;
     return prompt;
+}
+
+function buildTargetFilterKind(filter: TargetFilter, isPlural: boolean): string {
+    if (filter.kind === "anyOf") return filter.of.map((f) => buildTargetFilterKind(f, isPlural)).join(" or ");
+    else if (filter.kind === "object") return isPlural ? "objects" : "object";
+    else if (filter.kind === "player") return isPlural ? "players" : "player";
+    else return isPlural ? "spell or ability" : "spell or ability";
 }
 
 export function buildTargetOptions(state: GameState, sourceName: string, legalTargets: readonly Target[]): Choice[] {

@@ -71,8 +71,8 @@ export const nameOfStackEntry = (state: GameState, id: StackId, includeId?: bool
 
 export function describeManaCost(cost: ManaCost | null): string {
   if (cost === null) return "—";
-  const generic = cost.generic > 0 || cost.pips.length === 0 ? `${cost.generic}` : "";
-  return generic + cost.pips.map((p) => `${p}`).join("");
+  const generic = cost.generic > 0 || cost.pips.length === 0 ? `{${cost.generic}}` : "";
+  return generic + cost.pips.map((p) => `{${p}}`).join("");
 }
 
 export function manaCostFromCost(cost: Cost | null): ManaCost | null {
@@ -670,7 +670,7 @@ export function describeAction(state: GameState, a: Action): string {
           if (!chars) return "";
           const cost = describeManaCost(manaCostFromCost(chars.cost));
           const spell = getAbilityForSpell(chars);
-          const text = spell && spell.text !== "" ? spell.text : "";
+          const text = spell ? abilityText(spell, chars.name) : "";
           return cost === "" ? text : cost + (text === "" ? "" : `: ${text}`);
       }
       case "activateAbility":
@@ -838,6 +838,7 @@ export function findProblems(state: GameState): string[] {
   }
 
   const spellSources = new Set(state.stack.filter((e) => e.kind === "spell").map((e) => e.source));
+  if (state.casting?.kind === "spell") spellSources.add(state.casting.card);
   const r = state.resolving;
   if (r?.entry.kind === "spell") spellSources.add(r.entry.source);
   for (const obj of Object.values(state.objects)) {

@@ -27,7 +27,7 @@ function describeAppliedEffect(effect: ModificationInfo): string {
 
 function costComponentDescriptions(cost: Cost | null): string[] {
     if (cost === null) return ["—"];
-    return cost.length > 0 ? cost.map(describeCost) : ["no cost"];
+    return cost.length > 0 ? cost.map(describeCost).map((s) => s.replaceAll(/[{}]/g, "")) : ["no cost"];
 }
 
 export function CostDisplay({ cost, printedCost }: { readonly cost: Cost | null; readonly printedCost: Cost | null }) {

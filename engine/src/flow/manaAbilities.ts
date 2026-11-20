@@ -163,7 +163,7 @@ export function finishManaAbilityResolution(state: GameState, events: readonly G
     if (!next.ok) return next;
 
     if (next.state.casting) {
-        return payManaOptions({ ...next.state, resolvingMana: null, casting: { ...next.state.casting, events: [...next.state.casting.events, event] } });
+        return payManaOptions({ ...next.state, resolvingMana: null, casting: { ...next.state.casting, events: [...next.state.casting.events, event] } }, []);
     }
 
     return grantPriority({ ...next.state, resolvingMana: null, priority: { holder: resolving.player, consecutivePasses: 0 } }, events, resolving.player, 0);
