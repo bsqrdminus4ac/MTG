@@ -2,6 +2,7 @@ import { fail, ok, type ApplyResult } from "../core/result";
 import { withEntry } from "../core/util";
 import type { AbilityRef, ActivatableAbilityInfo } from "../model/abilities";
 import { snapshotObject } from "../model/characteristics";
+import { costHasChoice } from "../model/costs";
 import type { Decision, ResolvedAnswer } from "../model/decisions";
 import { abilityText, type EffectContext } from "../model/effects";
 import type { GameEvent } from "../model/events";
@@ -91,7 +92,9 @@ export function activateManaAbility(state: GameState, player: PlayerId, source: 
     const scope: EvalScope = { controller: player, source: source, bindings: {} };
 
     // Mana abilities don't use the stack (CR 605). We just resolve it immediately.
-    const payResult = payCosts(state, player, sourceSnapshot, ability, calculateFinalCost(state, scope, ability), []);
+    const finalCost = calculateFinalCost(state, scope, ability);
+    if (finalCost.components.some((c) => costHasChoice(c.kind))) return fail("Mana abilities cannot can't currently pay costs that require choices");
+    const payResult = payCosts(state, player, sourceSnapshot, ability, finalCost, []);
     if (!payResult.ok) return fail(payResult.error);
 
     const resolving: ManaResolutionInProgress = {

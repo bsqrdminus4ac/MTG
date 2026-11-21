@@ -23,3 +23,6 @@ export type NonManaCost = Exclude<CostComponent, { kind: "mana" }>;
 export type ResolvedCostComponent = Exclude<CostComponentOf<number>, { kind: "optional" | "mana" }>; // what TotalCost and payCosts see
 export type Cost = readonly CostComponent[];
 export type ResolvedCost = readonly ResolvedCostComponent[];
+export const costHasChoice = (cost: CostComponentOf<any>["kind"]) => {
+    return cost === "discard" || cost === "sacrifice";
+};

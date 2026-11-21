@@ -4,9 +4,11 @@ import {
     ALL_DEFINITIONS,
     arcaneElf,
     bear,
+    bloodIdol,
     bolt,
     cask,
     clockworkScribe,
+    confluence,
     discardLife,
     drake,
     dustyFilter,
@@ -17,16 +19,22 @@ import {
     island,
     infusion,
     llanowar,
+    manaBargain,
+    medallion,
     mountain,
     painfulPeak,
     plains,
+    pitchBolt,
     pyroAdept,
     reclamation,
+    sacOutlet,
     scrapIdol,
     scrapShooter,
     skeins,
     swamp,
+    taxSphere,
     treasureChest,
+    tollBooth,
     visionarySprite,
     wingSplicer,
 } from "@mtg/definitions";
@@ -141,6 +149,50 @@ export function continuousAbilityTestGame(): GameState {
             cards: [forest, swamp, island, mountain, llanowar, bear, infusion, bolt, drake, reclamation, cask, skeins],
             battlefield: [forest, swamp, island, mountain, llanowar, bear],
             hand: [infusion, bolt, drake],
+        },
+    ] as const;
+    let state = createGame(
+        ALL_DEFINITIONS,
+        players.map(({ player, cards }) => ({
+            id: player,
+            deck: cards.map((card) => card.id),
+        })),
+    );
+
+    for (const { player, battlefield, hand } of players) {
+        for (const [cards, zone] of [[battlefield, "battlefield"], [hand, "hand"]] as const) {
+            for (const card of cards) {
+                const cardInLibrary = state.players[player]?.library.find((id) => state.objects[id]?.definitionId === card.id);
+                if (cardInLibrary === undefined) throw new Error(`Missing ${card.name} in ${player}'s library`);
+                const moved = moveObject(state, cardInLibrary, zone);
+                if (!moved) throw new Error(`Unable to move ${card.name} to ${zone}`);
+                state = moved.state;
+            }
+        }
+    }
+
+    state = {
+        ...state,
+        turn: { number: 2, activePlayer: ALICE, step: "precombatMain" },
+        priority: { holder: ALICE, consecutivePasses: 0 },
+    };
+    return withPriorityDecision(state);
+}
+
+/** A two-player scenario for testing spell and activated-ability cost modifications. */
+export function costTestGame(): GameState {
+    const players = [
+        {
+            player: ALICE,
+            cards: [plains, forest, island, confluence, medallion, bloodIdol, tollBooth, sacOutlet, bear, manaBargain, taxSphere, pitchBolt, bear, drake, bolt],
+            battlefield: [plains, forest, island, confluence, medallion, bloodIdol, tollBooth, sacOutlet, bear],
+            hand: [manaBargain, taxSphere, pitchBolt, bear],
+        },
+        {
+            player: BOB,
+            cards: [plains, island, forest, confluence, taxSphere, tollBooth, sacOutlet, bear, manaBargain, medallion, bloodIdol, pitchBolt, bear, drake, bolt],
+            battlefield: [plains, island, forest, confluence, taxSphere, tollBooth, sacOutlet, bear],
+            hand: [manaBargain, medallion, bloodIdol, pitchBolt, bear],
         },
     ] as const;
     let state = createGame(

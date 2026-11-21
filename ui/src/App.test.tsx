@@ -97,6 +97,14 @@ describe("new game", () => {
 
         expect(screen.getByText("New game: continuous ability test scenario")).toBeTruthy();
     });
+
+    test("starts the selected cost test scenario", () => {
+        render(<App />);
+        fireEvent.change(screen.getByLabelText("New game type"), { target: { value: "costs" } });
+        fireEvent.click(screen.getByRole("button", { name: "New game" }));
+
+        expect(screen.getByText("New game: cost test scenario")).toBeTruthy();
+    });
 });
 
 describe("decision submission", () => {

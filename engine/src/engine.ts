@@ -1,7 +1,7 @@
 import { applySequentially, fail, type ApplyResult } from "./core/result";
 import { assertNever } from "./core/util";
 import { activateAbilityForPriority } from "./flow/abilities";
-import { applyAddManaDecision, applyCommitSpellDecision, applyTargetingDecision, beginSpellCast, cancelCast } from "./flow/casting";
+import { applyAddManaDecision, applyCommitSpellDecision, applyCostChoiceDecision, applyOptionalCostDecision, applyTargetingDecision, beginSpellCast, cancelCast } from "./flow/casting";
 import {
     applyAttackSelectionDecision,
     applyAttackTargetDecision,
@@ -148,6 +148,12 @@ function resume(state: GameState, then: Continuation, player: PlayerId, answer: 
         case "selectTriggerTargets":
             if (answer.kind !== "choose") return fail("expected a selection");
             return applyTriggerTargetingDecision(state, answer.chosen);
+        case "chooseOptionalCosts":
+            if (answer.kind !== "yesNo") return fail("exepcted a yes/no decision");
+            return applyOptionalCostDecision(state, then.bindAs, answer.value);
+        case "selectCostChoices":
+            if (answer.kind !== "choose") return fail("expected a selection");
+            return applyCostChoiceDecision(state, then.bindAs, answer.chosen);
         default:
             return assertNever(then); // narrows to never once every continuation kind has a case
     }

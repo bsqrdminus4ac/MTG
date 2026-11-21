@@ -36,6 +36,8 @@ export function beginActivation(state: GameState, player: PlayerId, source: Obje
         targets: [],
         targetSpecsSelected: targetSpecs,
         cost: null,
+        costChoices: [],
+        costChoicesSelected: [],
         bindings: {},
         rollback,
         sourceSnapshot,

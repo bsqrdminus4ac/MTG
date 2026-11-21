@@ -104,6 +104,8 @@ export type Continuation = Readonly<
     | { kind: "resolveManaEffect"; bindAs: string }
     | { kind: "orderTriggers"; player: PlayerId }
     | { kind: "selectTriggerTargets" }
+    | { kind: "chooseOptionalCosts"; bindAs: string }
+    | { kind: "selectCostChoices"; bindAs?: string }
 >;
 
 interface DecisionBase {

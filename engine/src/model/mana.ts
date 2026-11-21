@@ -29,6 +29,7 @@ export const parseCost = (c: string | ManaCost): ManaCost => {
 
     return { generic, pips };
 };
+export const costStr = (c: ManaCost): string => `${c.generic > 0 ? c.generic : ""}${c.pips.join("")}`;
 
 /** Hybrid, Phyrexian, X and snow costs are intentionally left out for now. */
 export interface ManaCost {

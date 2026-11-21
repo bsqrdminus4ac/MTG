@@ -2,6 +2,7 @@ import type { TotalCost } from "../rules/costs";
 import type { AbilityOfKind } from "./abilities";
 import type { CardDefinition, Characteristics } from "./cardDefinition";
 import type { ContinuousEffect } from "./continuous";
+import type { CostComponent } from "./costs";
 import type { ChoiceValue, Decision } from "./decisions";
 import type { Effect } from "./effects";
 import type { GameEvent } from "./events";
@@ -128,8 +129,11 @@ interface CastProgress {
     card: ObjectId; // Moved to the stack as the spell cast starts
     targets: readonly (readonly Target[])[];
     targetSpecsSelected: readonly boolean[];
+    optionalCostChoices?: readonly Extract<CostComponent, { kind: "optional" }>[];
     cost: TotalCost | null; // total cost, determined after targets
     bindings: Bindings;
+    costChoices: readonly (readonly ObjectId[])[];
+    costChoicesSelected: boolean[];
     rollback: GameState; // state before casting began
     events: readonly GameEvent[]; // buffered until commit
 }

@@ -1,9 +1,10 @@
 import { describe, expect, test } from "vitest";
 import { applyAction, submitAnswer } from "../../src/engine";
+import { safePicks, type Demand } from "../../src/flow/castability";
 import { priorityOptions } from "../../src/flow/priority";
 import type { AbilityOfKind, AbilityRef } from "../../src/model/abilities";
 import type { CardDefinition } from "../../src/model/cardDefinition";
-import { cardDefId, playerId, type ObjectId, type StackId } from "../../src/model/ids";
+import { cardDefId, nextID, playerId, type ObjectId, type StackId } from "../../src/model/ids";
 import { refKey } from "../../src/model/layers";
 import type { GameState } from "../../src/model/state";
 import { createGame } from "../../src/setup";
@@ -114,6 +115,25 @@ const instant: CardDefinition = {
     id: cardDefId("castability-instant"),
     name: "Test Instant",
     abilities: [{ kind: "spell", targets: [], effects: [], text: "" }],
+};
+
+const mixedCostSpell: CardDefinition = {
+    ...instant,
+    id: cardDefId("castability-mixed-cost-spell"),
+    name: "Mixed Cost Spell",
+    cost: [
+        { kind: "mana", cost: freeCost },
+        { kind: "discard", amount: 1 },
+        { kind: "sacrifice", amount: 1, what: { kind: "hasType", type: "Creature" } },
+        { kind: "sacrifice", amount: 1, what: { kind: "hasType", type: "Artifact" } },
+    ],
+};
+
+const artifactCreature: CardDefinition = {
+    ...creature,
+    id: cardDefId("castability-artifact-creature"),
+    name: "Artifact Creature",
+    types: ["Artifact", "Creature"],
 };
 
 const stackSpell: CardDefinition = {
@@ -341,7 +361,68 @@ function offersActivation(state: GameState, source: ObjectId, abilityRef: Abilit
     );
 }
 
+function canAssignDemands(demands: readonly Demand[], demandIndex = 0, remaining = demands[0]?.count ?? 0, used = new Set<ObjectId>()): boolean {
+    if (demandIndex === demands.length) return true;
+    const demand = demands[demandIndex];
+    if (!demand) return false;
+    if (remaining === 0) {
+        const nextDemand = demands[demandIndex + 1];
+        return canAssignDemands(demands, demandIndex + 1, nextDemand?.count ?? 0, used);
+    }
+
+    for (const candidate of demand.candidates) {
+        if (used.has(candidate)) continue;
+        const nextUsed = new Set(used);
+        nextUsed.add(candidate);
+        if (canAssignDemands(demands, demandIndex, remaining - 1, nextUsed)) return true;
+    }
+    return false;
+}
+
 describe("castability and activatability options", () => {
+    test("safe picks match exhaustive assignment for overlapping demands", () => {
+        let state = game([], [creature]);
+        const objects: ObjectId[] = [];
+        for (let i = 0; i < 4; i++) {
+            const [nextState, id] = nextID<ObjectId>(state);
+            state = nextState;
+            objects.push(id);
+        }
+
+        const countPatterns = [
+            [1, 1, 1],
+            [2, 1, 1],
+            [1, 2, 1],
+            [1, 1, 2],
+        ];
+        for (const counts of countPatterns) {
+            for (let mask = 0; mask < 1 << (3 * objects.length); mask++) {
+                const demands = counts.map((count, component): Demand => ({
+                    component,
+                    count,
+                    candidates: new Set(objects.filter((_, objectIndex) => mask & (1 << (component * objects.length + objectIndex)))),
+                }));
+
+                for (let component = 0; component < demands.length; component++) {
+                    const target = demands[component];
+                    if (!target) throw new Error("Missing demand under test");
+                    const expected = [...target.candidates].filter((pick) => {
+                        const remaining = demands
+                            .map((demand) => ({
+                                ...demand,
+                                candidates: new Set([...demand.candidates].filter((candidate) => candidate !== pick)),
+                                count: demand.count - (demand.component === component ? 1 : 0),
+                            }))
+                            .filter((demand) => demand.count > 0);
+                        return canAssignDemands(remaining);
+                    });
+
+                    expect(safePicks(demands, component).sort(), `mask ${mask}, counts ${counts}, component ${component}`).toEqual(expected.sort());
+                }
+            }
+        }
+    });
+
     test("offers a creature-only spell only when a creature is on the battlefield", () => {
         const inHand = moveDefinition(game([creature, creatureOnlySpell], [creatureOnlySpell, creature]), alice, creatureOnlySpell, "hand");
         const state = atPrecombatMain(inHand.state);
@@ -386,6 +467,47 @@ describe("castability and activatability options", () => {
 
         expect(offersCast(atPrecombatMain(abilitySource.state), spell.newId)).toBe(false);
         expect(offersActivation(abilitySource.state, abilitySource.newId, { kind: "printed", index: 0 })).toBe(false);
+    });
+
+    test("offers only picks that preserve mixed discard and sacrifice costs", () => {
+        let state = game(
+            [mixedCostSpell, artifactCreature, creature, instant],
+            [mixedCostSpell, artifactCreature, creature, instant],
+        );
+        const spell = moveDefinition(state, alice, mixedCostSpell, "hand");
+        state = spell.state;
+        const artifactCreatureOnBattlefield = moveDefinition(state, alice, artifactCreature, "battlefield");
+        state = artifactCreatureOnBattlefield.state;
+        const creatureOnBattlefield = moveDefinition(state, alice, creature, "battlefield");
+        state = creatureOnBattlefield.state;
+        const cardToDiscard = moveDefinition(state, alice, instant, "hand");
+        state = atPrecombatMain(cardToDiscard.state);
+
+        const started = applyAction(state, { type: "castSpell", player: alice, card: spell.newId });
+        if (!started.ok || started.state.pending?.kind !== "choose") throw new Error("Expected a discard decision");
+        expect(started.state.pending.options.map((option) => option.value)).toEqual([{ kind: "object", id: cardToDiscard.newId }]);
+
+        const selectedDiscard = submitAnswer(started.state, {
+            player: alice,
+            decision: started.state.pending.id,
+            answer: { kind: "choose", selected: [`object:${cardToDiscard.newId}`] },
+        });
+        if (!selectedDiscard.ok || selectedDiscard.state.pending?.kind !== "choose") throw new Error("Expected a creature sacrifice decision");
+        expect(selectedDiscard.state.pending.options.map((option) => option.value)).toContainEqual({ kind: "object", id: creatureOnBattlefield.newId });
+        expect(selectedDiscard.state.pending.options.map((option) => option.value)).not.toContainEqual({
+            kind: "object",
+            id: artifactCreatureOnBattlefield.newId,
+        });
+
+        const selectedCreature = submitAnswer(selectedDiscard.state, {
+            player: alice,
+            decision: selectedDiscard.state.pending.id,
+            answer: { kind: "choose", selected: [`object:${creatureOnBattlefield.newId}`] },
+        });
+        if (!selectedCreature.ok || selectedCreature.state.pending?.kind !== "choose") throw new Error("Expected an artifact sacrifice decision");
+        expect(selectedCreature.state.pending.options.map((option) => option.value)).toEqual([
+            { kind: "object", id: artifactCreatureOnBattlefield.newId },
+        ]);
     });
 
     test("offers spells and activated abilities made affordable by cost-reduction abilities", () => {

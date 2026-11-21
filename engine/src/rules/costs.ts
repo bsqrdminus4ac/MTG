@@ -19,8 +19,12 @@ export type TotalCost = Readonly<{
     changes: readonly { source: ObjectId; sourceName: string }[]; // which effects altered it
 }>;
 
+export function getAbilityCost(state: GameState, source: ObjectId, ability: AbilityOfKind<"spell" | "activated">): Cost | null {
+    return ability.kind === "spell" ? (getCharacteristics(state, source)?.cost ?? null) : ability.cost;
+}
+
 export function calculateFinalCost(state: GameState, scope: EvalScope, ability: AbilityOfKind<"spell" | "activated">): TotalCost {
-    const allCosts = ability.kind === "spell" ? getCharacteristics(state, scope.source)?.cost : ability.cost;
+    const allCosts = getAbilityCost(state, scope.source, ability);
     if (!allCosts) return { mana: null, components: [], changes: [] };
     const flattenedCosts = resolveOptionals(state, scope, allCosts);
 
@@ -55,35 +59,10 @@ function resolveCost(state: GameState, scope: EvalScope, cost: Exclude<CostCompo
     return cost;
 }
 
-export function couldPayCost(state: GameState, scope: EvalScope, cost: ResolvedCostComponent): boolean {
-    switch (cost.kind) {
-        case "payLife":
-            return (state.players[scope.controller]?.life ?? 0) > cost.amount;
-        case "tapSelf": {
-            const obj = state.objects[scope.source];
-            if (!obj) return false;
-            return obj.zone === "battlefield" && !obj.tapped;
-        }
-        case "sacrificeSelf": {
-            const obj = state.objects[scope.source];
-            if (!obj) return false;
-            return obj.zone === "battlefield";
-        }
-        case "sacrifice":
-            return getLegalSacrificeChoices(state, scope, true, cost.what).length >= cost.amount;
-
-        case "discard":
-            return getLegalDiscardChoices(state, scope, cost.what).length >= cost.amount;
-        default:
-            assertNever(cost);
-    }
-}
-
-export function getLegalSacrificeChoices(state: GameState, scope: EvalScope, allowSource: boolean, filter?: ObjectPredicate | undefined): readonly ObjectId[] {
-    const excludeSource: ObjectPredicate[] = allowSource ? [] : [{ kind: "not", of: { kind: "isSource" } }];
+export function getLegalSacrificeChoices(state: GameState, scope: EvalScope, filter?: ObjectPredicate | undefined): readonly ObjectId[] {
     const check: ObjectPredicate = {
         kind: "all",
-        of: [{ kind: "inZone", zone: "battlefield" }, { kind: "controlledBy", who: "you" }, ...excludeSource, ...(filter ? [filter] : [])],
+        of: [{ kind: "inZone", zone: "battlefield" }, { kind: "controlledBy", who: "you" }, ...(filter ? [filter] : [])],
     }; // Include battlefield check in case card writer didn't - only permanents on battlefield you control can be sacrificed
     const legalChoices: ObjectId[] = [];
     for (const objId of state.battlefield) {
@@ -107,7 +86,14 @@ export function getLegalDiscardChoices(state: GameState, scope: EvalScope, filte
     return legalChoices;
 }
 
-export function payCosts(state: GameState, player: PlayerId, sourceSnapshot: ObjectSnapshot, ability: AbilityOfKind<"spell" | "activated">, cost: TotalCost, costChoices: ObjectId[][]): ApplyResult {
+export function payCosts(
+    state: GameState,
+    player: PlayerId,
+    sourceSnapshot: ObjectSnapshot,
+    ability: AbilityOfKind<"spell" | "activated">,
+    cost: TotalCost,
+    costChoices: readonly (readonly ObjectId[])[],
+): ApplyResult {
     let steps: ((state: GameState) => ApplyResult)[] = [];
     if (cost.mana) {
         const currentCost = cost.mana;
